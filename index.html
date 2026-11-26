@@ -141,7 +141,7 @@
     const COLOR_MZY  = '#F90092';
     const COLOR_LC   = '#32B5E1';
 
-    // 备用公共 RSSHub 镜像列表（主节点被限流时自动轮询切换）
+    // 备用公共 RSSHub 镜像列表（仅用于弹窗手动新增自定义源时的兜底抓取）
     const RSSHUB_MIRRORS = [
       'https://rsshub.app',
       'https://rsshub.rssforever.com',
@@ -215,7 +215,6 @@
     ];
 
     const STORAGE_ARTISTS_KEY = 'onerland_custom_artists_v3';
-    const CACHE_POSTS_KEY = 'onerland_posts_cache_v5';
 
     let artistsConfig = loadArtistsConfig();
     let activeArtistId = 'ALL';
@@ -238,92 +237,36 @@
       localStorage.setItem(STORAGE_ARTISTS_KEY, JSON.stringify(artistsConfig));
     }
 
-    // ================= 3. 多镜像节点 + 多跨域代理自动重试抓取 =================
-       async function loadAllFeeds(force = false) {
-      document.getElementById('timeline-list').innerHTML = `<div class="text-center py-10 text-sm text-slate-400">正在加载最新聚合动态...</div>`;
-      let serverPosts = [];
-      let failedSources = [];
-
-      // 1. 优先秒读 GitHub Actions 后台抓取并生成的 feeds_data.json
-      try {
-        const res = await fetch('./feeds_data.json?t=' + Date.now());
-        if (res.ok) {
-          const payload = await res.json();
-          serverPosts = payload.posts || [];
-          failedSources = payload.failedSources || [];
-          if (payload.updatedAt) {
-            document.getElementById('last-sync').textContent = '后台同步于 · ' + new Date(payload.updatedAt).toLocaleTimeString();
-          }
-        }
-      } catch (e) {
-        console.warn('读取 feeds_data.json 失败，尝试前端直连抓取');
-      }
-
-      // 2. 找出用户在弹窗里额外新增的自定义账号（不在默认配置里的）
-      const defaultIds = new Set();
-      DEFAULT_ARTISTS.forEach(a => a.accounts.forEach(acc => defaultIds.add(acc.id)));
-
-      const customTasks = [];
-      artistsConfig.forEach(artist => {
-        artist.accounts.forEach(acc => {
-          if (!defaultIds.has(acc.id) || serverPosts.length === 0) {
-            customTasks.push(
-              (async () => {
-                const nodes = await fetchXmlWithFallback(acc.url);
-                if (nodes.length === 0) {
-                  if (!failedSources.includes(`${artist.artistName}-${acc.name}`)) {
-                    failedSources.push(`${artist.artistName}-${acc.name}`);
-                  }
-                  return;
-                }
-                nodes.forEach(node => {
-                  const title = node.querySelector('title')?.textContent || '';
-                  const desc = node.querySelector('description')?.textContent || node.querySelector('content')?.textContent || '';
-                  const pubDate = node.querySelector('pubDate')?.textContent || node.querySelector('published')?.textContent || node.querySelector('updated')?.textContent || '';
-                  const link = node.querySelector('link')?.textContent || node.querySelector('link')?.getAttribute('href') || '#';
-                  const tmpDiv = document.createElement('div');
-                  tmpDiv.innerHTML = desc;
-                  const imgs = [...tmpDiv.querySelectorAll('img')].map(img => img.src).filter(Boolean);
-                  const plainText = (tmpDiv.textContent || title).trim();
-                  const timestamp = pubDate ? new Date(pubDate).getTime() : Date.now();
-
-                  serverPosts.push({
-                    artistId: artist.artistId,
-                    artistName: artist.artistName,
-                    accountId: acc.id,
-                    platformName: acc.name,
-                    platformColor: acc.color,
-                    text: plainText,
-                    imgs,
-                    link,
-                    timestamp: isNaN(timestamp) ? 0 : timestamp
-                  });
-                });
-              })()
-            );
-          }
+    // ================= 3. 多镜像节点兜底抓取（用于弹窗自定义新增源） =================
+    async function fetchXmlWithFallback(rawUrl) {
+      const candidateUrls = [rawUrl];
+      if (rawUrl.includes('rsshub.app')) {
+        RSSHUB_MIRRORS.slice(1).forEach(mirror => {
+          candidateUrls.push(rawUrl.replace('https://rsshub.app', mirror));
         });
-      });
-
-      if (customTasks.length > 0) {
-        await Promise.all(customTasks);
       }
 
-      // 过滤掉用户在弹窗里已删除的艺人/账号
-      const activeAccountIds = new Set();
-      artistsConfig.forEach(a => a.accounts.forEach(acc => activeAccountIds.add(acc.id)));
-      allPosts = serverPosts.filter(p => activeAccountIds.has(p.accountId));
-      allPosts.sort((a, b) => b.timestamp - a.timestamp);
+      for (const targetUrl of candidateUrls) {
+        try {
+          const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 12000);
+          const res = await fetch(proxyUrl, { signal: controller.signal });
+          clearTimeout(timer);
+          if (!res.ok) continue;
 
-      const statusBar = document.getElementById('feed-status-bar');
-      if (failedSources.length > 0) {
-        statusBar.classList.remove('hidden');
-        statusBar.textContent = `⚠️ 部分源因平台反爬限制暂未返回数据（${failedSources.length} 个）：${failedSources.join('、')}。`;
-      } else {
-        statusBar.classList.add('hidden');
+          const data = await res.json();
+          if (!data.contents || data.contents.includes('RouteNotFound') || data.contents.includes('403 Forbidden') || data.contents.includes('Error 1015')) {
+            continue;
+          }
+          const doc = new DOMParser().parseFromString(data.contents, 'text/xml');
+          if (doc.querySelector('parsererror')) continue;
+
+          const nodes = [...doc.querySelectorAll('item'), ...doc.querySelectorAll('entry')];
+          if (nodes.length > 0) return nodes;
+        } catch (e) {}
       }
-
-      initUI();
+      return [];
     }
 
     // ================= 4. 弹窗增删管理逻辑 =================
@@ -518,72 +461,87 @@
       });
     }
 
-    // ================= 6. 动态抓取与双层筛选渲染 =================
+    // ================= 6. 核心加载函数：优先秒读后台生成的 feeds_data.json =================
     async function loadAllFeeds(force = false) {
-      const cached = localStorage.getItem(CACHE_POSTS_KEY);
-      if (!force && cached) {
-        const parsed = JSON.parse(cached);
-        if (Date.now() - parsed.ts < 5 * 60 * 1000 && parsed.data.length > 0) {
-          allPosts = parsed.data;
-          document.getElementById('last-sync').textContent = '已加载缓存 · ' + new Date(parsed.ts).toLocaleTimeString();
-          initUI();
-          return;
+      document.getElementById('timeline-list').innerHTML = `<div class="text-center py-10 text-sm text-slate-400">正在加载最新聚合动态...</div>`;
+      let serverPosts = [];
+      let failedSources = [];
+
+      // 1. 优先秒读 GitHub Actions 后台抓取并生成的 feeds_data.json
+      try {
+        const res = await fetch('./feeds_data.json?t=' + Date.now());
+        if (res.ok) {
+          const payload = await res.json();
+          serverPosts = payload.posts || [];
+          failedSources = payload.failedSources || [];
+          if (payload.updatedAt) {
+            document.getElementById('last-sync').textContent = '后台同步于 · ' + new Date(payload.updatedAt).toLocaleTimeString();
+          }
         }
+      } catch (e) {
+        console.warn('读取 feeds_data.json 失败，尝试前端直连抓取');
       }
 
-      document.getElementById('timeline-list').innerHTML = `<div class="text-center py-10 text-sm text-slate-400">正在多节点轮询抓取全平台动态（首次加载需 5-15 秒）...</div>`;
-      const results = [];
-      const failedSources = [];
+      // 2. 找出用户在弹窗里额外新增的自定义账号（不在默认配置里的）
+      const defaultIds = new Set();
+      DEFAULT_ARTISTS.forEach(a => a.accounts.forEach(acc => defaultIds.add(acc.id)));
 
-      const tasks = [];
+      const customTasks = [];
       artistsConfig.forEach(artist => {
         artist.accounts.forEach(acc => {
-          tasks.push(
-            (async () => {
-              const nodes = await fetchXmlWithFallback(acc.url);
-              if (nodes.length === 0) {
-                failedSources.push(`${artist.artistName}-${acc.name}`);
-                return;
-              }
-              nodes.forEach(node => {
-                const title = node.querySelector('title')?.textContent || '';
-                const desc = node.querySelector('description')?.textContent || node.querySelector('content')?.textContent || '';
-                const pubDate = node.querySelector('pubDate')?.textContent || node.querySelector('published')?.textContent || node.querySelector('updated')?.textContent || '';
-                const link = node.querySelector('link')?.textContent || node.querySelector('link')?.getAttribute('href') || '#';
+          if (!defaultIds.has(acc.id) || serverPosts.length === 0) {
+            customTasks.push(
+              (async () => {
+                const nodes = await fetchXmlWithFallback(acc.url);
+                if (nodes.length === 0) {
+                  if (!failedSources.includes(`${artist.artistName}-${acc.name}`)) {
+                    failedSources.push(`${artist.artistName}-${acc.name}`);
+                  }
+                  return;
+                }
+                nodes.forEach(node => {
+                  const title = node.querySelector('title')?.textContent || '';
+                  const desc = node.querySelector('description')?.textContent || node.querySelector('content')?.textContent || '';
+                  const pubDate = node.querySelector('pubDate')?.textContent || node.querySelector('published')?.textContent || node.querySelector('updated')?.textContent || '';
+                  const link = node.querySelector('link')?.textContent || node.querySelector('link')?.getAttribute('href') || '#';
+                  const tmpDiv = document.createElement('div');
+                  tmpDiv.innerHTML = desc;
+                  const imgs = [...tmpDiv.querySelectorAll('img')].map(img => img.src).filter(Boolean);
+                  const plainText = (tmpDiv.textContent || title).trim();
+                  const timestamp = pubDate ? new Date(pubDate).getTime() : Date.now();
 
-                const tmpDiv = document.createElement('div');
-                tmpDiv.innerHTML = desc;
-                const imgs = [...tmpDiv.querySelectorAll('img')].map(img => img.src).filter(Boolean);
-                const plainText = (tmpDiv.textContent || title).trim();
-                const timestamp = pubDate ? new Date(pubDate).getTime() : Date.now();
-
-                results.push({
-                  artistId: artist.artistId,
-                  artistName: artist.artistName,
-                  accountId: acc.id,
-                  platformName: acc.name,
-                  platformColor: acc.color,
-                  text: plainText,
-                  imgs,
-                  link,
-                  timestamp: isNaN(timestamp) ? 0 : timestamp
+                  serverPosts.push({
+                    artistId: artist.artistId,
+                    artistName: artist.artistName,
+                    accountId: acc.id,
+                    platformName: acc.name,
+                    platformColor: acc.color,
+                    text: plainText,
+                    imgs,
+                    link,
+                    timestamp: isNaN(timestamp) ? 0 : timestamp
+                  });
                 });
-              });
-            })()
-          );
+              })()
+            );
+          }
         });
       });
 
-      await Promise.all(tasks);
-      results.sort((a, b) => b.timestamp - a.timestamp);
-      allPosts = results;
-      localStorage.setItem(CACHE_POSTS_KEY, JSON.stringify({ ts: Date.now(), data: allPosts }));
-      document.getElementById('last-sync').textContent = '刚刚更新 · ' + new Date().toLocaleTimeString();
+      if (customTasks.length > 0) {
+        await Promise.all(customTasks);
+      }
+
+      // 过滤掉用户在弹窗里已删除的艺人/账号
+      const activeAccountIds = new Set();
+      artistsConfig.forEach(a => a.accounts.forEach(acc => activeAccountIds.add(acc.id)));
+      allPosts = serverPosts.filter(p => activeAccountIds.has(p.accountId));
+      allPosts.sort((a, b) => b.timestamp - a.timestamp);
 
       const statusBar = document.getElementById('feed-status-bar');
       if (failedSources.length > 0) {
         statusBar.classList.remove('hidden');
-        statusBar.textContent = `⚠️ 部分源因平台反爬限制暂未返回数据（${failedSources.length} 个）：${failedSources.join('、')}。微博/B站/YouTube 等可用源已正常显示。`;
+        statusBar.textContent = `⚠️ 部分源因平台反爬限制暂未返回数据（${failedSources.length} 个）：${failedSources.join('、')}。`;
       } else {
         statusBar.classList.add('hidden');
       }
