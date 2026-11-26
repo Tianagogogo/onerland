@@ -55,11 +55,11 @@
         <button onclick="lockAdminMode()" class="text-xs text-slate-400 hover:text-rose-500">退出管理模式</button>
       </div>
 
-      <textarea id="raw-post-input" rows="3" placeholder="直接粘贴微博 / 小红书 / 抖音 / B站分享口令或官宣全文（自动抓取标题、正文摘要、封面图、原帖链接及开票时间）..."
+      <textarea id="raw-post-input" rows="3" placeholder="直接粘贴微博 / 小红书 / 抖音 / B站分享口令或官宣全文（自动识别艺人、平台、链接及原帖时间，5秒内自动完成读取）..."
         class="w-full text-xs sm:text-sm p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:border-indigo-500"></textarea>
 
       <div class="flex items-center gap-2 flex-wrap">
-        <button onclick="smartParsePost()" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition">
+        <button id="smart-parse-btn" onclick="smartParsePost()" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition">
           🪄 智能识别内容
         </button>
         <button onclick="document.getElementById('raw-post-input').value=''; document.getElementById('parse-confirm-box').classList.add('hidden');" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs">
@@ -98,11 +98,11 @@
             <label id="cp-content-label" class="text-slate-400 block mb-1">完整博文正文 / 演出详情（支持多行）</label>
             <textarea id="cp-content" rows="4" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 leading-relaxed"></textarea>
           </div>
-          <div id="cp-time-wrap" class="hidden">
-            <label class="text-amber-600 dark:text-amber-400 font-semibold block mb-1">开票准确时间（必填）</label>
+          <div>
+            <label id="cp-time-label" class="text-indigo-600 dark:text-indigo-400 font-semibold block mb-1">原帖实际发布时间（可修改）</label>
             <input id="cp-time" type="datetime-local" class="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950" />
           </div>
-          <div id="cp-url-wrap" class="sm:col-span-2">
+          <div>
             <label class="text-slate-400 block mb-1">直达原帖 / 购票链接</label>
             <input id="cp-url" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950" />
           </div>
@@ -202,7 +202,7 @@
   </div>
 
   <script>
-    // ================= 0. 已校准的 Supabase 云端同步配置 =================
+    // ================= 0. Supabase 云端同步配置 =================
     const SUPABASE_URL = 'https://xtgkepaqikpzvmpkoxsa.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0Z2tlcGFxaWtwenZtcGtveHNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU2NzU1MDgsImV4cCI6MjExMTI1MTUwOH0.dsY0P3S-alER-Dg9U_sdAvGR5aw90lrShn2vSLpm_4g';
     const ADMIN_PIN = '1208';
@@ -352,11 +352,17 @@
       localStorage.setItem(STORAGE_ARTISTS_KEY, JSON.stringify(artistsConfig));
     }
 
-    // ================= 3. 智能解析粘贴内容 + 自动拉取原帖标题与封面图 =================
+    function getLocalDatetimeString(dateObj = new Date()) {
+      const pad = n => String(n).padStart(2, '0');
+      return `${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())}T${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}`;
+    }
+
+    // ================= 3. 智能解析粘贴内容（5 秒超时保护 + 原帖时间识别） =================
     async function smartParsePost() {
       const text = document.getElementById('raw-post-input').value.trim();
       if (!text) return alert('请先粘贴分享链接或动态文案！');
 
+      const parseBtn = document.getElementById('smart-parse-btn');
       const urlMatch = text.match(/https?:\/\/[^\s\u4e00-\u9fa5]+/);
       const url = urlMatch ? urlMatch[0] : '';
 
@@ -387,7 +393,7 @@
       const currentYear = new Date().getFullYear();
       const dateRegex = /(?:(\d{4})[年\.\-\/])?(\d{1,2})[月\.\-\/](\d{1,2})[日号]?\s*(?:周[一二三四五六日天]|星期[一二三四五六日天])?\s*(?:上午|中午|下午|晚上)?\s*(\d{1,2})[:：点时](\d{1,2})?/;
       const m = text.match(dateRegex);
-      let targetDateStr = '';
+      let targetDateStr = isTicket ? '' : getLocalDatetimeString();
       if (m) {
         const year = m[1] || currentYear;
         const month = m[2].padStart(2, '0');
@@ -400,7 +406,7 @@
 
       document.getElementById('cp-artist').value = artist;
       document.getElementById('cp-platform').value = platform;
-      document.getElementById('cp-content').value = cleanText || '正在自动读取原帖标题与正文...';
+      document.getElementById('cp-content').value = cleanText || '正在读取原帖信息（最多 5 秒）...';
       document.getElementById('cp-time').value = targetDateStr;
       document.getElementById('cp-url').value = url;
       document.getElementById('cp-img').value = '';
@@ -409,50 +415,78 @@
       document.getElementById('parse-confirm-box').classList.remove('hidden');
 
       if (url) {
+        parseBtn.disabled = true;
+        parseBtn.textContent = '⏳ 识别中...';
         try {
-          const metaRes = await fetch(`https://api.microlink.io?url=${encodeURIComponent(url)}`);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+          const metaRes = await fetch(`https://api.microlink.io?url=${encodeURIComponent(url)}`, {
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+
+          let filled = false;
           if (metaRes.ok) {
             const metaJson = await metaRes.json();
             const d = metaJson.data || {};
             const fetchedTitle = (d.title || '').trim();
             const fetchedDesc = (d.description || '').trim();
             const fetchedImg = d.image?.url || '';
+            const fetchedDate = d.date ? new Date(d.date) : null;
 
-            const combined = [fetchedTitle, fetchedDesc]
-              .filter(Boolean)
-              .filter((v, i, arr) => arr.indexOf(v) === i)
-              .join('\n');
+            const isBlockedPage = /微博-随时随地|Sina Visitor System|安全验证|小红书 - 你的生活指南|抖音-记录美好生活/.test(fetchedTitle);
 
-            if (!cleanText && combined) {
-              document.getElementById('cp-content').value = combined;
-            } else if (cleanText && fetchedDesc && fetchedDesc.length > cleanText.length) {
-              document.getElementById('cp-content').value = fetchedDesc;
-            } else if (!cleanText) {
-              document.getElementById('cp-content').value = `${artist} 的 ${platform} 动态（可直接粘贴具体博文替换此处）`;
+            if (!isBlockedPage) {
+              const combined = [fetchedTitle, fetchedDesc]
+                .filter(Boolean)
+                .filter((v, i, arr) => arr.indexOf(v) === i)
+                .join('\n');
+
+              if (!cleanText && combined) {
+                document.getElementById('cp-content').value = combined;
+                filled = true;
+              } else if (cleanText && fetchedDesc && fetchedDesc.length > cleanText.length) {
+                document.getElementById('cp-content').value = fetchedDesc;
+                filled = true;
+              }
             }
 
-            if (fetchedImg) {
+            if (fetchedImg && !isBlockedPage) {
               document.getElementById('cp-img').value = fetchedImg;
             }
+
+            if (!isTicket && !m && fetchedDate && !isNaN(fetchedDate.getTime())) {
+              document.getElementById('cp-time').value = getLocalDatetimeString(fetchedDate);
+            }
+          }
+
+          if (!filled && !cleanText) {
+            document.getElementById('cp-content').value = `${artist} 的 ${platform} 动态（平台限制自动读取，请直接在此粘贴博文正文）`;
           }
         } catch (e) {
           if (!cleanText) {
-            document.getElementById('cp-content').value = `${artist} 的 ${platform} 动态（可直接粘贴具体博文替换此处）`;
+            document.getElementById('cp-content').value = `${artist} 的 ${platform} 动态（读取超时，请直接在此粘贴博文正文）`;
           }
+        } finally {
+          parseBtn.disabled = false;
+          parseBtn.textContent = '🪄 智能识别内容';
         }
       }
     }
 
     function toggleCloudFields() {
       const type = document.querySelector('input[name="cloudEntryType"]:checked').value;
-      const timeWrap = document.getElementById('cp-time-wrap');
-      const urlWrap = document.getElementById('cp-url-wrap');
+      const timeLabel = document.getElementById('cp-time-label');
       if (type === 'ticket') {
-        timeWrap.classList.remove('hidden');
-        urlWrap.classList.remove('sm:col-span-2');
+        timeLabel.textContent = '开票准确时间（必填）';
+        timeLabel.className = 'text-amber-600 dark:text-amber-400 font-semibold block mb-1';
       } else {
-        timeWrap.classList.add('hidden');
-        urlWrap.classList.add('sm:col-span-2');
+        timeLabel.textContent = '原帖实际发布时间（可修改）';
+        timeLabel.className = 'text-indigo-600 dark:text-indigo-400 font-semibold block mb-1';
+        if (!document.getElementById('cp-time').value) {
+          document.getElementById('cp-time').value = getLocalDatetimeString();
+        }
       }
     }
 
@@ -463,10 +497,10 @@
       const content = document.getElementById('cp-content').value.trim();
       const url = document.getElementById('cp-url').value.trim();
       const imgUrl = document.getElementById('cp-img').value.trim();
-      const ticket_time = document.getElementById('cp-time').value;
+      const customTimeVal = document.getElementById('cp-time').value;
 
       if (!content) return alert('请填写博文正文或演出名称！');
-      if (type === 'ticket' && !ticket_time) return alert('开票倒计时必须填写准确开票时间！');
+      if (type === 'ticket' && !customTimeVal) return alert('开票倒计时必须填写准确开票时间！');
 
       const btn = document.getElementById('cp-submit-btn');
       btn.disabled = true;
@@ -474,9 +508,17 @@
 
       try {
         const endpoint = type === 'ticket' ? 'tickets' : 'feeds';
-        const storedContent = imgUrl ? `${content}\n[IMG:${imgUrl}]` : content;
+        let storedContent = content;
+        if (imgUrl) storedContent += `\n[IMG:${imgUrl}]`;
+        if (customTimeVal) {
+          const pubTs = new Date(customTimeVal).getTime();
+          if (!isNaN(pubTs)) {
+            storedContent += `\n[PUB:${pubTs}]`;
+          }
+        }
+
         const payload = type === 'ticket'
-          ? { title: `${artist}|${content}`, ticket_time, platform, url }
+          ? { title: `${artist}|${content}`, ticket_time: customTimeVal, platform, url }
           : { platform, artist, content: storedContent, url };
 
         const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
@@ -751,7 +793,7 @@
       });
     }
 
-    // ================= 6. 核心加载函数 =================
+    // ================= 6. 核心加载函数（按原帖实际发布时间排序与显示） =================
     async function loadAllFeeds(force = false) {
       document.getElementById('timeline-list').innerHTML = `<div class="text-center py-10 text-sm text-slate-400">正在同步最新聚合动态...</div>`;
       let serverPosts = [];
@@ -765,8 +807,15 @@
             const meta = ARTIST_META_MAP[r.artist] || { artistId: 'oner', color: COLOR_ONER };
             const matchedArtistObj = artistsConfig.find(a => a.artistName === r.artist);
             const matchedAcc = matchedArtistObj?.accounts.find(acc => acc.name === r.platform);
-            const imgMatch = (r.content || '').match(/\[IMG:(https?:\/\/[^\]]+)\]/);
-            const cleanBody = (r.content || '').replace(/\n?\[IMG:https?:\/\/[^\]]+\]/g, '').trim();
+            const rawContent = r.content || '';
+            const imgMatch = rawContent.match(/\[IMG:(https?:\/\/[^\]]+)\]/);
+            const pubMatch = rawContent.match(/\[PUB:(\d+)\]/);
+            const cleanBody = rawContent
+              .replace(/\n?\[IMG:https?:\/\/[^\]]+\]/g, '')
+              .replace(/\n?\[PUB:\d+\]/g, '')
+              .trim();
+            const realTimestamp = pubMatch ? Number(pubMatch[1]) : new Date(r.created_at).getTime();
+
             return {
               cloudId: r.id,
               artistId: matchedArtistObj?.artistId || meta.artistId,
@@ -777,7 +826,7 @@
               text: cleanBody,
               imgs: imgMatch ? [imgMatch[1]] : [],
               link: r.url || '#',
-              timestamp: new Date(r.created_at).getTime()
+              timestamp: realTimestamp
             };
           });
           serverPosts.push(...cloudFeeds);
@@ -936,6 +985,7 @@
 
     function formatTimeAgo(ts) {
       const diff = Math.floor((Date.now() - ts) / 1000);
+      if (diff < 0) return '即将发布';
       if (diff < 60) return '刚刚';
       if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
       if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
