@@ -326,6 +326,8 @@ function openLightbox(src, caption = '') {
   const img = document.getElementById('lightbox-img');
   const cap = document.getElementById('lightbox-caption');
   if (!box || !img) return;
+  document.body.appendChild(box);
+  box.style.zIndex = '9999';
   img.src = src;
   if (cap) cap.textContent = caption;
   box.classList.remove('hidden');
