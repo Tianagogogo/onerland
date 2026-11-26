@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ONERLAND · 时光典藏与观演实用工具站</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <link rel="stylesheet" href="./css/theme.css" />
 </head>
 <body class="text-slate-800 min-h-screen antialiased selection:bg-slate-300 selection:text-slate-950">
 
-  <!-- 顶部导航栏（桌面端展示 4 项切换，移动端自动收起到顶部标题 + 底部 4 项导航） -->
+  <!-- 顶部导航栏 -->
   <header class="sticky top-0 z-30 bg-white/85 backdrop-blur-xl border-b border-slate-300/80">
     <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
       <div class="flex items-center gap-2 cursor-pointer select-none" onclick="handleSecretTitleTap()">
@@ -18,7 +19,6 @@
         <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 border border-slate-300 text-slate-600 hidden sm:inline">非盈利追星工具站</span>
       </div>
 
-      <!-- 桌面端 4 项主导航 -->
       <nav class="hidden sm:inline-flex items-center p-1 rounded-full bg-slate-200/85 border border-slate-300 text-xs gap-1">
         <button type="button" id="top-tab-home" onclick="switchMainTab('home')" class="px-3.5 py-1 rounded-full obsidian-btn text-white font-semibold transition">🏠 首页</button>
         <button type="button" id="top-tab-shows" onclick="switchMainTab('shows')" class="px-3.5 py-1 rounded-full text-slate-600 hover:text-slate-900 transition">🏛️ 档案</button>
@@ -34,7 +34,7 @@
 
   <main class="max-w-5xl mx-auto px-4 py-5 space-y-6">
 
-    <!-- ================= 1. 首页控制台 ================= -->
+    <!-- 1. 首页控制台 -->
     <section id="view-home-page" class="space-y-5">
       <div id="home-anniversary-box"></div>
       <div class="space-y-2.5">
@@ -47,7 +47,7 @@
       <div id="home-feed-brief"></div>
     </section>
 
-    <!-- ================= 2. 演出档案库 ================= -->
+    <!-- 2. 演出档案库 -->
     <section id="view-shows-page" class="hidden space-y-6">
       <div class="space-y-3">
         <div class="flex items-center justify-between flex-wrap gap-2">
@@ -73,12 +73,11 @@
       </div>
     </section>
 
-    <!-- ================= 3. 纯本地足迹与纪念票根 ================= -->
+    <!-- 3. 纯本地足迹与纪念票根 -->
     <section id="view-footprint-page" class="hidden space-y-5">
       <div id="local-fan-pref-box"></div>
       <div id="footprint-map-box"></div>
 
-      <!-- Canvas 纪念票根生成器 -->
       <div class="p-4 sm:p-5 rounded-2xl chronicle-card space-y-4">
         <div class="flex items-center justify-between flex-wrap gap-2">
           <div>
@@ -105,7 +104,7 @@
       </div>
     </section>
 
-    <!-- ================= 4. 多平台社媒动态 ================= -->
+    <!-- 4. 多平台社媒动态 -->
     <section id="view-feeds-page" class="hidden space-y-4">
       <div class="metal-card p-4 rounded-2xl space-y-3">
         <div class="flex items-center justify-between flex-wrap gap-2">
@@ -122,7 +121,6 @@
 
   </main>
 
-  <!-- 全站底部版权与非商业免责声明 -->
   <footer class="max-w-5xl mx-auto px-4 py-6 mt-4 border-t border-slate-300/70 text-[11px] text-slate-500 space-y-1 text-center">
     <p>ONERLAND 为非盈利、非商业粉丝档案与观演实用工具站，不接任何广告、会员、打赏或票务交易。</p>
     <p>站内演出海报版权归原经纪公司及主办方所有，仅作非商业信息索引展示；如有侵权请通过邮箱联系核实删除。</p>
@@ -135,6 +133,17 @@
     <button type="button" id="bottom-tab-footprint" onclick="switchMainTab('footprint')" class="py-1.5 rounded-xl text-slate-600">🎫 足迹</button>
     <button type="button" id="bottom-tab-feeds" onclick="switchMainTab('feeds')" class="py-1.5 rounded-xl text-slate-600">📱 动态</button>
   </nav>
+
+  <!-- 图片灯箱大图预览弹窗 -->
+  <div id="image-lightbox" onclick="this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-zoom-out">
+    <div class="max-w-3xl max-h-[90vh] flex flex-col items-center gap-2" onclick="event.stopPropagation()">
+      <img id="lightbox-img" src="" class="max-h-[82vh] max-w-full rounded-xl shadow-2xl object-contain bg-white border border-slate-200" />
+      <div class="flex items-center gap-4 text-xs text-white">
+        <span id="lightbox-caption"></span>
+        <button type="button" onclick="document.getElementById('image-lightbox').classList.add('hidden')" class="px-3 py-1 rounded bg-white/20 hover:bg-white/30 text-white">关闭预览</button>
+      </div>
+    </div>
+  </div>
 
   <!-- 外部工具站跳转前二次确认弹窗 -->
   <div id="external-jump-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
@@ -166,15 +175,36 @@
     </div>
   </div>
 
-  <!-- 隐藏管理端（独立路由 #admin 或连点标题 5 次唤起，不在导航暴露） -->
+  <!-- 隐藏管理端 -->
   <div id="hidden-admin-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="chronicle-card rounded-2xl max-w-2xl w-full max-h-[88vh] flex flex-col overflow-hidden bg-white">
       <div class="p-4 border-b border-slate-200 flex items-center justify-between">
-        <h3 class="font-bold text-sm text-slate-900">🛠️ 独立管理台（单页投喂 & 待办队列）</h3>
+        <h3 class="font-bold text-sm text-slate-900">🛠️ 独立管理台（单页投喂 · 海报识图 · 编辑队列）</h3>
         <button type="button" onclick="document.getElementById('hidden-admin-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-800">✕</button>
       </div>
       <div class="p-4 overflow-y-auto space-y-4 text-xs">
         <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+          <div class="flex items-center gap-2 flex-wrap">
+            <label class="cursor-pointer px-3 py-1.5 rounded-lg liquid-silver-btn font-medium">
+              上传海报图片
+              <input type="file" accept="image/*" class="hidden" onchange="handleAdminPosterFile(event)" />
+            </label>
+            <button type="button" id="adm-ocr-btn" onclick="runPosterOCRRecognition()" class="px-3 py-1.5 rounded-lg liquid-silver-btn font-semibold">🔍 识别海报场次</button>
+            <button type="button" onclick="configGeminiKey()" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-600">🔑 AI密钥</button>
+            <button type="button" onclick="resetAdminForm()" class="px-2.5 py-1.5 rounded-lg text-slate-500 hover:text-slate-900">重置</button>
+          </div>
+
+          <div id="adm-ocr-status" class="hidden text-[11px] text-slate-600 font-medium"></div>
+          <img id="adm-poster-preview" class="hidden max-h-36 rounded-lg border border-slate-300 object-contain" />
+
+          <div id="adm-ocr-batch-box" class="hidden p-2.5 rounded-lg bg-white border border-slate-200 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-slate-800">识别到的多场排期：</span>
+              <button type="button" onclick="importOCRBatchShows()" class="px-2.5 py-1 rounded-lg obsidian-btn font-semibold">✅ 批量导入</button>
+            </div>
+            <div id="adm-ocr-batch-list" class="space-y-1 max-h-40 overflow-y-auto no-scrollbar"></div>
+          </div>
+
           <div class="grid grid-cols-2 gap-2">
             <select id="adm-type" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white">
               <option value="ticket">发布：近期演出</option>
@@ -185,14 +215,17 @@
               <option value="ONER">ONER</option><option value="岳岳">岳岳</option><option value="木子洋">木子洋</option><option value="灵超">灵超</option><option value="坤音娱乐">坤音娱乐</option>
             </select>
             <input id="adm-title" type="text" placeholder="站次标题 或 平台名(如:微博)" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
-            <input id="adm-date" type="text" placeholder="日期 YYYY-MM-DD（动态可留空）" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
-            <input id="adm-poster" type="text" placeholder="海报链接 https://...（选填）" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
+            <input id="adm-date" type="text" placeholder="演出日期 YYYY-MM-DD" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
+            <input id="adm-poster" type="text" placeholder="海报链接或 Base64（选填）" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
             <input id="adm-url" type="text" placeholder="原帖/购票链接 https://..." class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
+            <input id="adm-sale-time" type="datetime-local" title="开票时间（用于倒计时）" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
+            <input id="adm-sale-plat" type="text" placeholder="购票平台（如:大麦）" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
           </div>
+
           <textarea id="adm-body" rows="2" placeholder="场馆名称 或 动态正文..." class="w-full px-2.5 py-2 rounded-lg border border-slate-300 bg-white"></textarea>
           <div class="flex items-center justify-between">
             <label class="flex items-center gap-1.5 cursor-pointer"><input id="adm-pin" type="checkbox" /> 设为动态页置顶重要公告</label>
-            <button type="button" onclick="submitAdminQuickPost()" class="px-4 py-1.5 rounded-lg obsidian-btn font-semibold">☁️ 同步发布</button>
+            <button id="adm-submit-btn" type="button" onclick="submitAdminQuickPost()" class="px-4 py-1.5 rounded-lg obsidian-btn font-semibold">☁️ 同步发布</button>
           </div>
         </div>
 
@@ -208,8 +241,10 @@
   <script src="./js/store.js"></script>
   <script src="./js/home-ui.js"></script>
   <script src="./js/shows-ui.js"></script>
+  <script src="./js/parser.js"></script>
   <script src="./js/footprint-ui.js"></script>
   <script src="./js/feeds-ui.js"></script>
+  <script src="./js/admin-ui.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
@@ -218,6 +253,7 @@
     switchMainTab('home');
     loadTourData();
     loadAllFeeds();
+    setInterval(updateCountdowns, 1000);
   </script>
 </body>
 </html>
