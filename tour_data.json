@@ -4,87 +4,179 @@ import re
 import hashlib
 import urllib.request
 import xml.etree.ElementTree as ET
+from email.utils import parsedate_to_datetime
+from datetime import datetime
 
-# ================= 1. 后台定时抓取巡演/开票公告的 RSS 源 =================
-# priority 越小优先级越高（官博优先于个人微博）
-RSS_FEEDS = [
-    {"artist": "ONER", "priority": 1, "url": "https://rsshub.app/weibo/user/6524267181"},
-    {"artist": "坤音娱乐", "priority": 1, "url": "https://rsshub.app/weibo/user/6062604272"},
-    {"artist": "ONER", "priority": 2, "url": "https://rsshub.app/bilibili/user/video/670365731"},
-    {"artist": "坤音娱乐", "priority": 2, "url": "https://rsshub.app/bilibili/user/video/172392717"},
-    {"artist": "岳岳", "priority": 3, "url": "https://rsshub.app/weibo/user/6392771552"},
-    {"artist": "木子洋", "priority": 3, "url": "https://rsshub.app/weibo/user/6400910760"},
-    {"artist": "灵超", "priority": 3, "url": "https://rsshub.app/weibo/user/6400910962"},
+# ================= 1. 应援色与全员账号配置 =================
+COLOR_ONER = "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)"
+COLOR_QINS = "#111827"
+COLOR_YY   = "#9C73EF"
+COLOR_MZY  = "#F90092"
+COLOR_LC   = "#32B5E1"
+
+RSSHUB_MIRRORS = [
+    "https://rsshub.app",
+    "https://rsshub.rssforever.com",
+    "https://hub.slarker.me",
+]
+
+ARTISTS_CONFIG = [
+    {
+        "artistId": "oner", "artistName": "ONER", "priority": 1, "badgeStyle": COLOR_ONER,
+        "accounts": [
+            {"id": "oner_wb", "name": "微博", "color": COLOR_ONER, "url": "https://rsshub.app/weibo/user/6524267181"},
+            {"id": "oner_xhs", "name": "小红书", "color": COLOR_ONER, "url": "https://rsshub.app/xiaohongshu/user/64d9d216000000000100646b/notes"},
+            {"id": "oner_dy", "name": "抖音", "color": COLOR_ONER, "url": "https://rsshub.app/douyin/user/MS4wLjABAAAAX2dJKmn9ZDVnsNdM_VPT_Lco3l8fpRp0PCRQ24uSzG4"},
+            {"id": "oner_tt", "name": "TikTok", "color": COLOR_ONER, "url": "https://rsshub.app/tiktok/user/@oner0830official"},
+            {"id": "oner_ig", "name": "Instagram", "color": COLOR_ONER, "url": "https://rsshub.app/instagram/user/oner_official"},
+            {"id": "oner_bili", "name": "B站", "color": COLOR_ONER, "url": "https://rsshub.app/bilibili/user/video/670365731"},
+        ]
+    },
+    {
+        "artistId": "qins", "artistName": "坤音娱乐", "priority": 1, "badgeStyle": COLOR_QINS,
+        "accounts": [
+            {"id": "qins_wb", "name": "微博", "color": COLOR_QINS, "url": "https://rsshub.app/weibo/user/6062604272"},
+            {"id": "qins_dy", "name": "抖音", "color": COLOR_QINS, "url": "https://rsshub.app/douyin/user/MS4wLjABAAAAWTvzHZq48nC6rktRVvjlqv1-4b7ewFs1jy2qrzFHzyU"},
+            {"id": "qins_ig", "name": "Instagram", "color": COLOR_QINS, "url": "https://rsshub.app/instagram/user/qinsentertainment"},
+            {"id": "qins_bili", "name": "B站", "color": COLOR_QINS, "url": "https://rsshub.app/bilibili/user/video/172392717"},
+            {"id": "qins_yt", "name": "YouTube", "color": COLOR_QINS, "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UCF-kpt07kZx9RMsBB2k-QlQ"},
+        ]
+    },
+    {
+        "artistId": "pinkray", "artistName": "岳岳", "priority": 3, "badgeStyle": COLOR_YY,
+        "accounts": [
+            {"id": "yy_wb", "name": "微博", "color": COLOR_YY, "url": "https://rsshub.app/weibo/user/6392771552"},
+            {"id": "yy_xhs", "name": "小红书", "color": COLOR_YY, "url": "https://rsshub.app/xiaohongshu/user/5a5c65f811be106a7251d287/notes"},
+            {"id": "yy_dy", "name": "抖音", "color": COLOR_YY, "url": "https://rsshub.app/douyin/user/MS4wLjABAAAAXzN1GfvLXnG3-CSbB9ODEawvgowtEwCLbH1CrgbWShv_uAbweB8mqdVkMHqYVZ-S"},
+            {"id": "yy_tt", "name": "TikTok", "color": COLOR_YY, "url": "https://rsshub.app/tiktok/user/@pinkray_oner"},
+            {"id": "yy_ig", "name": "Instagram", "color": COLOR_YY, "url": "https://rsshub.app/instagram/user/pinkray_official"},
+        ]
+    },
+    {
+        "artistId": "kwin", "artistName": "木子洋", "priority": 3, "badgeStyle": COLOR_MZY,
+        "accounts": [
+            {"id": "mzy_wb", "name": "微博", "color": COLOR_MZY, "url": "https://rsshub.app/weibo/user/6400910760"},
+            {"id": "mzy_xhs", "name": "小红书", "color": COLOR_MZY, "url": "https://rsshub.app/xiaohongshu/user/5a5c7e6111be1064506d7edf/notes"},
+            {"id": "mzy_dy", "name": "抖音", "color": COLOR_MZY, "url": "https://rsshub.app/douyin/user/MS4wLjABAAAAQeNwNv0VAWX3IcnMTqaHgpBFbLEMs5YVQ2U702OVYBSHVKw9T1Aab4P_7BmWI7GK"},
+            {"id": "mzy_tt", "name": "TikTok", "color": COLOR_MZY, "url": "https://rsshub.app/tiktok/user/@kwin_oner"},
+            {"id": "mzy_ig", "name": "Instagram", "color": COLOR_MZY, "url": "https://rsshub.app/instagram/user/kwin0421_official"},
+        ]
+    },
+    {
+        "artistId": "didi", "artistName": "灵超", "priority": 3, "badgeStyle": COLOR_LC,
+        "accounts": [
+            {"id": "lc_wb", "name": "微博", "color": COLOR_LC, "url": "https://rsshub.app/weibo/user/6400910962"},
+            {"id": "lc_xhs", "name": "小红书", "color": COLOR_LC, "url": "https://rsshub.app/xiaohongshu/user/5a5ca2e2e8ac2b239b29d3a6/notes"},
+            {"id": "lc_dy", "name": "抖音", "color": COLOR_LC, "url": "https://rsshub.app/douyin/user/MS4wLjABAAAAaCStczPllk8yRlFr3QLnEAJQAtgSfgO3tDZ1Jz8R1uW4Ot3fu4UYivRqMmEJ_OX0"},
+            {"id": "lc_tt", "name": "TikTok", "color": COLOR_LC, "url": "https://rsshub.app/tiktok/user/@didi_oner"},
+            {"id": "lc_ig", "name": "Instagram", "color": COLOR_LC, "url": "https://rsshub.app/instagram/user/didichao_official"},
+        ]
+    }
 ]
 
 KEYWORDS = ["巡演", "演唱会", "见面会", "音乐节", "开票", "预售", "一开", "二开", "三开", "加场", "大麦", "猫眼", "纷玩岛"]
+TOUR_FILE = "tour_data.json"
+FEEDS_FILE = "feeds_data.json"
 
-DATA_FILE = "tour_data.json"
 API_KEY = os.environ.get("LLM_API_KEY", "")
 BASE_URL = os.environ.get("LLM_BASE_URL", "https://api.deepseek.com/chat/completions")
 MODEL_NAME = os.environ.get("LLM_MODEL", "deepseek-flash")
 
 
+def parse_timestamp(date_str):
+    if not date_str:
+        return int(datetime.now().timestamp() * 1000)
+    try:
+        dt = parsedate_to_datetime(date_str)
+        return int(dt.timestamp() * 1000)
+    except Exception:
+        try:
+            dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            return int(dt.timestamp() * 1000)
+        except Exception:
+            return int(datetime.now().timestamp() * 1000)
+
+
+def fetch_rss_with_mirrors(raw_url):
+    candidates = [raw_url]
+    if "rsshub.app" in raw_url:
+        for m in RSSHUB_MIRRORS[1:]:
+            candidates.append(raw_url.replace("https://rsshub.app", m))
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Accept": "application/rss+xml, application/xml, text/xml, */*"
+    }
+
+    for url in candidates:
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                xml_data = resp.read().decode("utf-8", errors="ignore")
+            if "RouteNotFound" in xml_data or "403 Forbidden" in xml_data:
+                continue
+            root = ET.fromstring(xml_data)
+            nodes = root.findall(".//item") + root.findall(".//{http://www.w3.org/2005/Atom}entry")
+            if not nodes:
+                continue
+
+            items = []
+            for node in nodes[:15]:
+                title = (node.findtext("title") or node.findtext("{http://www.w3.org/2005/Atom}title") or "").strip()
+                desc = (node.findtext("description") or node.findtext("{http://www.w3.org/2005/Atom}content") or "").strip()
+                pub = (node.findtext("pubDate") or node.findtext("{http://www.w3.org/2005/Atom}published") or node.findtext("{http://www.w3.org/2005/Atom}updated") or "").strip()
+                link = (node.findtext("link") or "").strip()
+                if not link:
+                    link_el = node.find("{http://www.w3.org/2005/Atom}link")
+                    if link_el is not None:
+                        link = link_el.attrib.get("href", "")
+
+                imgs = re.findall(r'<img[^>]+src=["\']([^"\']+)["\']', desc, flags=re.I)
+                clean_text = re.sub(r"<[^>]+>", " ", f"{title}\n{desc}")
+                clean_text = re.sub(r"[ \t]+", " ", clean_text).strip()
+
+                items.append({
+                    "text": clean_text[:1500],
+                    "imgs": imgs[:4],
+                    "link": link,
+                    "timestamp": parse_timestamp(pub)
+                })
+            return items
+        except Exception:
+            continue
+    return []
+
+
 def normalize_city(city_str):
-    """统一城市名称格式，避免 '北京' 和 '北京站' 重复建卡"""
     c = (city_str or "").strip()
     c = re.sub(r"(站|专场|场)$", "", c)
     return f"{c}站" if c else ""
 
 
 def get_text_fingerprint(text):
-    """提取核心文案指纹，过滤掉转发前缀和话题标签，防止多人转发同一文案重复调用 AI"""
     cleaned = re.sub(r"//?@[^:：\s]+[:：]?", "", text)
     cleaned = re.sub(r"#[^#]+#", "", cleaned)
     cleaned = re.sub(r"[^\w\u4e00-\u9fa5]", "", cleaned)
     return hashlib.md5(cleaned[:200].encode("utf-8")).hexdigest()
 
 
-def fetch_rss_items(url):
-    items = []
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            xml_data = resp.read().decode("utf-8", errors="ignore")
-        root = ET.fromstring(xml_data)
-        for node in root.findall(".//item") + root.findall(".//{http://www.w3.org/2005/Atom}entry"):
-            title = (node.findtext("title") or node.findtext("{http://www.w3.org/2005/Atom}title") or "").strip()
-            desc = (node.findtext("description") or node.findtext("{http://www.w3.org/2005/Atom}content") or "").strip()
-            link = (node.findtext("link") or "").strip()
-            if not link:
-                link_el = node.find("{http://www.w3.org/2005/Atom}link")
-                if link_el is not None:
-                    link = link_el.attrib.get("href", "")
-            clean_text = re.sub(r"<[^>]+>", " ", f"{title} {desc}")
-            clean_text = re.sub(r"\s+", " ", clean_text).strip()
-            items.append({"text": clean_text[:1500], "link": link})
-    except Exception as e:
-        print(f"抓取 RSS 失败 ({url}): {e}")
-    return items[:10]
-
-
 def call_ai_extract(text, default_artist):
     if not API_KEY:
-        print("未配置 LLM_API_KEY，跳过提取")
         return None
-
-    prompt = f"""你是巡演信息结构化提取与去重助手。请分析以下动态文本，判断是否包含【演唱会/巡演/见面会/音乐节的演出时间或开票时间（一开/二开/三开/预售）】。
-注意：如果成员个人账号转发宣传的是 ONER 团体演出，artist 必须统一填 "ONER"；只有明确是个人单人演出时才填个人名字。
-如果与演出/开票无关，只返回 {{"is_tour": false}}。
-如果有关，严格按以下 JSON 格式返回（时间统一为 YYYY-MM-DD HH:MM 格式，未知则留空字符串）：
+    prompt = f"""你是巡演信息结构化提取助手。判断是否包含【演唱会/巡演/见面会/音乐节的演出时间或开票时间（一开/二开/三开/预售）】。
+成员个人转发 ONER 团体演出时，artist 统一填 "ONER"。无关只返回 {{"is_tour": false}}。
+有关严格返回 JSON（时间格式 YYYY-MM-DD HH:MM）：
 {{
   "is_tour": true,
-  "artist": "ONER / 木子洋 / 岳岳 / 灵超 / 坤音娱乐（团体演出统一填 ONER）",
+  "artist": "ONER / 木子洋 / 岳岳 / 灵超 / 坤音娱乐",
   "city": "城市名，如：北京站",
-  "venue": "场馆名称（未知留空）",
-  "show_date": "演出时间，如：2026-12-20 19:30（未知留空）",
-  "round_name": "开票轮次，如：一开 / 二开 / 三开 / 预售（无具体开票轮次留空）",
-  "sale_time": "开票时间，如：2026-12-05 14:18（未知留空）",
-  "platform": "购票平台，如：大麦 / 猫眼 / 纷玩岛（未知留空）"
+  "venue": "场馆名称",
+  "show_date": "演出时间",
+  "round_name": "一开 / 二开 / 三开 / 预售",
+  "sale_time": "开票时间",
+  "platform": "大麦 / 猫眼 / 纷玩岛"
 }}
-
-动态内容：
-{text}"""
+动态内容：{text}"""
 
     payload = json.dumps({
         "model": MODEL_NAME,
@@ -93,135 +185,88 @@ def call_ai_extract(text, default_artist):
         "temperature": 0.1
     }).encode("utf-8")
 
-    req = urllib.request.Request(
-        BASE_URL,
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {API_KEY}"
-        }
-    )
+    req = urllib.request.Request(BASE_URL, data=payload, headers={"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"})
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             res = json.loads(resp.read().decode("utf-8"))
-            content = res["choices"][0]["message"]["content"]
-            return json.loads(content)
-    except Exception as e:
-        print(f"AI 提取异常: {e}")
+            return json.loads(res["choices"][0]["message"]["content"])
+    except Exception:
         return None
 
 
 def main():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            tour_list = json.load(f)
-    else:
-        tour_list = []
+    tour_list = json.load(open(TOUR_FILE, "r", encoding="utf-8")) if os.path.exists(TOUR_FILE) else []
+    processed_links = {item.get("source_url") for item in tour_list if item.get("source_url")}
+    seen_fps = set()
+    tour_updated = False
 
-    processed_links = set()
-    for item in tour_list:
-        if item.get("source_url"):
-            processed_links.add(item["source_url"])
-        for url in item.get("related_urls", []):
-            processed_links.add(url)
+    all_feed_posts = []
+    failed_sources = []
 
-    seen_fingerprints = set()
-    updated = False
-
-    # 按优先级排序抓取（官博优先）
-    sorted_feeds = sorted(RSS_FEEDS, key=lambda x: x["priority"])
-
-    for feed in sorted_feeds:
-        for item in fetch_rss_items(feed["url"]):
-            if item["link"] in processed_links:
-                continue
-            if not any(kw in item["text"] for kw in KEYWORDS):
+    for artist in ARTISTS_CONFIG:
+        for acc in artist["accounts"]:
+            items = fetch_rss_with_mirrors(acc["url"])
+            if not items:
+                failed_sources.append(f"{artist['artistName']}-{acc['name']}")
                 continue
 
-            fp = get_text_fingerprint(item["text"])
-            if fp in seen_fingerprints:
-                print(f"跳过高度雷同转发文案: {item['link']}")
-                processed_links.add(item["link"])
-                continue
-            seen_fingerprints.add(fp)
+            for item in items:
+                all_feed_posts.append({
+                    "artistId": artist["artistId"],
+                    "artistName": artist["artistName"],
+                    "accountId": acc["id"],
+                    "platformName": acc["name"],
+                    "platformColor": acc["color"],
+                    "text": item["text"],
+                    "imgs": item["imgs"],
+                    "link": item["link"],
+                    "timestamp": item["timestamp"]
+                })
 
-            print(f"发现疑似巡演动态，调用 AI 提取: {item['link']}")
-            extracted = call_ai_extract(item["text"], feed["artist"])
-            if not (extracted and extracted.get("is_tour") and extracted.get("city")):
-                continue
+                # 巡演 AI 提取（仅检查微博与B站等文字公告源）
+                if acc["name"] in ("微博", "B站") and item["link"] not in processed_links:
+                    if any(kw in item["text"] for kw in KEYWORDS):
+                        fp = get_text_fingerprint(item["text"])
+                        if fp not in seen_fps:
+                            seen_fps.add(fp)
+                            ext = call_ai_extract(item["text"], artist["artistName"])
+                            if ext and ext.get("is_tour") and ext.get("city"):
+                                a_name = "ONER" if ext.get("artist") == "坤音娱乐" else (ext.get("artist") or artist["artistName"])
+                                city = normalize_city(ext["city"])
+                                existing = next((x for x in tour_list if x.get("artist") == a_name and normalize_city(x.get("city")) == city), None)
+                                new_round = {"round_name": ext.get("round_name") or "开票", "sale_time": ext.get("sale_time") or "", "platform": ext.get("platform") or "官方渠道"}
+                                if existing:
+                                    if ext.get("venue") and existing.get("venue") in ("", "待公布"):
+                                        existing["venue"] = ext["venue"]
+                                    if ext.get("show_date") and existing.get("show_date") in ("", "待公布"):
+                                        existing["show_date"] = ext["show_date"]
+                                    if new_round["sale_time"] and not any(r.get("sale_time") == new_round["sale_time"] for r in existing.get("rounds", [])):
+                                        existing.setdefault("rounds", []).append(new_round)
+                                else:
+                                    tour_list.append({
+                                        "artist": a_name, "city": city,
+                                        "venue": ext.get("venue") or "待公布",
+                                        "show_date": ext.get("show_date") or "待公布",
+                                        "rounds": [new_round] if new_round["sale_time"] else [],
+                                        "source_url": item["link"]
+                                    })
+                                processed_links.add(item["link"])
+                                tour_updated = True
 
-            artist_name = (extracted.get("artist") or feed["artist"]).strip()
-            if artist_name == "坤音娱乐":
-                artist_name = "ONER"
-            city = normalize_city(extracted["city"])
-            venue = (extracted.get("venue") or "").strip()
-            show_date = (extracted.get("show_date") or "").strip()
-            sale_time = (extracted.get("sale_time") or "").strip()
-            round_name = (extracted.get("round_name") or "开票").strip()
-            platform = (extracted.get("platform") or "官方渠道").strip()
+    all_feed_posts.sort(key=lambda x: x["timestamp"], reverse=True)
+    feeds_payload = {
+        "updatedAt": int(datetime.now().timestamp() * 1000),
+        "failedSources": failed_sources,
+        "posts": all_feed_posts[:300]
+    }
+    with open(FEEDS_FILE, "w", encoding="utf-8") as f:
+        json.dump(feeds_payload, f, ensure_ascii=False, indent=2)
 
-            # 查找同一艺人 + 同一城市的现有记录（若日期不同且均已知，视为加场或不同巡演）
-            existing = None
-            for x in tour_list:
-                if x.get("artist") == artist_name and normalize_city(x.get("city")) == city:
-                    old_day = (x.get("show_date") or "")[:10]
-                    new_day = show_date[:10]
-                    if not old_day or old_day == "待公布" or not new_day or old_day == new_day:
-                        existing = x
-                        break
-
-            if existing:
-                # 增量补全缺失的关键信息，不覆盖已有的有效详情
-                if venue and existing.get("venue") in ("", "待公布", None):
-                    existing["venue"] = venue
-                if show_date and existing.get("show_date") in ("", "待公布", None):
-                    existing["show_date"] = show_date
-
-                # 若当前来源优先级更高（如官博），更新主链接
-                if feed["priority"] <= existing.get("_priority", 99):
-                    existing["source_url"] = item["link"]
-                    existing["_priority"] = feed["priority"]
-
-                related = existing.setdefault("related_urls", [])
-                if item["link"] not in related:
-                    related.append(item["link"])
-
-                # 合并去重开票轮次（一开/二开/三开）
-                if sale_time:
-                    is_dup_round = any(
-                        r.get("sale_time") == sale_time or (r.get("round_name") == round_name and r.get("sale_time"))
-                        for r in existing.get("rounds", [])
-                    )
-                    if not is_dup_round:
-                        existing.setdefault("rounds", []).append({
-                            "round_name": round_name,
-                            "sale_time": sale_time,
-                            "platform": platform
-                        })
-                        # 按开票时间先后自动排序
-                        existing["rounds"].sort(key=lambda r: r.get("sale_time", ""))
-            else:
-                new_entry = {
-                    "artist": artist_name,
-                    "city": city,
-                    "venue": venue or "待公布",
-                    "show_date": show_date or "待公布",
-                    "rounds": [{"round_name": round_name, "sale_time": sale_time, "platform": platform}] if sale_time else [],
-                    "source_url": item["link"],
-                    "related_urls": [item["link"]],
-                    "_priority": feed["priority"]
-                }
-                tour_list.append(new_entry)
-
-            processed_links.add(item["link"])
-            updated = True
-
-    if updated:
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
+    if tour_updated:
+        with open(TOUR_FILE, "w", encoding="utf-8") as f:
             json.dump(tour_list, f, ensure_ascii=False, indent=2)
-        print("tour_data.json 已完成去重合并并更新！")
-    else:
-        print("本次巡检无新巡演信息。")
+
+    print(f"抓取完成：成功获取 {len(all_feed_posts)} 条动态，受限源 {len(failed_sources)} 个。")
 
 
 if __name__ == "__main__":
