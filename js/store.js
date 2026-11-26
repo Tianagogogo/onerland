@@ -237,3 +237,85 @@ function configGeminiKey() {
   }
   updateAiKeyStatusUI();
 }
+AppState.currentUser = JSON.parse(localStorage.getItem('onerland_otp_user_v1') || 'null');
+
+function updateAuthButtonUI() {
+  const btn = document.getElementById('user-auth-btn');
+  if (!btn) return;
+  btn.textContent = AppState.currentUser ? `👤 ${AppState.currentUser.email.split('@')[0]}` : '👤 登录';
+}
+
+function openUserAuthModal() {
+  document.getElementById('user-auth-modal')?.classList.remove('hidden');
+  const statusEl = document.getElementById('auth-current-status');
+  if (statusEl) {
+    statusEl.textContent = AppState.currentUser
+      ? `当前已登录：${AppState.currentUser.email}`
+      : '当前为访客模式（本地纪念/筛选无需登录；核验票根与搭子联系需邮箱验证码登录）';
+  }
+}
+
+async function sendEmailOTP() {
+  const email = (document.getElementById('auth-email-input')?.value || '').trim();
+  if (!email || !email.includes('@')) return alert('请输入有效的邮箱地址');
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/otp`, {
+      method: 'POST',
+      headers: SB_HEADERS,
+      body: JSON.stringify({ email, create_user: true })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    alert('6位验证码已发送至邮箱，请查收！');
+  } catch (e) {
+    alert(`发送失败：${e.message}（请确认 Supabase Auth 已开启 Email OTP）`);
+  }
+}
+
+async function verifyEmailOTP() {
+  const email = (document.getElementById('auth-email-input')?.value || '').trim();
+  const token = (document.getElementById('auth-otp-input')?.value || '').trim();
+  if (!email || !token) return alert('请填写邮箱和验证码');
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/verify`, {
+      method: 'POST',
+      headers: SB_HEADERS,
+      body: JSON.stringify({ email, token, type: 'email' })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    AppState.currentUser = { email, accessToken: data.access_token || '' };
+    localStorage.setItem('onerland_otp_user_v1', JSON.stringify(AppState.currentUser));
+    updateAuthButtonUI();
+    document.getElementById('user-auth-modal')?.classList.add('hidden');
+    renderTourCards();
+    alert('邮箱验证登录成功！');
+  } catch (e) {
+    alert(`验证失败：${e.message}`);
+  }
+}
+
+function logoutEmailUser() {
+  AppState.currentUser = null;
+  localStorage.removeItem('onerland_otp_user_v1');
+  updateAuthButtonUI();
+  renderTourCards();
+}
+
+function updateAiKeyStatusUI() {
+  const hasKey = Boolean((localStorage.getItem(GEMINI_KEY_STORAGE) || '').trim());
+  const el = document.getElementById('ai-key-status');
+  if (el) el.textContent = hasKey ? '已配置' : '未配置';
+}
+
+function configGeminiKey() {
+  const current = localStorage.getItem(GEMINI_KEY_STORAGE) || '';
+  const input = prompt('请输入 Google AI Studio (Gemini) API Key（留空确定可清除）：', current);
+  if (input === null) return;
+  if (input.trim()) {
+    localStorage.setItem(GEMINI_KEY_STORAGE, input.trim());
+    alert('AI 识图密钥已保存！');
+  } else {
+    localStorage.removeItem(GEMINI_KEY_STORAGE);
+  }
+  updateAiKeyStatusUI();
+}
