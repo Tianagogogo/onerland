@@ -263,7 +263,7 @@ function renderTourCards() {
     const badge = (ARTIST_COLORS[item.artist] || ARTIST_COLORS['ONER']).bg;
     const safeCity = String(item.city || '').replace(/['"<>]/g, '');
     const cleanVenue = (item.venue || '').replace(/·/g, ' ').trim();
-    const shiyeLiveUrl = `https://www.shiyelive.com/?q=${encodeURIComponent(cleanVenue || safeCity)}`;
+    const shiyeLiveUrl = `https://shijiao.xingpaste.com/?q=${encodeURIComponent(cleanVenue || safeCity)}`;
     const amapUrl = `https://uri.amap.com/search?keyword=${encodeURIComponent(cleanVenue || safeCity)}`;
     const slotPopoverId = `tour-slot-pop-${item.cloudId || idx}`;
     const myBuddy = buddyStore[item.cloudId];
