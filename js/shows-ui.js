@@ -183,7 +183,6 @@ function openSeriesModal(themeKey) {
   document.getElementById('series-detail-modal').classList.remove('hidden');
 }
 
-// 切换默认粉籍（团粉 / 唯粉 / CP）及删除标签
 function changeBuddyBiasMode(mode) {
   const cur = getFanPrefState();
   saveFanPrefState({
@@ -287,6 +286,7 @@ function renderTourCards() {
     const amapUrl = `https://uri.amap.com/search?keyword=${encodeURIComponent(cleanVenue || safeCity)}`;
     const slotPopoverId = `tour-slot-pop-${item.cloudId || idx}`;
     const buddyEntries = getBuddyListByShow(item.cloudId);
+    const safeBooth = String(item.merchBooth || '').replace(/['"<>]/g, '');
 
     const roundsHtml = item.activeRounds.length ? `
       <div class="space-y-1.5 pt-1">
@@ -319,6 +319,7 @@ function renderTourCards() {
             <p class="text-xs text-slate-500">📍 ${item.venue} ｜ 🗓️ ${item.show_date}</p>
             <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
               ${item.prices ? `<span class="text-[11px] px-2 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-700">💰 ${item.prices}</span>` : ''}
+              ${safeBooth ? `<span class="text-[11px] px-2 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-900 font-medium" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</span>` : ''}
               ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeCity)}
             </div>
           </div>
@@ -328,7 +329,7 @@ function renderTourCards() {
 
         <div class="flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-slate-200/80 text-xs">
           <div class="flex items-center gap-1.5 flex-wrap">
-            <button type="button" onclick="document.getElementById('guide-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🧭 指南 ▾</button>
+            <button type="button" onclick="document.getElementById('guide-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🚇 交通 ▾</button>
             <button type="button" onclick="requestExternalToolJump('${shiyeLiveUrl}', '视野 live（非官方座位视野工具站）', '${cleanVenue || safeCity}')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🔭 视野 live ↗</button>
             <button type="button" onclick="document.getElementById('buddy-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg obsidian-btn text-white font-medium">🤝 找搭子 (${buddyEntries.length}) ▾</button>
           </div>
@@ -343,14 +344,12 @@ function renderTourCards() {
           <div class="whitespace-pre-line">${item.transport || '• 建议提前 60–90 分钟到达场馆核验身份证入场\n• 禁止携带打火机、专业长焦相机及超尺寸灯牌'}</div>
         </div>
 
-        <!-- 完整同场搭子广场与粉籍标签切换界面 -->
         <div id="buddy-drawer-${idx}" class="hidden p-3.5 rounded-xl bg-slate-50 border border-slate-300 text-xs space-y-3">
           <div class="flex items-center justify-between flex-wrap gap-1">
             <span class="font-bold text-slate-900">🤝 同场观演搭子界面 · ${safeCity}</span>
             <span class="text-[11px] text-slate-500">隐私保护 · 严禁转票定金</span>
           </div>
 
-          <!-- 1. 直接更改默认粉籍 -->
           <div class="p-2.5 rounded-lg bg-white border border-slate-200 space-y-2">
             <div class="flex items-center justify-between flex-wrap gap-1.5">
               <span class="font-semibold text-slate-700">默认粉籍属性：</span>
@@ -373,7 +372,6 @@ function renderTourCards() {
               </div>
             ` : ''}
 
-            <!-- 2. 可随时删除的自定义标签 -->
             <div class="space-y-1.5">
               <div class="flex items-center gap-1.5 flex-wrap">
                 <span class="text-[11px] text-slate-500">我的标签：</span>
@@ -394,13 +392,11 @@ function renderTourCards() {
             </div>
           </div>
 
-          <!-- 3. 发布搭子意向 -->
           <div class="flex gap-1.5">
             <input id="buddy-note-${item.cloudId}" type="text" placeholder="发布本场搭子说明（如：同城高铁出发，看台一起应援）..." class="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white" />
             <button type="button" onclick="saveLocalBuddyIntent(${item.cloudId}, '${safeCity}')" class="px-3 py-1.5 rounded-lg obsidian-btn font-semibold shrink-0">发布搭子</button>
           </div>
 
-          <!-- 4. 本场已发布的搭子列表（支持删除） -->
           <div class="space-y-1.5">
             <div class="text-[11px] font-semibold text-slate-600">📋 本场搭子动态列表（${buddyEntries.length} 条）：</div>
             ${buddyEntries.length
@@ -482,6 +478,7 @@ function renderArchiveTimeline() {
     const badge = (ARTIST_COLORS[item.artist] || ARTIST_COLORS['ONER']).bg;
     const safeTitle = String(item.title || '').replace(/['"<>]/g, '');
     const slotPopoverId = `arc-slot-pop-${item.cloudId || idx}`;
+    const safeBooth = String(item.merchBooth || '').replace(/['"<>]/g, '');
     return `
       <div class="p-4 rounded-2xl metal-card flex items-center justify-between gap-3">
         <div class="flex items-center gap-3.5 min-w-0">
@@ -492,6 +489,7 @@ function renderArchiveTimeline() {
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="text-[10px] px-2 py-0.5 rounded text-white font-semibold" style="background:${badge}">${item.artist}</span>
               <span class="font-bold text-sm text-slate-900 truncate">${safeTitle}</span>
+              ${safeBooth ? `<span class="text-[10px] px-2 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-900 font-medium" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</span>` : ''}
               ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeTitle)}
             </div>
             <p class="text-xs text-slate-500">🗓️ ${item.showDate} ｜ 📍 ${item.venue}</p>
