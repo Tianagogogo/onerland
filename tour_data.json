@@ -1,0 +1,8 @@
+artist-tracker/
+├── .github/
+│   └── workflows/
+│       └── update_tour.yml   # 1. GitHub Actions 定时巡检配置（每15分钟自动运行）
+├── scripts/
+│   └── fetch_and_extract.py  # 2. Python 脚本（抓 RSS + 调用 AI 提取巡演/开票信息）
+├── tour_data.json            # 3. 自动生成的巡演日程数据库（网页直接读取它）
+└── index.html                # 4. 追星聚合网页（含巡演抢票倒计时 + 社交时间线）
