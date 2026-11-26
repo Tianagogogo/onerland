@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>艺人动态与巡演抢票中心</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .line-clamp-4 {
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen">
+
+  <!-- 顶部导航 -->
+  <header class="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-800">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <h1 class="font-bold text-lg tracking-tight">艺人动态 & 巡演日程中心</h1>
+      </div>
+      <div class="flex items-center gap-2 text-xs">
+        <span id="last-sync" class="text-slate-400 hidden sm:inline">加载中...</span>
+        <button onclick="loadAllFeeds(true)" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white dark:bg-indigo-600 hover:opacity-90 transition font-medium">
+          刷新动态
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 py-6 space-y-8">
+
+    <!-- ================= 板块一：巡演日程 & 抢票倒计时 ================= -->
+    <section>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-base font-bold flex items-center gap-2">
+          <span>🎫 巡演行程与开票倒计时</span>
+          <span class="text-xs font-normal px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">AI 自动追踪</span>
+        </h2>
+      </div>
+      <div id="tour-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-slate-400">
+          正在加载巡演日程...
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 板块二：置顶最新动态 ================= -->
+    <section id="latest-spotlight" class="hidden">
+      <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 border border-indigo-500/30">
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <div class="flex items-center gap-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+            <span class="px-2 py-0.5 rounded bg-indigo-600 text-white">最新更新</span>
+            <span id="spotlight-platform"></span>
+            <span>·</span>
+            <span id="spotlight-time"></span>
+          </div>
+          <a id="spotlight-link" href="#" target="_blank" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+            直达原帖 ↗
+          </a>
+        </div>
+        <p id="spotlight-text" class="text-sm sm:text-base font-medium leading-relaxed"></p>
+      </div>
+    </section>
+
+    <!-- ================= 板块三：多维筛选 + 全局时间线 ================= -->
+    <section class="space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
+        <!-- 平台胶囊 -->
+        <div id="platform-tabs" class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0"></div>
+        <!-- 日期筛选 & 搜索 -->
+        <div class="flex items-center gap-2">
+          <input type="date" id="date-filter" onchange="renderTimeline()" class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent" />
+          <button onclick="clearDate()" class="text-xs px-2 py-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-white">重置</button>
+          <input type="text" id="keyword-filter" oninput="renderTimeline()" placeholder="搜索动态..." class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent w-32 sm:w-40" />
+        </div>
+      </div>
+
+      <!-- 时间线列表 -->
+      <div id="timeline-list" class="space-y-4"></div>
+    </section>
+
+  </main>
+
+  <script>
+    // ================= 1. 预设社交平台 RSS 列表（修改为你的艺人链接） =================
+    const FEEDS = [
+      { id: 'weibo', name: '微博', color: '#E6162D', url: 'https://rsshub.app/weibo/user/1195230310' },
+      { id: 'bilibili', name: 'B站', color: '#FB7299', url: 'https://rsshub.app/bilibili/user/dynamic/2' },
+      { id: 'youtube', name: 'YouTube', color: '#FF0000', url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC_x5XG1OV2P6uZZ5FSM9Ttw' }
+    ];
+
+    let allPosts = [];
+    let activePlatform = 'ALL';
+    let tourSchedules = [];
+
+    // ================= 2. 巡演日程与实时倒计时渲染 =================
+    async function loadTourData() {
+      try {
+        const res = await fetch('./tour_data.json?t=' + Date.now());
+        tourSchedules = await res.json();
+        renderTourCards();
+        setInterval(updateCountdowns, 1000);
+      } catch (e) {
+        document.getElementById('tour-grid').innerHTML = `<div class="text-sm text-slate-400">暂无巡演日程数据</div>`;
+      }
+    }
+
+    function renderTourCards() {
+      const container = document.getElementById('tour-grid');
+      if (!tourSchedules.length) {
+        container.innerHTML = `<div class="text-sm text-slate-400">暂无已公布的巡演日程</div>`;
+        return;
+      }
+
+      container.innerHTML = tourSchedules.map((item, idx) => {
+        const roundsHtml = (item.rounds || []).map((r, rIdx) => {
+          const targetTs = new Date(r.sale_time.replace(/-/g, '/')).getTime();
+          const isPast = !isNaN(targetTs) && targetTs < Date.now();
+          return `
+            <div class="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-lg ${isPast ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-400 line-through' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 font-medium'}">
+              <span>${r.round_name}：${r.sale_time} (${r.platform})</span>
+              <span class="countdown-badge font-mono" data-time="${r.sale_time}"></span>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between gap-3">
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-base">${item.city}</span>
+                <a href="${item.source_url || '#'}" target="_blank" class="text-xs text-slate-400 hover:text-indigo-500">官宣原帖 ↗</a>
+              </div>
+              <p class="text-xs text-slate-500 mt-1">📍 ${item.venue} ｜ 🗓️ ${item.show_date}</p>
+            </div>
+            <div class="space-y-1.5">
+              ${roundsHtml || '<div class="text-xs text-slate-400">开票时间待官宣</div>'}
+            </div>
+          </div>
+        `;
+      }).join('');
+      updateCountdowns();
+    }
+
+    function updateCountdowns() {
+      const now = Date.now();
+      document.querySelectorAll('.countdown-badge').forEach(el => {
+        const raw = el.getAttribute('data-time');
+        const target = new Date(raw.replace(/-/g, '/')).getTime();
+        if (isNaN(target)) return;
+        const diff = target - now;
+        if (diff <= 0) {
+          el.textContent = '已开票';
+          return;
+        }
+        const d = Math.floor(diff / 86400000);
+        const h = Math.floor((diff % 86400000) / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        el.textContent = `剩 ${d}天${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+      });
+    }
+
+    // ================= 3. RSS 社交动态聚合抓取与时间线渲染 =================
+    async function loadAllFeeds(force = false) {
+      const cacheKey = 'artist_feeds_cache_v1';
+      const cached = localStorage.getItem(cacheKey);
+      if (!force && cached) {
+        const parsed = JSON.parse(cached);
+        if (Date.now() - parsed.ts < 5 * 60 * 1000) {
+          allPosts = parsed.data;
+          document.getElementById('last-sync').textContent = '已加载缓存 · ' + new Date(parsed.ts).toLocaleTimeString();
+          initUI();
+          return;
+        }
+      }
+
+      document.getElementById('timeline-list').innerHTML = `<div class="text-center py-10 text-sm text-slate-400">正在同步各平台最新动态...</div>`;
+      const results = [];
+
+      await Promise.all(FEEDS.map(async feed => {
+        try {
+          const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(feed.url)}`;
+          const res = await fetch(proxyUrl);
+          const data = await res.json();
+          const doc = new DOMParser().parseFromString(data.contents, 'text/xml');
+          const nodes = [...doc.querySelectorAll('item'), ...doc.querySelectorAll('entry')];
+
+          nodes.forEach(node => {
+            const title = node.querySelector('title')?.textContent || '';
+            const desc = node.querySelector('description')?.textContent || node.querySelector('content')?.textContent || '';
+            const pubDate = node.querySelector('pubDate')?.textContent || node.querySelector('published')?.textContent || node.querySelector('updated')?.textContent || '';
+            const link = node.querySelector('link')?.textContent || node.querySelector('link')?.getAttribute('href') || '#';
+
+            const tmpDiv = document.createElement('div');
+            tmpDiv.innerHTML = desc;
+            const imgs = [...tmpDiv.querySelectorAll('img')].map(img => img.src).filter(Boolean);
+            const plainText = (tmpDiv.textContent || title).trim();
+            const timestamp = pubDate ? new Date(pubDate).getTime() : Date.now();
+
+            results.push({
+              platformId: feed.id,
+              platformName: feed.name,
+              platformColor: feed.color,
+              text: plainText,
+              imgs,
+              link,
+              timestamp: isNaN(timestamp) ? 0 : timestamp
+            });
+          });
+        } catch (err) {
+          console.warn('抓取失败:', feed.name, err);
+        }
+      }));
+
+      results.sort((a, b) => b.timestamp - a.timestamp);
+      allPosts = results;
+      localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: allPosts }));
+      document.getElementById('last-sync').textContent = '刚刚更新 · ' + new Date().toLocaleTimeString();
+      initUI();
+    }
+
+    function initUI() {
+      // 渲染置顶最新动态
+      if (allPosts.length > 0) {
+        const top = allPosts[0];
+        document.getElementById('latest-spotlight').classList.remove('hidden');
+        document.getElementById('spotlight-platform').textContent = top.platformName;
+        document.getElementById('spotlight-time').textContent = formatTimeAgo(top.timestamp);
+        document.getElementById('spotlight-text').textContent = top.text.slice(0, 140) + (top.text.length > 140 ? '...' : '');
+        document.getElementById('spotlight-link').href = top.link;
+      }
+
+      // 渲染平台胶囊
+      const tabs = [{ id: 'ALL', name: `全部 (${allPosts.length})` }, ...FEEDS.map(f => ({
+        id: f.id,
+        name: `${f.name} (${allPosts.filter(p => p.platformId === f.id).length})`
+      }))];
+
+      document.getElementById('platform-tabs').innerHTML = tabs.map(t => `
+        <button onclick="setPlatform('${t.id}')" class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition ${activePlatform === t.id ? 'bg-slate-900 text-white dark:bg-indigo-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}">
+          ${t.name}
+        </button>
+      `).join('');
+
+      renderTimeline();
+    }
+
+    function setPlatform(id) {
+      activePlatform = id;
+      initUI();
+    }
+
+    function clearDate() {
+      document.getElementById('date-filter').value = '';
+      renderTimeline();
+    }
+
+    function renderTimeline() {
+      const dateVal = document.getElementById('date-filter').value;
+      const kw = document.getElementById('keyword-filter').value.trim().toLowerCase();
+
+      const filtered = allPosts.filter(p => {
+        if (activePlatform !== 'ALL' && p.platformId !== activePlatform) return false;
+        if (dateVal) {
+          const d = new Date(p.timestamp);
+          const localDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          if (localDate !== dateVal) return false;
+        }
+        if (kw && !p.text.toLowerCase().includes(kw)) return false;
+        return true;
+      });
+
+      const listEl = document.getElementById('timeline-list');
+      if (!filtered.length) {
+        listEl.innerHTML = `<div class="text-center py-10 text-sm text-slate-400">没有符合筛选条件的动态</div>`;
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(p => {
+        const dateStr = new Date(p.timestamp).toLocaleString('zh-CN', { hour12: false });
+        const imgsHtml = p.imgs.slice(0, 4).map(src => `
+          <a href="${src}" target="_blank">
+            <img src="${src}" loading="lazy" class="w-full h-36 object-cover rounded-lg border border-slate-200 dark:border-slate-800" />
+          </a>
+        `).join('');
+
+        return `
+          <article class="p-4 sm:p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+            <div class="flex items-center justify-between text-xs">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded text-white font-semibold" style="background:${p.platformColor}">${p.platformName}</span>
+                <span class="text-slate-500">${formatTimeAgo(p.timestamp)} · ${dateStr}</span>
+              </div>
+              <a href="${p.link}" target="_blank" class="text-slate-400 hover:text-indigo-500">原帖 ↗</a>
+            </div>
+            <p class="text-sm leading-relaxed whitespace-pre-line line-clamp-4 cursor-pointer" onclick="this.classList.toggle('line-clamp-4')">${p.text}</p>
+            ${imgsHtml ? `<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">${imgsHtml}</div>` : ''}
+          </article>
+        `;
+      }).join('');
+    }
+
+    function formatTimeAgo(ts) {
+      const diff = Math.floor((Date.now() - ts) / 1000);
+      if (diff < 60) return '刚刚';
+      if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
+      if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+      return Math.floor(diff / 86400) + ' 天前';
+    }
+
+    loadTourData();
+    loadAllFeeds();
+  </script>
+</body>
+</html>
