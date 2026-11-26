@@ -215,3 +215,25 @@ function openHiddenAdminDrawer() {
     if (typeof renderAdminTodoQueue === 'function') renderAdminTodoQueue();
   }
 }
+function updateAiKeyStatusUI() {
+  const hasKey = Boolean((localStorage.getItem(GEMINI_KEY_STORAGE) || '').trim());
+  const el = document.getElementById('ai-key-status');
+  if (el) {
+    el.textContent = hasKey ? '已配置' : '未配置';
+    el.className = hasKey ? 'text-emerald-700 font-bold' : '';
+  }
+}
+
+function configGeminiKey() {
+  const current = localStorage.getItem(GEMINI_KEY_STORAGE) || '';
+  const input = prompt('请输入 Google AI Studio (Gemini) API Key（留空确定可清除）：', current);
+  if (input === null) return;
+  if (input.trim()) {
+    localStorage.setItem(GEMINI_KEY_STORAGE, input.trim());
+    alert('AI 识图密钥已保存！');
+  } else {
+    localStorage.removeItem(GEMINI_KEY_STORAGE);
+    alert('已清除 AI 识图密钥。');
+  }
+  updateAiKeyStatusUI();
+}
