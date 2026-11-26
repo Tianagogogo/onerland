@@ -55,7 +55,7 @@
         <button onclick="lockAdminMode()" class="text-xs text-slate-400 hover:text-rose-500">退出管理模式</button>
       </div>
 
-      <textarea id="raw-post-input" rows="3" placeholder="直接粘贴微博 / 小红书 / 抖音 / B站分享口令或巡演官宣全文（自动拆解巡演主题、城市、场馆、多轮开票时间，并自动匹配交通枢纽到场馆路线）..."
+      <textarea id="raw-post-input" rows="3" placeholder="直接粘贴微博 / 小红书 / 抖音 / B站分享口令或巡演、音乐节官宣全文..."
         class="w-full text-xs sm:text-sm p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:border-indigo-500"></textarea>
 
       <div class="flex items-center gap-2 flex-wrap">
@@ -99,17 +99,17 @@
             <input id="cp-url-ticket" type="text" placeholder="https://..." class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950" />
           </div>
 
-          <!-- 巡演专属结构化字段（支持多轮开票倒计时 + 交通枢纽攻略） -->
+          <!-- 巡演 / 音乐节专属结构化字段 -->
           <div id="cp-tour-fields" class="hidden sm:col-span-2 space-y-3 p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/20">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div class="sm:col-span-2">
-                <label class="text-amber-700 dark:text-amber-300 font-medium block mb-1">巡演主题与城市站次（显示为卡片主标题）</label>
-                <input id="cp-tour-title" type="text" placeholder="如：「极尽声色」巡回演唱会 · 合肥站" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950" />
+                <label class="text-amber-700 dark:text-amber-300 font-medium block mb-1">巡演或音乐节名称与城市站次</label>
+                <input id="cp-tour-title" type="text" placeholder="如：「极尽声色」巡回演唱会 · 合肥站 或 XX音乐节" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950" />
               </div>
               <div>
-                <label class="text-slate-500 block mb-1">演出场馆（输入后可点右侧自动匹配交通）</label>
+                <label class="text-slate-500 block mb-1">演出场馆 / 音乐节场地</label>
                 <div class="flex gap-1.5">
-                  <input id="cp-tour-venue" type="text" placeholder="如：合肥少荃体育中心体育馆" class="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950" />
+                  <input id="cp-tour-venue" type="text" placeholder="如：合肥少荃体育中心体育馆 或 户外草坪" class="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950" />
                   <button type="button" onclick="autoFillVenueTransport()" class="px-2.5 py-1.5 rounded-lg bg-sky-500/15 text-sky-700 dark:text-sky-300 hover:bg-sky-500/25 shrink-0 font-medium">
                     🚇 匹配路线
                   </button>
@@ -118,6 +118,10 @@
               <div>
                 <label class="text-slate-500 block mb-1">演出日期</label>
                 <input id="cp-tour-showdate" type="text" placeholder="如：2026-12-26 (周六)" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950" />
+              </div>
+              <div class="sm:col-span-2">
+                <label class="text-purple-700 dark:text-purple-300 font-medium block mb-1">预计演出时段备注（音乐节适用，可留空）</label>
+                <input id="cp-tour-slot" type="text" placeholder="如：16:20-17:00 预计登台 / 下午主舞台场次" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950" />
               </div>
             </div>
 
@@ -135,10 +139,10 @@
             <!-- 交通枢纽到场馆路线指南 -->
             <div class="pt-2 border-t border-amber-500/15 space-y-1.5">
               <div class="flex items-center justify-between">
-                <label class="text-sky-700 dark:text-sky-300 font-semibold">🚇 交通枢纽到场馆具体时间与路线（地铁 / 高铁站 / 机场）</label>
+                <label class="text-sky-700 dark:text-sky-300 font-semibold">🚇 交通枢纽到场馆具体时间与路线（地铁 / 高铁站 / 机场 / 接驳车）</label>
                 <span class="text-[11px] text-slate-400">每行一条，支持自由修改</span>
               </div>
-              <textarea id="cp-tour-transport" rows="4" placeholder="例如：&#10;🚇 地铁：4号线「综保区站」B口出站，步行约650米（10分钟）&#10;🚄 高铁南站：地铁4号线直达（约45分钟）；打车约21公里（30分钟）&#10;✈️ 新桥机场：机场巴士3号线至高铁南站转地铁4号线（约85分钟）；打车约60分钟"
+              <textarea id="cp-tour-transport" rows="4" placeholder="系统将根据城市、场馆或官宣文案自动匹配交通路线，也可在此自定义粘贴..."
                 class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 leading-relaxed"></textarea>
             </div>
           </div>
@@ -270,7 +274,7 @@
     let cloudTickets = [];
     let cloudFeeds = [];
 
-    // ================= 内置城市场馆交通枢纽路线数据库 =================
+    // ================= 内置全国 20+ 热门巡演城市场馆交通数据库 =================
     const VENUE_TRANSPORT_DB = [
       {
         keywords: ['合肥', '少荃'],
@@ -282,49 +286,73 @@
         ].join('\n')
       },
       {
-        keywords: ['北京', '五棵松', '润百颜', '华熙'],
+        keywords: ['北京', '五棵松', '润百颜', '华熙', '国家体育馆', '工体', '工人体育场', '鸟巢', '首都体育馆'],
         routes: [
-          '🚇 地铁：1号线「五棵松站」B1/B2口出站，经地下连廊步行约2分钟直达场馆',
-          '🚄 北京西站/南站：西站乘9号线至军事博物馆转1号线（约25分钟）；南站乘4号线至西单转1号线（约40分钟）',
+          '🚇 地铁：五棵松/润百颜ECM乘1号线「五棵松站」B1/B2口步行2分钟；国家体育馆/鸟巢乘8号线「奥林匹克公园站」；首体乘4/9号线「国家图书馆站」',
+          '🚄 北京西站/南站：西站乘9号线至军事博物馆转1号线至五棵松（约25分钟）；南站乘4号线至西单转1号线（约40分钟）',
           '✈️ 首都国际机场：首都机场线至东直门转2号线至建国门再转1号线（约65分钟）；打车约35-45分钟',
           '✈️ 大兴国际机场：大兴机场线至草桥转10号线至公主坟再转1号线（约70分钟）；打车约55分钟'
         ].join('\n')
       },
       {
-        keywords: ['西安', '奥体'],
+        keywords: ['西安', '奥体', '曲江', '陕西省体育场'],
         routes: [
-          '🚇 地铁：14号线「奥体中心站」出站即达；或3号线「国际港务区站」B1口向东步行约10分钟（14号线末班车约23:07）',
+          '🚇 地铁：西安奥体中心乘14号线「奥体中心站」出站即达（末班车约23:07）；曲江竞技中心乘4号线「金滹沱站」',
           '🚄 西安北站（高铁）：地铁14号线直达「奥体中心站」（仅3站，约12分钟，无需换乘）',
           '🚉 西安站：地铁4号线至北客站(北广场)换乘14号线至「奥体中心站」（约40分钟）',
           '✈️ 咸阳国际机场：地铁14号线直达「奥体中心站」（约45分钟，无需另购城际票）'
         ].join('\n')
       },
       {
-        keywords: ['上海', '梅赛德斯', '奔驰文化中心', '东方体育'],
+        keywords: ['上海', '梅赛德斯', '奔驰文化中心', '东方体育', '静安体育', '浦发银行', '虹口', '徐家汇', '上海体育馆'],
         routes: [
-          '🚇 地铁：梅奔中心乘8号线「中华艺术宫站」4号口步行5分钟；东方体育中心乘6/8/11号线「东方体育中心站」直达',
+          '🚇 地铁：梅奔中心乘8号线「中华艺术宫站」4号口步行5分钟；东方体育中心乘6/8/11号线直达；上海体育馆乘1/4号线直达',
           '🚄 上海虹桥站/机场：地铁10号线至老西门换乘8号线（约45-50分钟）；打车约35-45分钟',
           '✈️ 浦东国际机场：地铁2号线至龙阳路转7号线至耀华路再转8号线（约75分钟）'
         ].join('\n')
       },
       {
-        keywords: ['广州', '宝能', '体育馆'],
+        keywords: ['广州', '宝能', '体育馆', '天河', '海心沙', '亚运城'],
         routes: [
-          '🚇 地铁：6号线/7号线「萝岗站」C/D口出站步行约5分钟（宝能广州国际体育演艺中心）',
+          '🚇 地铁：宝能演艺中心乘6/7号线「萝岗站」C/D口步行5分钟；天河体育中心乘1/3号线「体育西路站」',
           '🚄 广州南站（高铁）：地铁7号线直达「萝岗站」（约55分钟，无需换乘）',
           '✈️ 白云国际机场：地铁3号线北延段至燕塘转6号线至「萝岗站」（约65分钟）'
         ].join('\n')
       },
       {
-        keywords: ['成都', '东安湖', '凤凰山'],
+        keywords: ['深圳', '大运', '春茧', '深圳湾', '宝安体育'],
         routes: [
-          '🚇 地铁：东安湖乘2号线至连山坡转K6/摆渡车；凤凰山体育公园乘5号线「杜家碾站」D1口出站即达',
-          '🚄 成都东站（高铁）：至东安湖打车约20分钟；至凤凰山乘7号线至北站西二路转5号线（约40分钟）',
-          '✈️ 天府/双流机场：双流机场乘10号线转7号线再转5号线；天府机场乘18号线转1/7号线接驳'
+          '🚇 地铁：大运中心乘16号线「大运中心站」C/D口步行5分钟；春茧/深圳湾乘2/11号线「后海站」H口步行10分钟',
+          '🚄 深圳北站（高铁）：至大运乘5号线至布吉转14号线至大运站再转16号线（约50分钟）；至深圳湾乘4号线转2号线（约45分钟）',
+          '✈️ 宝安国际机场：地铁11号线直达「后海站」（约35分钟）；至大运乘11号线转14号线（约75分钟）'
         ].join('\n')
       },
       {
-        keywords: ['南京', '奥体', '青奥'],
+        keywords: ['杭州', '奥体', '小莲花', '大莲花', '黄龙'],
+        routes: [
+          '🚇 地铁：杭州奥体中心乘6/7号线「奥体中心站」A/C口步行5分钟；黄龙体育中心乘3/10号线「黄龙体育中心站」',
+          '🚄 杭州东站（高铁）：地铁6号线直达「奥体中心站」（约25分钟，无需换乘）',
+          '✈️ 萧山国际机场：地铁7号线直达「奥体中心站」（约30分钟，无需换乘）'
+        ].join('\n')
+      },
+      {
+        keywords: ['成都', '东安湖', '凤凰山', '金融城', '高新体育'],
+        routes: [
+          '🚇 地铁：凤凰山乘5号线「杜家碾站」D1口出站即达；东安湖乘2号线至连山坡转K6/摆渡车；高新体育中心乘1/18号线「孵化园站」',
+          '🚄 成都东站（高铁）：至东安湖打车约20分钟；至凤凰山乘7号线至北站西二路转5号线（约40分钟）',
+          '✈️ 双流/天府机场：双流乘10号线转7号线；天府机场乘18号线直达市区换乘（约50-70分钟）'
+        ].join('\n')
+      },
+      {
+        keywords: ['重庆', '华熙', '鱼洞', '奥体', '国际博览', '悦来'],
+        routes: [
+          '🚇 地铁：华熙LIVE·鱼洞乘2/3号线「鱼洞站」步行8分钟；国博中心乘6/10号线「悦来站」',
+          '🚄 重庆西站/北站：重庆北站乘3号线直达「鱼洞站」（约65分钟）或10号线直达「悦来站」（约25分钟）',
+          '✈️ 江北国际机场：地铁3号线直达「鱼洞站」（约75分钟）或10号线直达「悦来站」（约15分钟）'
+        ].join('\n')
+      },
+      {
+        keywords: ['南京', '奥体', '青奥', '五台山', '太阳宫'],
         routes: [
           '🚇 地铁：2号线「奥体东站」或10号线「奥体中心站」出站步行约5-8分钟',
           '🚄 南京南站（高铁）：地铁1号线至安德门换乘10号线至「奥体中心站」（约25分钟）',
@@ -332,11 +360,83 @@
         ].join('\n')
       },
       {
-        keywords: ['武汉', '光谷', '五环'],
+        keywords: ['武汉', '光谷', '五环', '沌口', '洪山'],
         routes: [
-          '🚇 地铁：光谷国际网球中心乘11号线「光谷同济医院站」；五环体育中心乘1号线「五环大道站」转有轨电车/步行',
+          '🚇 地铁：光谷网球中心乘11号线「光谷同济医院站」；五环体育中心乘1号线「五环大道站」；沌口乘3/6号线「东风公司站」',
           '🚄 武汉站（高铁）：至光谷乘19号线直达（约25分钟）；至汉口站/武昌站可乘2号线/4号线换乘',
           '✈️ 天河国际机场：地铁2号线至光谷广场换乘11号线（约85分钟）'
+        ].join('\n')
+      },
+      {
+        keywords: ['长沙', '贺龙', '芒果馆', '国际会展', '梅溪湖'],
+        routes: [
+          '🚇 地铁：贺龙体育中心乘1/3号线「侯家塘站」；国际会展中心乘2/4号线「光达站」',
+          '🚄 长沙南站（高铁）：地铁2/4号线直达「光达站」（仅1站，约5分钟）；至侯家塘乘4号线转1号线（约30分钟）',
+          '✈️ 黄花国际机场：磁浮快线至高铁南站换乘地铁2/4号线（约35分钟）'
+        ].join('\n')
+      },
+      {
+        keywords: ['苏州', '奥体', '独墅湖', '文化艺术中心'],
+        routes: [
+          '🚇 地铁：苏州奥体中心乘5/6号线「苏州奥体中心站」出站即达',
+          '🚄 苏州站/苏州北站：苏州站乘4号线至南门转5号线（约35分钟）；苏州北站乘2号线至骑河转5号线（约45分钟）',
+          '✈️ 无锡硕放机场：机场大巴至苏州火车站转地铁5号线（约65分钟）'
+        ].join('\n')
+      },
+      {
+        keywords: ['天津', '奥体', '水滴', '梅江', '体育馆'],
+        routes: [
+          '🚇 地铁：天津奥体中心(水滴)乘5/6号线「肿瘤医院站」或「水上公园东路站」步行8分钟',
+          '🚄 天津站/天津南站：天津站乘3号线至营口道转1号线再转5/6号线（约30分钟）；南站乘3号线转6号线（约35分钟）',
+          '✈️ 滨海国际机场：地铁2号线至靖江路换乘5号线直达（约45分钟）'
+        ].join('\n')
+      },
+      {
+        keywords: ['郑州', '奥体', '国际会展'],
+        routes: [
+          '🚇 地铁：郑州奥体中心乘6/14号线「奥体中心站」出站即达',
+          '🚄 郑州东站（高铁）：地铁1号线至铁炉换乘14号线至「奥体中心站」（约50分钟）',
+          '✈️ 新郑国际机场：城郊线至南四环转2号线再转6号线（约75分钟）'
+        ].join('\n')
+      },
+      {
+        keywords: ['青岛', '国信', '市民健身中心', '凤凰之声'],
+        routes: [
+          '🚇 地铁：国信体育中心乘4号线「劲松七路站」步行8分钟；市民健身中心乘8号线「健身中心(红岛会展)站」',
+          '🚄 青岛北站（高铁）：至市民健身中心乘8号线直达（约20分钟）；至国信乘3号线转4号线（约35分钟）',
+          '✈️ 胶东国际机场：地铁8号线直达「健身中心站」（约25分钟）或至青岛北站换乘'
+        ].join('\n')
+      },
+      {
+        keywords: ['厦门', '凤凰体育', '白鹭', '海峡大剧院', '嘉庚'],
+        routes: [
+          '🚇 地铁：厦门奥林匹克体育中心(凤凰体育馆/白鹭体育场)乘3号线「国际博览中心站」4号口出站即达',
+          '🚄 厦门北站（高铁）：地铁1号线至火炬园换乘3号线至「国际博览中心站」（约45分钟）',
+          '✈️ 高崎国际机场：打车至凤凰体育馆约18分钟；或乘BRT/地铁换乘3号线（约35分钟）'
+        ].join('\n')
+      },
+      {
+        keywords: ['福州', '海峡奥体'],
+        routes: [
+          '🚇 地铁：福州海峡奥体中心乘5号线「霞镜站」或「东岭站」出站步行约8-10分钟',
+          '🚄 福州南站（高铁）：地铁5号线直达「霞镜站」（约35分钟，无需换乘）',
+          '✈️ 长乐国际机场：机场大巴至市区换乘地铁5号线（约70分钟）'
+        ].join('\n')
+      },
+      {
+        keywords: ['宁波', '奥体'],
+        routes: [
+          '🚇 地铁：宁波奥体中心乘4号线「奥体中心站」出站步行约5分钟',
+          '🚄 宁波站（高铁）：地铁4号线直达「奥体中心站」（约25分钟，无需换乘）',
+          '✈️ 栎社国际机场：地铁2号线至鼓楼换乘1号线再转4号线（约50分钟）'
+        ].join('\n')
+      },
+      {
+        keywords: ['昆明', '滇池', '新亚洲', '拓东'],
+        routes: [
+          '🚇 地铁：滇池国际会展中心乘5号线「滇池国际会展中心站」出站即达',
+          '🚄 昆明南站（高铁）：地铁1号线至珥季路转公交/打车（约30分钟）；或乘4号线至菊华转5号线',
+          '✈️ 长水国际机场：地铁6号线至塘子巷换乘2号线再转5号线（约65分钟）'
         ].join('\n')
       }
     ];
@@ -358,7 +458,12 @@
       if (matched) {
         document.getElementById('cp-tour-transport').value = matched;
       } else {
-        alert('当前场馆暂未在内置城市库中，你可以直接在下方文本框粘贴该场馆的地铁/高铁/机场路线。');
+        const placeName = venue || '演出现场';
+        document.getElementById('cp-tour-transport').value = [
+          `🚌 乐迷接驳车：请关注主办方官方微博发布的「${placeName}」往返接驳大巴上车点`,
+          `🚄 高铁站 → ${placeName}：建议出站后换乘官方接驳车或网约车直达`,
+          `✈️ 机场 → ${placeName}：可点击卡片「导航 ↗」使用高德地图查看实时公交与打车预计耗时`
+        ].join('\n');
       }
     }
 
@@ -501,7 +606,7 @@
       return `${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())}T${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}`;
     }
 
-    // ================= 3. 多轮开票动态增减与智能解析 =================
+    // ================= 3. 多轮开票 + 预计演出时段 + 智能解析 =================
     function addTicketRoundRow(roundName = '正式开票', saleTime = '', platform = '大麦') {
       const container = document.getElementById('ticket-rounds-container');
       const row = document.createElement('div');
@@ -555,16 +660,16 @@
       else if (text.includes('灵超') || text.includes('DIDI')) artist = '灵超';
       else if (text.includes('坤音')) artist = '坤音娱乐';
 
-      const isTicket = /开票|预售|抢票|巡演|演唱会|大麦|秀动|售票时间|购票平台|优先购|特权购/.test(text);
+      const isTicket = /开票|预售|抢票|巡演|演唱会|音乐节|嘉年华|大麦|秀动|售票时间|购票平台|优先购|特权购/.test(text);
       document.getElementsByName('cloudEntryType').forEach(r => r.checked = (r.value === (isTicket ? 'ticket' : 'feed')));
 
       let defaultPlatform = '微博';
       if (isTicket) {
-        const platMatch = text.match(/(?:购票平台|售票平台)[：:]\s*([^\n\r⏰📍🗓️]+)/);
+        const platMatch = text.match(/(?:购票平台|售票平台|票务平台)[：:]\s*([^\n\r⏰📍🗓️]+)/);
         if (platMatch) {
           defaultPlatform = platMatch[1].trim();
         } else {
-          const foundPlats = ['大麦', '坤音商城小程序', '坤音商城', '猫眼', '携程', '票星球', '秀动'].filter(p => text.includes(p));
+          const foundPlats = ['大麦', '坤音商城小程序', '坤音商城', '猫眼', '携程', '票星球', '秀动', '纷玩岛'].filter(p => text.includes(p));
           if (foundPlats.length) defaultPlatform = [...new Set(foundPlats)].join(' | ');
         }
       } else {
@@ -576,17 +681,26 @@
         else if (/tiktok\.com|TikTok/i.test(text)) defaultPlatform = 'TikTok';
       }
 
-      const themeMatch = text.match(/[「《]([^」》]+)[」》]\s*(巡回演唱会|演唱会|巡演|见面会|音乐会)?/);
-      const themeStr = themeMatch ? `「${themeMatch[1]}」${themeMatch[2] || '巡回演唱会'}` : '巡回演唱会';
+      const themeMatch = text.match(/[「《]([^」》]+)[」》]\s*(巡回演唱会|演唱会|巡演|音乐节|嘉年华|见面会|音乐会)?/);
+      const festDirectMatch = text.match(/([\u4e00-\u9fa5A-Za-z0-9·]{2,16}(?:音乐节|嘉年华))/);
+      const themeStr = themeMatch
+        ? `「${themeMatch[1]}」${themeMatch[2] || (text.includes('音乐节') ? '音乐节' : '巡回演唱会')}`
+        : (festDirectMatch ? festDirectMatch[1] : '巡回演唱会');
 
       const cityMatch = text.match(/[「【\[]?([\u4e00-\u9fa5]{2,5}站)[」】\]]?/);
       const cityStr = cityMatch ? cityMatch[1] : '';
 
-      const venueMatch = text.match(/(?:演出地点|场馆|地点)[：:]\s*([^\n\r！!。]+)/);
-      const venueStr = venueMatch ? venueMatch[1].trim() : '官方已公布场馆';
+      let venueStr = '';
+      const venueLabelMatch = text.match(/(?:演出地点|演出场馆|活动地点|举办地点|场馆|场地|地址|地点|📍)\s*[：:]?\s*([^\n\r！!。⏰🗓️]+)/);
+      if (venueLabelMatch && venueLabelMatch[1].trim().length >= 3) {
+        venueStr = venueLabelMatch[1].trim();
+      } else {
+        const buildingMatch = text.match(/([\u4e00-\u9fa5A-Za-z0-9·]{2,22}(?:体育中心体育馆|体育中心|体育馆|体育场|演艺中心|文化中心|大剧院|艺术中心|展览中心|会展中心|ECM中心|音乐广场|草坪|公园|营地|度假区|博览园|赛车场|沙滩|生态岛|嬉戏谷))/);
+        if (buildingMatch) venueStr = buildingMatch[1].trim();
+      }
 
       const currentYear = new Date().getFullYear();
-      const showDateMatch = text.match(/(?:演出时间|演出日期)[：:]\s*(?:(\d{4})[年\.\-\/])?(\d{1,2})[月\.\-\/](\d{1,2})[日号]?\s*(?:[（(]?(周[一二三四五六日天]|星期[一二三四五六日天])[）)]?)?/);
+      const showDateMatch = text.match(/(?:演出时间|演出日期|活动时间|时间)[：:]\s*(?:(\d{4})[年\.\-\/])?(\d{1,2})[月\.\-\/](\d{1,2})[日号]?\s*(?:[（(]?(周[一二三四五六日天]|星期[一二三四五六日天])[）)]?)?/);
       let showDateStr = '';
       if (showDateMatch) {
         const y = showDateMatch[1] || currentYear;
@@ -594,6 +708,16 @@
         const da = showDateMatch[3].padStart(2, '0');
         const wk = showDateMatch[4] ? ` (${showDateMatch[4]})` : '';
         showDateStr = `${y}-${mo}-${da}${wk}`;
+      }
+
+      // 提取预计演出时段备注（如 16:20-17:00 或 下午16:30）
+      let slotStr = '';
+      const slotLabelMatch = text.match(/(?:预计演出时段|演出时段|登台时间|出场时间)[：:]\s*([^\n\r！!。]+)/);
+      if (slotLabelMatch) {
+        slotStr = slotLabelMatch[1].trim();
+      } else if (/音乐节|嘉年华/.test(text)) {
+        const rangeMatch = text.match(/\b(\d{1,2}:\d{2}\s*[-~—至]\s*\d{1,2}:\d{2})\b/);
+        if (rangeMatch) slotStr = rangeMatch[1].trim();
       }
 
       const roundsContainer = document.getElementById('ticket-rounds-container');
@@ -625,7 +749,23 @@
       detectedRounds.forEach(r => addTicketRoundRow(r.round_name, r.sale_time, r.platform));
 
       const fullTourTitle = cityStr ? `${themeStr} · ${cityStr}` : themeStr;
-      const matchedTransport = findPresetTransport(`${fullTourTitle} ${venueStr} ${text}`);
+
+      let matchedTransport = '';
+      const textTransportMatch = text.match(/(?:交通指南|出行攻略|交通接驳|接驳车|交通方式|到达方式)[：:]?\s*([\s\S]{10,300}?)(?=\n\s*\n|#|@|$)/);
+      if (textTransportMatch) {
+        matchedTransport = textTransportMatch[1].trim();
+      } else {
+        matchedTransport = findPresetTransport(`${fullTourTitle} ${venueStr} ${text}`);
+      }
+
+      if (!matchedTransport && isTicket) {
+        const placeName = venueStr || '演出现场';
+        matchedTransport = [
+          `🚌 乐迷接驳车：请关注主办方官方微博发布的「${placeName}」往返接驳大巴上车点`,
+          `🚄 高铁站 → ${placeName}：建议出站后换乘官方接驳车或网约车直达`,
+          `✈️ 机场 → ${placeName}：可点击卡片「导航 ↗」使用高德地图查看实时公交与打车预计耗时`
+        ].join('\n');
+      }
 
       let cleanText = text
         .replace(/https?:\/\/\S+/g, '')
@@ -640,6 +780,7 @@
       document.getElementById('cp-tour-title').value = fullTourTitle;
       document.getElementById('cp-tour-venue').value = venueStr;
       document.getElementById('cp-tour-showdate').value = showDateStr;
+      document.getElementById('cp-tour-slot').value = slotStr;
       document.getElementById('cp-tour-transport').value = matchedTransport;
       document.getElementById('cp-content').value = cleanText;
       document.getElementById('cp-content').placeholder = '请在此粘贴或补充具体博文正文（支持多行）...';
@@ -690,12 +831,13 @@
       try {
         if (type === 'ticket') {
           const tourTitle = document.getElementById('cp-tour-title').value.trim();
-          const venue = document.getElementById('cp-tour-venue').value.trim() || '待官方公布';
+          const venue = document.getElementById('cp-tour-venue').value.trim() || '场馆待补充';
           const showDate = document.getElementById('cp-tour-showdate').value.trim();
+          const slotNote = document.getElementById('cp-tour-slot').value.trim();
           const transportText = document.getElementById('cp-tour-transport').value.trim();
           const url = document.getElementById('cp-url-ticket').value.trim();
 
-          if (!tourTitle) throw new Error('请填写巡演主题与城市站次！');
+          if (!tourTitle) throw new Error('请填写巡演或音乐节名称与城市站次！');
 
           const rounds = [];
           document.querySelectorAll('.ticket-round-row').forEach(row => {
@@ -712,8 +854,8 @@
           rounds.sort((a, b) => new Date(a.sale_time.replace(/-/g, '/')) - new Date(b.sale_time.replace(/-/g, '/')));
           const earliestIsoTime = rounds[0].sale_time.replace(' ', 'T');
 
-          const structuredTitle = `${artist}|${tourTitle}|${venue}|${showDate || rounds[0].sale_time}`;
-          const tourMetaObj = { rounds, transport: transportText };
+          const structuredTitle = `${artist}|${tourTitle}|${venue}|${showDate || rounds[0].sale_time}|${slotNote}`;
+          const tourMetaObj = { rounds, transport: transportText, slot: slotNote };
           const encodedMeta = `META:${JSON.stringify(tourMetaObj)}`;
           const payload = { title: structuredTitle, ticket_time: earliestIsoTime, platform: encodedMeta, url };
 
@@ -895,7 +1037,7 @@
       loadAllFeeds(true);
     }
 
-    // ================= 5. 巡演日程加载（自动解析多轮开票倒计时 + 交通路线） =================
+    // ================= 5. 巡演日程加载 =================
     async function loadTourData() {
       cloudTickets = [];
       try {
@@ -906,8 +1048,9 @@
             const parts = r.title.split('|');
             const artist = parts.length > 1 ? parts[0] : 'ONER';
             const cityTitle = parts.length > 1 ? parts[1] : r.title;
-            const venue = parts.length > 2 ? parts[2] : '待官方公布';
+            const venue = parts.length > 2 ? parts[2] : '场馆待补充';
             const showDate = parts.length > 3 ? parts[3] : r.ticket_time.replace('T', ' ');
+            let slotNote = parts.length > 4 ? parts.slice(4).join('|') : '';
 
             let parsedRounds = [];
             let savedTransport = '';
@@ -917,6 +1060,7 @@
                 const meta = JSON.parse(r.platform.slice(5));
                 if (Array.isArray(meta.rounds)) parsedRounds = meta.rounds;
                 if (meta.transport) savedTransport = meta.transport;
+                if (meta.slot) slotNote = meta.slot;
               } catch (e) {}
             } else if (r.platform && r.platform.startsWith('ROUNDS:')) {
               try {
@@ -932,7 +1076,6 @@
               }];
             }
 
-            // 如果旧记录里未手动存过交通路线，则自动根据城市/场馆名称匹配内置交通数据库
             if (!savedTransport) {
               savedTransport = findPresetTransport(`${cityTitle} ${venue}`);
             }
@@ -943,6 +1086,7 @@
               city: cityTitle,
               venue,
               show_date: showDate,
+              slot: slotNote,
               source_url: r.url || '#',
               rounds: parsedRounds,
               transport: savedTransport
@@ -977,7 +1121,8 @@
       container.innerHTML = filteredTours.map((item, idx) => {
         const matchedArtist = artistsConfig.find(a => a.artistName.toLowerCase() === (item.artist || '').toLowerCase());
         const artistBadgeBg = matchedArtist?.badgeStyle || '#4f46e5';
-        const amapSearchUrl = `https://uri.amap.com/search?keyword=${encodeURIComponent(item.venue)}`;
+        const navKeyword = (item.venue && !item.venue.includes('待')) ? item.venue : item.city;
+        const amapSearchUrl = `https://uri.amap.com/search?keyword=${encodeURIComponent(navKeyword)}`;
 
         const roundsHtml = (item.rounds || []).map(r => {
           const targetTs = new Date(r.sale_time.replace(/-/g, '/')).getTime();
@@ -1015,8 +1160,9 @@
                   ${(isAdmin && item.cloudId) ? `<button onclick="deleteCloudRecord('tickets', ${item.cloudId})" class="text-xs text-rose-500 hover:underline">删除</button>` : ''}
                 </div>
               </div>
-              <div class="flex items-center justify-between gap-2 mt-1.5 flex-wrap">
-                <p class="text-xs text-slate-500">📍 ${item.venue} ｜ 🗓️ ${item.show_date}</p>
+              <p class="text-xs text-slate-500 mt-1.5">📍 ${item.venue} ｜ 🗓️ ${item.show_date}</p>
+              <div class="flex items-center justify-between gap-2 mt-2 flex-wrap">
+                ${item.slot ? `<span class="text-[11px] px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-300 font-medium">🎤 预计演出时段：${item.slot}</span>` : '<span></span>'}
                 <div class="flex items-center gap-2">
                   <button onclick="toggleTransportDrawer(${idx})" class="text-[11px] px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-700 dark:text-sky-300 hover:bg-sky-500/20 font-medium transition">
                     🚇 交通路线攻略 ▾
@@ -1030,7 +1176,7 @@
               <!-- 可折叠的交通枢纽路线抽屉 -->
               <div id="transport-box-${idx}" class="hidden mt-2.5 p-2.5 rounded-lg bg-sky-500/5 border border-sky-500/20 text-xs text-slate-600 dark:text-slate-300 space-y-1 leading-relaxed whitespace-pre-line">
                 <div class="font-semibold text-sky-700 dark:text-sky-300 mb-1">🚇 交通枢纽 → ${item.venue}：</div>
-                ${item.transport || '暂无预设路线，可点击右侧「导航 ↗」使用高德地图一键规划。'}
+                ${item.transport || '该场地暂未录入预设路线，可点击右侧「导航 ↗」一键使用高德地图规划路线。'}
               </div>
             </div>
 
