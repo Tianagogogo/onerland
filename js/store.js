@@ -1,330 +1,217 @@
-let isAdmin = localStorage.getItem('onerland_admin_pin') === ADMIN_PIN;
-let activeMainTab = 'shows';
-let editingTicketId = null;
-let isArchiveExpanded = false;
-let cloudTickets = [];
-let cloudArchives = [];
-let cloudFeeds = [];
-let activeArchiveType = 'ALL';
-let batchParsedItems = [];
-let cpScheduleImgs = [];
-let arcScheduleImgs = [];
-let cpViewImgs = [];
-let arcViewImgs = [];
-let artistsConfig = loadArtistsConfig();
-let activeArtistId = 'ALL';
-let activeAccountId = 'ALL';
-let allPosts = [];
-let tourSchedules = [];
-const popoverCloseTimers = {};
+const AppState = {
+  isAdmin: localStorage.getItem('onerland_admin_pin') === ADMIN_PIN,
+  activeTab: 'home', // 'home' | 'shows' | 'footprint' | 'feeds'
+  activeArtistId: 'ALL',
+  activeAccountId: 'ALL',
+  activeArchiveType: 'ALL',
+  isArchiveExpanded: false,
+  editingTicketId: null,
+  cloudTickets: [],
+  cloudArchives: [],
+  allPosts: [],
+  artistsConfig: JSON.parse(localStorage.getItem(LOCAL_KEYS.ARTISTS) || 'null') || DEFAULT_ARTISTS,
+  // 纯本地隐私状态（绝不上传云端）
+  fanPref: JSON.parse(localStorage.getItem(LOCAL_KEYS.FAN_PREF) || 'null') || {
+    biasType: 'group', // 'group' | 'solo' | 'cp'
+    biasMembers: ['ONER'],
+    autoFilterShows: false,
+    silentMatchNote: ''
+  },
+  footprints: JSON.parse(localStorage.getItem(LOCAL_KEYS.FOOTPRINTS) || '[]'),
+  anniversary: JSON.parse(localStorage.getItem(LOCAL_KEYS.ANNIVERSARY) || 'null') || {
+    firstMeetDate: '2018-08-30',
+    fanNickname: '万能人',
+    customEvents: [
+      { title: 'ONER 出道纪念日', date: '08-30' },
+      { title: '岳岳生日', date: '07-11' },
+      { title: '木子洋生日', date: '04-21' },
+      { title: '灵超生日', date: '01-09' }
+    ]
+  },
+  pendingExternalUrl: ''
+};
 
-function loadArtistsConfig() {
-  const saved = localStorage.getItem(STORAGE_ARTISTS_KEY);
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    } catch (e) {}
-  }
-  return JSON.parse(JSON.stringify(DEFAULT_ARTISTS));
+function saveLocalState(key, val) {
+  localStorage.setItem(key, JSON.stringify(val));
 }
 
-function saveArtistsConfig() {
-  localStorage.setItem(STORAGE_ARTISTS_KEY, JSON.stringify(artistsConfig));
-}
-
-function getLocalDatetimeString(dateObj = new Date()) {
-  const pad = n => String(n).padStart(2, '0');
-  return `${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())}T${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}`;
-}
-
+// 4页主导航切换（浏览态与管理态彻底分离）
 function switchMainTab(tab) {
-  activeMainTab = tab;
-  const showsPage = document.getElementById('view-shows-page');
-  const feedsPage = document.getElementById('view-feeds-page');
-  const tabShowsBtn = document.getElementById('nav-tab-shows');
-  const tabFeedsBtn = document.getElementById('nav-tab-feeds');
+  AppState.activeTab = tab;
+  const tabs = ['home', 'shows', 'footprint', 'feeds'];
+  tabs.forEach(t => {
+    const view = document.getElementById(`view-${t}-page`);
+    if (view) view.classList.toggle('hidden', t !== tab);
 
-  if (tab === 'shows') {
-    showsPage.classList.remove('hidden');
-    feedsPage.classList.add('hidden');
-    tabShowsBtn.className = 'px-3 py-1 rounded-full obsidian-btn font-semibold transition';
-    tabFeedsBtn.className = 'px-3 py-1 rounded-full text-slate-600 hover:text-slate-900 font-medium transition';
-  } else {
-    showsPage.classList.add('hidden');
-    feedsPage.classList.remove('hidden');
-    tabFeedsBtn.className = 'px-3 py-1 rounded-full obsidian-btn font-semibold transition';
-    tabShowsBtn.className = 'px-3 py-1 rounded-full text-slate-600 hover:text-slate-900 font-medium transition';
-    renderFeedsSectionOnly();
-  }
+    ['top-tab-', 'bottom-tab-'].forEach(prefix => {
+      const btn = document.getElementById(`${prefix}${t}`);
+      if (!btn) return;
+      if (t === tab) {
+        btn.classList.add('obsidian-btn', 'text-white', 'font-semibold');
+        btn.classList.remove('text-slate-600');
+      } else {
+        btn.classList.remove('obsidian-btn', 'text-white', 'font-semibold');
+        btn.classList.add('text-slate-600');
+      }
+    });
+  });
+
+  if (tab === 'home') renderHomeDashboard();
+  if (tab === 'shows') { renderThemeQuickBar(); renderTourCards(); renderArchiveTimeline(); }
+  if (tab === 'footprint') renderFootprintPage();
+  if (tab === 'feeds') renderFeedsSectionOnly();
 }
 
-function refreshCurrentTab() {
-  if (activeMainTab === 'shows') loadTourData();
-  else loadAllFeeds(true);
+// 演出名称前缀正则自动归类专题（解决同系列自动聚合）
+function extractSeriesPrefix(fullTitle, savedTheme = '') {
+  if (savedTheme) return savedTheme.trim();
+  const str = (fullTitle || '').trim();
+  const bracketMatch = str.match(/^([「《【\[][^」》】\]]+[」》】\]]\s*(?:巡回演唱会|演唱会|巡演|音乐节|嘉年华|见面会|音乐会)?)/);
+  if (bracketMatch) return bracketMatch[1].trim();
+  const dashMatch = str.match(/^([^·\-—|]+?)\s*[·\-—|]\s*.+站$/);
+  if (dashMatch && dashMatch[1].length >= 2) return dashMatch[1].trim();
+  return '';
 }
 
-function toggleArtistMenu(e) {
-  e.stopPropagation();
-  document.getElementById('artist-dropdown-menu').classList.toggle('hidden');
+function cleanSocialPostText(rawText) {
+  if (!rawText) return '';
+  return rawText
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/\[?(?:图片|视频|微博视频|查看图片|网页链接|直播|超话)\]?/g, '')
+    .replace(/复制打开抖音[\s\S]*|小红书App[\s\S]*|长按复制此条消息[\s\S]*/g, '')
+    .trim();
 }
 
-document.addEventListener('click', () => {
-  const menu = document.getElementById('artist-dropdown-menu');
-  if (menu && !menu.classList.contains('hidden')) menu.classList.add('hidden');
-});
-
-function selectArtist(id) {
-  activeArtistId = id;
-  activeAccountId = 'ALL';
-  isArchiveExpanded = false;
-  document.getElementById('artist-dropdown-menu').classList.add('hidden');
-  syncArtistDropdownUI();
-  renderTourCards();
-  renderArchiveTimeline();
-  renderFeedsSectionOnly();
-}
-
-function selectAccount(id) {
-  activeAccountId = id;
-  renderFeedsSectionOnly();
-}
-
-function syncAdminUI() {
-  const panel = document.getElementById('admin-publisher-panel');
-  const btn = document.getElementById('admin-unlock-btn');
-  if (isAdmin) {
-    panel.classList.remove('hidden');
-    btn.classList.add('hidden');
-    updateAiKeyStatusUI();
-  } else {
-    panel.classList.add('hidden');
-    btn.classList.remove('hidden');
-  }
-  renderTourCards();
-  renderArchiveTimeline();
-  renderTimeline();
-}
-
-function toggleAdminMode() {
-  const pin = prompt('请输入管理员暗码以开启发布与编辑权限：');
-  if (pin === ADMIN_PIN) {
-    isAdmin = true;
-    localStorage.setItem('onerland_admin_pin', ADMIN_PIN);
-    syncAdminUI();
-  } else if (pin !== null) {
-    alert('暗码错误，当前保持访客只读模式。');
-  }
-}
-
-function lockAdminMode() {
-  isAdmin = false;
-  localStorage.removeItem('onerland_admin_pin');
-  syncAdminUI();
-}
-
-function updateAiKeyStatusUI() {
-  const hasKey = !!localStorage.getItem(GEMINI_KEY_STORAGE);
-  const el = document.getElementById('ai-key-status');
-  if (el) {
-    el.textContent = hasKey ? '已启用 AI 多模态识图' : '未配置(点此配置)';
-    el.className = hasKey ? 'text-emerald-700 font-bold' : '';
-  }
-}
-
-function configGeminiKey() {
-  const current = localStorage.getItem(GEMINI_KEY_STORAGE) || '';
-  const input = prompt('请输入免费的 Google AI Studio (Gemini) API Key，开启高精度海报与多场次排期表识图（留空确定可清除）：', current);
-  if (input === null) return;
-  if (input.trim()) {
-    localStorage.setItem(GEMINI_KEY_STORAGE, input.trim());
-    alert('AI 识图密钥已保存！');
-  } else {
-    localStorage.removeItem(GEMINI_KEY_STORAGE);
-  }
-  updateAiKeyStatusUI();
-}
-
-function openLightbox(src, caption = '') {
-  if (!src) return;
-  document.getElementById('lightbox-img').src = src;
-  document.getElementById('lightbox-caption').textContent = caption;
-  document.getElementById('image-lightbox').classList.remove('hidden');
-}
-
-function extractThemeName(fullTitle, savedTheme = '') {
-  if (savedTheme) return savedTheme;
-  const m = (fullTitle || '').match(/([「《][^」》]+[」》]\s*(?:巡回演唱会|演唱会|巡演|音乐节|嘉年华)?)/);
-  return m ? m[1].trim() : '';
-}
-
+// 统一加载演出库数据
 async function loadTourData() {
-  cloudTickets = [];
-  cloudArchives = [];
+  AppState.cloudTickets = [];
+  AppState.cloudArchives = [];
   try {
-    const sbRes = await fetch(`${SUPABASE_URL}/rest/v1/tickets?select=*&order=ticket_time.asc`, { headers: SB_HEADERS });
-    if (sbRes.ok) {
-      const rows = await sbRes.json();
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tickets?select=*&order=ticket_time.asc`, { headers: SB_HEADERS });
+    if (res.ok) {
+      const rows = await res.json();
       rows.forEach(r => {
-        try {
-          const rawTitle = r.title || '';
-          const rawTime = r.ticket_time || '';
-          const rawPlat = r.platform || '';
+        const rawTitle = r.title || '';
+        const rawTime = r.ticket_time || '';
+        const rawPlat = r.platform || '';
 
-          if (rawTitle.startsWith('ARCHIVE|')) {
-            const parts = rawTitle.split('|');
-            const artist = parts[1] || 'ONER';
-            const showTitle = parts[2] || '演出回顾';
-            const showDate = parts[3] || rawTime.slice(0, 10);
-            let arcData = { subType: 'tour', theme: '', venue: '', posterUrl: '', prices: '', seatUrl: '', slot: '', scheduleImgs: [], viewImgs: [], setlist: [] };
-            if (rawPlat.startsWith('ARCHIVE:')) {
-              try { arcData = { ...arcData, ...JSON.parse(rawPlat.slice(8)) }; } catch (e) {}
-            }
-            cloudArchives.push({
-              cloudId: r.id,
-              artist,
-              title: showTitle,
-              theme: extractThemeName(showTitle, arcData.theme),
-              showDate,
-              year: showDate.slice(0, 4),
-              url: r.url || '',
-              ...arcData
-            });
-            return;
+        if (rawTitle.startsWith('ARCHIVE|')) {
+          const [, artist = 'ONER', showTitle = '演出回顾', showDate = rawTime.slice(0, 10)] = rawTitle.split('|');
+          let arcData = { subType: 'tour', theme: '', venue: '', posterUrl: '', prices: '', seatUrl: '', slot: '', scheduleImgs: [], viewImgs: [], setlist: [] };
+          if (rawPlat.startsWith('ARCHIVE:')) {
+            try { arcData = { ...arcData, ...JSON.parse(rawPlat.slice(8)) }; } catch (e) {}
           }
-
-          const parts = rawTitle.split('|');
-          const artist = parts.length > 1 ? parts[0] : 'ONER';
-          const cityTitle = parts.length > 1 ? parts[1] : rawTitle;
-          const venue = parts.length > 2 ? parts[2] : '场馆待补充';
-          const showDate = parts.length > 3 ? parts[3] : rawTime.replace('T', ' ');
-          let slotNote = parts.length > 4 ? parts[4] : '';
-
-          let parsedRounds = [];
-          let savedTransport = '';
-          let savedTheme = '';
-          let savedPrices = '';
-          let savedStartTime = '';
-          let savedPosterUrl = '';
-          let savedSeatUrl = '';
-          let savedStageType = 'auto';
-          let savedScheduleImgs = [];
-          let savedViewImgs = [];
-
-          if (rawPlat.startsWith('META:')) {
-            try {
-              const meta = JSON.parse(rawPlat.slice(5));
-              if (Array.isArray(meta.rounds)) parsedRounds = meta.rounds;
-              if (meta.transport) savedTransport = meta.transport;
-              if (meta.slot) slotNote = meta.slot;
-              if (meta.theme) savedTheme = meta.theme;
-              if (meta.prices) savedPrices = meta.prices;
-              if (meta.startTime) savedStartTime = meta.startTime;
-              if (meta.posterUrl) savedPosterUrl = meta.posterUrl;
-              if (meta.seatUrl) savedSeatUrl = meta.seatUrl;
-              if (meta.stageType) savedStageType = meta.stageType;
-              if (Array.isArray(meta.scheduleImgs)) savedScheduleImgs = meta.scheduleImgs;
-              if (Array.isArray(meta.viewImgs)) savedViewImgs = meta.viewImgs;
-            } catch (e) {}
-          } else if (rawPlat.startsWith('ROUNDS:')) {
-            try { parsedRounds = JSON.parse(rawPlat.slice(7)); } catch (e) {}
-          }
-
-          if (!Array.isArray(parsedRounds) || parsedRounds.length === 0) {
-            if (rawPlat && !rawPlat.startsWith('META:')) {
-              parsedRounds = [{ round_name: '正式开票', sale_time: rawTime.replace('T', ' '), platform: rawPlat || '大麦' }];
-            }
-          }
-
-          if (!savedTransport) savedTransport = findPresetTransport(`${cityTitle} ${venue}`);
-
-          cloudTickets.push({
-            cloudId: r.id,
-            artist,
-            city: cityTitle,
-            theme: extractThemeName(cityTitle, savedTheme),
-            venue,
-            show_date: showDate,
-            startTime: savedStartTime,
-            slot: slotNote,
-            prices: savedPrices,
-            posterUrl: savedPosterUrl,
-            seatUrl: savedSeatUrl,
-            stageType: savedStageType,
-            scheduleImgs: savedScheduleImgs,
-            viewImgs: savedViewImgs,
-            source_url: r.url || '#',
-            rounds: parsedRounds,
-            transport: savedTransport
+          AppState.cloudArchives.push({
+            cloudId: r.id, artist, title: showTitle,
+            theme: extractSeriesPrefix(showTitle, arcData.theme),
+            showDate, year: showDate.slice(0, 4), url: r.url || '', ...arcData
           });
-        } catch (rowErr) {}
+          return;
+        }
+
+        const parts = rawTitle.split('|');
+        const artist = parts.length > 1 ? parts[0] : 'ONER';
+        const cityTitle = parts.length > 1 ? parts[1] : rawTitle;
+        const venue = parts.length > 2 ? parts[2] : '场馆待补充';
+        const showDate = parts.length > 3 ? parts[3] : rawTime.slice(0, 10);
+        let slotNote = parts.length > 4 ? parts[4] : '';
+        let meta = { rounds: [], transport: '', theme: '', prices: '', startTime: '', posterUrl: '', seatUrl: '', scheduleImgs: [], viewImgs: [] };
+
+        if (rawPlat.startsWith('META:')) {
+          try { meta = { ...meta, ...JSON.parse(rawPlat.slice(5)) }; } catch (e) {}
+        } else if (rawPlat) {
+          meta.rounds = [{ round_name: '正式开票', sale_time: rawTime.replace('T', ' '), platform: rawPlat }];
+        }
+
+        AppState.cloudTickets.push({
+          cloudId: r.id, artist, city: cityTitle,
+          theme: extractSeriesPrefix(cityTitle, meta.theme),
+          venue, show_date: showDate, startTime: meta.startTime || '',
+          slot: meta.slot || slotNote, prices: meta.prices || '',
+          posterUrl: meta.posterUrl || '', seatUrl: meta.seatUrl || '',
+          scheduleImgs: meta.scheduleImgs || [], viewImgs: meta.viewImgs || [],
+          source_url: r.url || '#', rounds: meta.rounds || [],
+          transport: meta.transport || findPresetTransport(`${cityTitle} ${venue}`)
+        });
       });
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('演出数据离线或加载异常，将优先展示本地缓存', e);
+  }
 
-  cloudArchives.sort((a, b) => new Date(b.showDate) - new Date(a.showDate));
-  updateArchiveYearOptions();
-  tourSchedules = [...cloudTickets];
-  renderThemeQuickBar();
-  renderTourCards();
-  renderArchiveTimeline();
+  AppState.cloudArchives.sort((a, b) => new Date(b.showDate) - new Date(a.showDate));
+  if (typeof updateArchiveYearOptions === 'function') updateArchiveYearOptions();
+  renderHomeDashboard();
+  if (AppState.activeTab === 'shows') {
+    renderThemeQuickBar(); renderTourCards(); renderArchiveTimeline();
+  }
 }
 
-async function loadAllFeeds(force = false) {
-  let serverPosts = [];
-  cloudFeeds = [];
+// 统一加载社媒动态（支持手动置顶公告标签 [PIN]）
+async function loadAllFeeds() {
+  let posts = [];
   try {
-    const sbRes = await fetch(`${SUPABASE_URL}/rest/v1/feeds?select=*&order=created_at.desc&limit=80`, { headers: SB_HEADERS });
-    if (sbRes.ok) {
-      const rows = await sbRes.json();
-      cloudFeeds = rows.map(r => {
-        const meta = ARTIST_META_MAP[r.artist] || { artistId: 'oner', color: COLOR_ONER };
-        const matchedArtistObj = artistsConfig.find(a => a.artistName === r.artist);
-        const matchedAcc = matchedArtistObj?.accounts.find(acc => acc.name === r.platform);
-        const rawContent = r.content || '';
-        const pubMatch = rawContent.match(/\[PUB:(\d+)\]/);
-        const strippedBody = rawContent
-          .replace(/\n?\[IMG:https?:\/\/[^\]]+\]/g, '')
-          .replace(/\n?\[PUB:\d+\]/g, '')
-          .trim();
-        const cleanBody = cleanSocialPostText(strippedBody);
-        const realTimestamp = pubMatch ? Number(pubMatch[1]) : new Date(r.created_at).getTime();
-
-        return {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/feeds?select=*&order=created_at.desc&limit=80`, { headers: SB_HEADERS });
+    if (res.ok) {
+      const rows = await res.json();
+      rows.forEach(r => {
+        const meta = ARTIST_COLORS[r.artist] || ARTIST_COLORS['ONER'];
+        const raw = r.content || '';
+        const isPinned = raw.includes('[PIN]');
+        const pubMatch = raw.match(/\[PUB:(\d+)\]/);
+        const body = cleanSocialPostText(raw.replace(/\[PIN\]/g, '').replace(/\n?\[IMG:[^\]]+\]/g, '').replace(/\n?\[PUB:\d+\]/g, ''));
+        posts.push({
           cloudId: r.id,
-          artistId: matchedArtistObj?.artistId || meta.artistId,
+          artistId: meta.id,
           artistName: r.artist,
-          accountId: matchedAcc?.id || `${meta.artistId}_cloud`,
-          platformName: r.platform,
-          platformColor: matchedArtistObj?.badgeStyle || meta.color,
-          text: cleanBody,
+          platformName: r.platform || '微博',
+          platformColor: meta.bg,
+          text: body,
+          isPinned,
           link: r.url || '#',
-          timestamp: realTimestamp
-        };
+          timestamp: pubMatch ? Number(pubMatch[1]) : new Date(r.created_at).getTime()
+        });
       });
-      serverPosts.push(...cloudFeeds);
-      document.getElementById('last-sync').textContent = '社媒已同步 · ' + new Date().toLocaleTimeString();
     }
   } catch (e) {}
 
   try {
-    const res = await fetch('./feeds_data.json?t=' + Date.now());
-    if (res.ok) {
-      const payload = await res.json();
+    const staticRes = await fetch('./feeds_data.json?t=' + Date.now());
+    if (staticRes.ok) {
+      const payload = await staticRes.json();
       if (Array.isArray(payload.posts)) {
-        serverPosts.push(...payload.posts.map(p => ({ ...p, text: cleanSocialPostText(p.text || '') })));
+        posts.push(...payload.posts.map(p => ({ ...p, isPinned: false, text: cleanSocialPostText(p.text || '') })));
       }
     }
   } catch (e) {}
 
-  allPosts = serverPosts.sort((a, b) => b.timestamp - a.timestamp);
-  renderFeedsSectionOnly();
+  // 手动置顶公告优先，其余按时间倒序
+  AppState.allPosts = posts.sort((a, b) => (Number(b.isPinned) - Number(a.isPinned)) || (b.timestamp - a.timestamp));
+  renderHomeDashboard();
+  if (AppState.activeTab === 'feeds') renderFeedsSectionOnly();
 }
 
-async function deleteCloudRecord(table, id) {
-  if (!isAdmin) return;
-  if (!confirm('确定从所有设备删除这条记录吗？')) return;
-  await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, { method: 'DELETE', headers: SB_HEADERS });
-  if (table === 'tickets') await loadTourData();
-  else await loadAllFeeds(true);
+// 隐藏管理端路由检测（#admin 或连续点击顶部主标题 5 次）
+let titleClickCount = 0;
+function handleSecretTitleTap() {
+  titleClickCount++;
+  setTimeout(() => { titleClickCount = 0; }, 2000);
+  if (titleClickCount >= 5) {
+    titleClickCount = 0;
+    openHiddenAdminDrawer();
+  }
+}
+
+function openHiddenAdminDrawer() {
+  if (!AppState.isAdmin) {
+    const pin = prompt('请输入管理员暗码进入独立审核与投喂台：');
+    if (pin !== ADMIN_PIN) return;
+    AppState.isAdmin = true;
+    localStorage.setItem('onerland_admin_pin', ADMIN_PIN);
+  }
+  const panel = document.getElementById('hidden-admin-modal');
+  if (panel) {
+    panel.classList.remove('hidden');
+    if (typeof renderAdminTodoQueue === 'function') renderAdminTodoQueue();
+  }
 }
