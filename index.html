@@ -207,12 +207,13 @@
   <script>
     // ================= 0. Supabase 云端同步与管理员暗码配置 =================
     // 👇 请替换为你自己的 Supabase Project URL、anon public Key 和管理员暗码 👇
- const SUPABASE_URL = 'https://xtgkepaqikpzvmpkoxsa.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_nCjf_o2p6Fxw8vrAEl5vyQ_-SPy_WU5';
+ const SUPABASE_URL = 'https://xtgkepaqikpzvnmpkoxsa.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0Z2tlcGFxaWtwenZtcGtveHNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU2NzU1MDgsImV4cCI6MjExMTI1MTUwOH0.dsY0P3S-alER-Dg9U_sdAvGR5aw90lrShn2vSLpm_4g';
     const ADMIN_PIN = '1208';
 
     const SB_HEADERS = {
       'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
       'Content-Type': 'application/json',
       'Prefer': 'return=representation'
     };
