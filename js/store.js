@@ -404,3 +404,105 @@ function deleteBuddyEntryForShow(cloudId, entryId) {
   localStorage.setItem(BUDDY_STORAGE_KEY, JSON.stringify(all));
 }
 
+// ================= 场馆体验客观结构化采集与聚合（样本 >= 5 解锁统计） =================
+const VENUE_EXP_STORAGE_KEY = 'onerland_venue_experience_v1';
+
+function normalizeVenueKey(venueName = '') {
+  return (venueName || '')
+    .replace(/·/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getAllVenueExperiences() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(VENUE_EXP_STORAGE_KEY) || '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function getVenueExperienceList(venueName) {
+  const key = normalizeVenueKey(venueName);
+  if (!key) return [];
+  const all = getAllVenueExperiences();
+  return Array.isArray(all[key]) ? all[key] : [];
+}
+
+function addVenueExperience(venueName, record) {
+  const key = normalizeVenueKey(venueName);
+  if (!key) return;
+  const all = getAllVenueExperiences();
+  const list = Array.isArray(all[key]) ? all[key] : [];
+  list.unshift({
+    id: Date.now(),
+    venue: key,
+    createdAt: new Date().toLocaleDateString(),
+    ...record
+  });
+  all[key] = list;
+  localStorage.setItem(VENUE_EXP_STORAGE_KEY, JSON.stringify(all));
+}
+
+function deleteVenueExperience(venueName, recordId) {
+  const key = normalizeVenueKey(venueName);
+  if (!key) return;
+  const all = getAllVenueExperiences();
+  const list = Array.isArray(all[key]) ? all[key] : [];
+  all[key] = list.filter(x => String(x.id) !== String(recordId));
+  localStorage.setItem(VENUE_EXP_STORAGE_KEY, JSON.stringify(all));
+}
+
+// 聚合计算：仅当样本 >= 5 条时输出分布百分比
+function computeVenueExperienceStats(venueName) {
+  const list = getVenueExperienceList(venueName);
+  const total = list.length;
+  if (total < 5) {
+    return { unlocked: false, total, remaining: 5 - total, list };
+  }
+
+  const queueBuckets = {
+    '10分钟内': 0,
+    '10-30分钟': 0,
+    '30-60分钟': 0,
+    '60分钟以上': 0
+  };
+  let bagCheckCount = 0;
+  const storageCounts = {};
+
+  list.forEach(item => {
+    if (queueBuckets[item.queueTime] !== undefined) {
+      queueBuckets[item.queueTime]++;
+    }
+    if (item.bagCheck === 'strict') {
+      bagCheckCount++;
+    }
+    const st = item.storageType || '无寄存/未注意';
+    storageCounts[st] = (storageCounts[st] || 0) + 1;
+  });
+
+  const queueDist = Object.entries(queueBuckets).map(([label, count]) => ({
+    label,
+    count,
+    pct: Math.round((count / total) * 100)
+  }));
+
+  const storageDist = Object.entries(storageCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, count]) => ({
+      label,
+      count,
+      pct: Math.round((count / total) * 100)
+    }));
+
+  return {
+    unlocked: true,
+    total,
+    bagCheckPct: Math.round((bagCheckCount / total) * 100),
+    bagCheckCount,
+    queueDist,
+    storageDist,
+    list
+  };
+}
