@@ -362,7 +362,6 @@
       const text = document.getElementById('raw-post-input').value.trim();
       if (!text) return alert('请先粘贴分享链接或动态文案！');
 
-      const parseBtn = document.getElementById('smart-parse-btn');
       const urlMatch = text.match(/https?:\/\/[^\s\u4e00-\u9fa5]+/);
       const url = urlMatch ? urlMatch[0] : '';
 
@@ -382,9 +381,11 @@
       else if (text.includes('灵超') || text.includes('DIDI')) artist = '灵超';
       else if (text.includes('坤音')) artist = '坤音娱乐';
 
+      // 清理掉网址、乱码口令和平台提示尾巴，保留真正的博文文案
       let cleanText = text
         .replace(/https?:\/\/\S+/g, '')
-        .replace(/复制打开抖音.*|小红书App.*|长按复制此条消息.*|打开小红书查看.*/g, '')
+        .replace(/复制打开抖音.*|小红书App.*|长按复制此条消息.*|打开小红书查看.*|打开抖音搜索.*/g, '')
+        .replace(/[0-9a-zA-Z]{8,12}\s*$/g, '')
         .trim();
 
       const isTicket = /开票|预售|抢票|巡演|演唱会|大麦|秀动|售票/.test(text);
@@ -406,75 +407,15 @@
 
       document.getElementById('cp-artist').value = artist;
       document.getElementById('cp-platform').value = platform;
-      document.getElementById('cp-content').value = cleanText || '正在读取原帖信息（最多 5 秒）...';
+      document.getElementById('cp-content').value = cleanText;
+      document.getElementById('cp-content').placeholder = '请在此粘贴或补充具体博文正文（支持多行）...';
       document.getElementById('cp-time').value = targetDateStr;
       document.getElementById('cp-url').value = url;
       document.getElementById('cp-img').value = '';
 
       toggleCloudFields();
       document.getElementById('parse-confirm-box').classList.remove('hidden');
-
-      if (url) {
-        parseBtn.disabled = true;
-        parseBtn.textContent = '⏳ 识别中...';
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-          const metaRes = await fetch(`https://api.microlink.io?url=${encodeURIComponent(url)}`, {
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-
-          let filled = false;
-          if (metaRes.ok) {
-            const metaJson = await metaRes.json();
-            const d = metaJson.data || {};
-            const fetchedTitle = (d.title || '').trim();
-            const fetchedDesc = (d.description || '').trim();
-            const fetchedImg = d.image?.url || '';
-            const fetchedDate = d.date ? new Date(d.date) : null;
-
-            const isBlockedPage = /微博-随时随地|Sina Visitor System|安全验证|小红书 - 你的生活指南|抖音-记录美好生活/.test(fetchedTitle);
-
-            if (!isBlockedPage) {
-              const combined = [fetchedTitle, fetchedDesc]
-                .filter(Boolean)
-                .filter((v, i, arr) => arr.indexOf(v) === i)
-                .join('\n');
-
-              if (!cleanText && combined) {
-                document.getElementById('cp-content').value = combined;
-                filled = true;
-              } else if (cleanText && fetchedDesc && fetchedDesc.length > cleanText.length) {
-                document.getElementById('cp-content').value = fetchedDesc;
-                filled = true;
-              }
-            }
-
-            if (fetchedImg && !isBlockedPage) {
-              document.getElementById('cp-img').value = fetchedImg;
-            }
-
-            if (!isTicket && !m && fetchedDate && !isNaN(fetchedDate.getTime())) {
-              document.getElementById('cp-time').value = getLocalDatetimeString(fetchedDate);
-            }
-          }
-
-          if (!filled && !cleanText) {
-            document.getElementById('cp-content').value = `${artist} 的 ${platform} 动态（平台限制自动读取，请直接在此粘贴博文正文）`;
-          }
-        } catch (e) {
-          if (!cleanText) {
-            document.getElementById('cp-content').value = `${artist} 的 ${platform} 动态（读取超时，请直接在此粘贴博文正文）`;
-          }
-        } finally {
-          parseBtn.disabled = false;
-          parseBtn.textContent = '🪄 智能识别内容';
-        }
-      }
     }
-
     function toggleCloudFields() {
       const type = document.querySelector('input[name="cloudEntryType"]:checked').value;
       const timeLabel = document.getElementById('cp-time-label');
