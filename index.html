@@ -239,37 +239,91 @@
     }
 
     // ================= 3. 多镜像节点 + 多跨域代理自动重试抓取 =================
-    async function fetchXmlWithFallback(rawUrl) {
-      const candidateUrls = [rawUrl];
-      if (rawUrl.includes('rsshub.app')) {
-        RSSHUB_MIRRORS.slice(1).forEach(mirror => {
-          candidateUrls.push(rawUrl.replace('https://rsshub.app', mirror));
-        });
-      }
+       async function loadAllFeeds(force = false) {
+      document.getElementById('timeline-list').innerHTML = `<div class="text-center py-10 text-sm text-slate-400">正在加载最新聚合动态...</div>`;
+      let serverPosts = [];
+      let failedSources = [];
 
-      for (const targetUrl of candidateUrls) {
-        try {
-          const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 12000);
-          const res = await fetch(proxyUrl, { signal: controller.signal });
-          clearTimeout(timer);
-          if (!res.ok) continue;
-
-          const data = await res.json();
-          if (!data.contents || data.contents.includes('RouteNotFound') || data.contents.includes('403 Forbidden') || data.contents.includes('Error 1015')) {
-            continue;
+      // 1. 优先秒读 GitHub Actions 后台抓取并生成的 feeds_data.json
+      try {
+        const res = await fetch('./feeds_data.json?t=' + Date.now());
+        if (res.ok) {
+          const payload = await res.json();
+          serverPosts = payload.posts || [];
+          failedSources = payload.failedSources || [];
+          if (payload.updatedAt) {
+            document.getElementById('last-sync').textContent = '后台同步于 · ' + new Date(payload.updatedAt).toLocaleTimeString();
           }
-          const doc = new DOMParser().parseFromString(data.contents, 'text/xml');
-          if (doc.querySelector('parsererror')) continue;
-
-          const nodes = [...doc.querySelectorAll('item'), ...doc.querySelectorAll('entry')];
-          if (nodes.length > 0) return nodes;
-        } catch (e) {
-          // 当前镜像失败，继续尝试下一个备用节点
         }
+      } catch (e) {
+        console.warn('读取 feeds_data.json 失败，尝试前端直连抓取');
       }
-      return [];
+
+      // 2. 找出用户在弹窗里额外新增的自定义账号（不在默认配置里的）
+      const defaultIds = new Set();
+      DEFAULT_ARTISTS.forEach(a => a.accounts.forEach(acc => defaultIds.add(acc.id)));
+
+      const customTasks = [];
+      artistsConfig.forEach(artist => {
+        artist.accounts.forEach(acc => {
+          if (!defaultIds.has(acc.id) || serverPosts.length === 0) {
+            customTasks.push(
+              (async () => {
+                const nodes = await fetchXmlWithFallback(acc.url);
+                if (nodes.length === 0) {
+                  if (!failedSources.includes(`${artist.artistName}-${acc.name}`)) {
+                    failedSources.push(`${artist.artistName}-${acc.name}`);
+                  }
+                  return;
+                }
+                nodes.forEach(node => {
+                  const title = node.querySelector('title')?.textContent || '';
+                  const desc = node.querySelector('description')?.textContent || node.querySelector('content')?.textContent || '';
+                  const pubDate = node.querySelector('pubDate')?.textContent || node.querySelector('published')?.textContent || node.querySelector('updated')?.textContent || '';
+                  const link = node.querySelector('link')?.textContent || node.querySelector('link')?.getAttribute('href') || '#';
+                  const tmpDiv = document.createElement('div');
+                  tmpDiv.innerHTML = desc;
+                  const imgs = [...tmpDiv.querySelectorAll('img')].map(img => img.src).filter(Boolean);
+                  const plainText = (tmpDiv.textContent || title).trim();
+                  const timestamp = pubDate ? new Date(pubDate).getTime() : Date.now();
+
+                  serverPosts.push({
+                    artistId: artist.artistId,
+                    artistName: artist.artistName,
+                    accountId: acc.id,
+                    platformName: acc.name,
+                    platformColor: acc.color,
+                    text: plainText,
+                    imgs,
+                    link,
+                    timestamp: isNaN(timestamp) ? 0 : timestamp
+                  });
+                });
+              })()
+            );
+          }
+        });
+      });
+
+      if (customTasks.length > 0) {
+        await Promise.all(customTasks);
+      }
+
+      // 过滤掉用户在弹窗里已删除的艺人/账号
+      const activeAccountIds = new Set();
+      artistsConfig.forEach(a => a.accounts.forEach(acc => activeAccountIds.add(acc.id)));
+      allPosts = serverPosts.filter(p => activeAccountIds.has(p.accountId));
+      allPosts.sort((a, b) => b.timestamp - a.timestamp);
+
+      const statusBar = document.getElementById('feed-status-bar');
+      if (failedSources.length > 0) {
+        statusBar.classList.remove('hidden');
+        statusBar.textContent = `⚠️ 部分源因平台反爬限制暂未返回数据（${failedSources.length} 个）：${failedSources.join('、')}。`;
+      } else {
+        statusBar.classList.add('hidden');
+      }
+
+      initUI();
     }
 
     // ================= 4. 弹窗增删管理逻辑 =================
