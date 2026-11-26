@@ -87,6 +87,9 @@
         </div>
       </div>
 
+      <!-- 节点抓取状态提示条 -->
+      <div id="feed-status-bar" class="hidden text-xs px-3.5 py-2 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20"></div>
+
       <!-- 时间线列表 -->
       <div id="timeline-list" class="space-y-4"></div>
     </section>
@@ -132,11 +135,19 @@
 
   <script>
     // ================= 1. 专属应援色/品牌色定义 =================
-    const COLOR_ONER = 'linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)'; // 图一：猩绯 -> 赤铜色
-    const COLOR_QINS = '#111827';                                          // 坤音娱乐：黑色
-    const COLOR_YY   = '#9C73EF';                                          // 图二：岳岳 - 藤紫
-    const COLOR_MZY  = '#F90092';                                          // 图三：木子洋 - 洋红
-    const COLOR_LC   = '#32B5E1';                                          // 图四：灵超 - 天色
+    const COLOR_ONER = 'linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)';
+    const COLOR_QINS = '#111827';
+    const COLOR_YY   = '#9C73EF';
+    const COLOR_MZY  = '#F90092';
+    const COLOR_LC   = '#32B5E1';
+
+    // 备用公共 RSSHub 镜像列表（主节点被限流时自动轮询切换）
+    const RSSHUB_MIRRORS = [
+      'https://rsshub.app',
+      'https://rsshub.rssforever.com',
+      'https://hub.slarker.me',
+      'https://rsshub.pseudo-dynamic.site'
+    ];
 
     // ================= 2. 预设全员与官方账号列表 =================
     const DEFAULT_ARTISTS = [
@@ -204,7 +215,7 @@
     ];
 
     const STORAGE_ARTISTS_KEY = 'onerland_custom_artists_v3';
-    const CACHE_POSTS_KEY = 'onerland_posts_cache_v4';
+    const CACHE_POSTS_KEY = 'onerland_posts_cache_v5';
 
     let artistsConfig = loadArtistsConfig();
     let activeArtistId = 'ALL';
@@ -227,7 +238,41 @@
       localStorage.setItem(STORAGE_ARTISTS_KEY, JSON.stringify(artistsConfig));
     }
 
-    // ================= 3. 弹窗增删管理逻辑 =================
+    // ================= 3. 多镜像节点 + 多跨域代理自动重试抓取 =================
+    async function fetchXmlWithFallback(rawUrl) {
+      const candidateUrls = [rawUrl];
+      if (rawUrl.includes('rsshub.app')) {
+        RSSHUB_MIRRORS.slice(1).forEach(mirror => {
+          candidateUrls.push(rawUrl.replace('https://rsshub.app', mirror));
+        });
+      }
+
+      for (const targetUrl of candidateUrls) {
+        try {
+          const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 12000);
+          const res = await fetch(proxyUrl, { signal: controller.signal });
+          clearTimeout(timer);
+          if (!res.ok) continue;
+
+          const data = await res.json();
+          if (!data.contents || data.contents.includes('RouteNotFound') || data.contents.includes('403 Forbidden') || data.contents.includes('Error 1015')) {
+            continue;
+          }
+          const doc = new DOMParser().parseFromString(data.contents, 'text/xml');
+          if (doc.querySelector('parsererror')) continue;
+
+          const nodes = [...doc.querySelectorAll('item'), ...doc.querySelectorAll('entry')];
+          if (nodes.length > 0) return nodes;
+        } catch (e) {
+          // 当前镜像失败，继续尝试下一个备用节点
+        }
+      }
+      return [];
+    }
+
+    // ================= 4. 弹窗增删管理逻辑 =================
     function openManageModal() {
       renderManageList();
       document.getElementById('manage-modal').classList.remove('hidden');
@@ -338,7 +383,7 @@
       loadAllFeeds(true);
     }
 
-    // ================= 4. 巡演日程加载（支持按艺人过滤） =================
+    // ================= 5. 巡演日程加载 =================
     async function loadTourData() {
       try {
         const res = await fetch('./tour_data.json?t=' + Date.now());
@@ -419,12 +464,12 @@
       });
     }
 
-    // ================= 5. 动态抓取与双层筛选渲染 =================
+    // ================= 6. 动态抓取与双层筛选渲染 =================
     async function loadAllFeeds(force = false) {
       const cached = localStorage.getItem(CACHE_POSTS_KEY);
       if (!force && cached) {
         const parsed = JSON.parse(cached);
-        if (Date.now() - parsed.ts < 5 * 60 * 1000) {
+        if (Date.now() - parsed.ts < 5 * 60 * 1000 && parsed.data.length > 0) {
           allPosts = parsed.data;
           document.getElementById('last-sync').textContent = '已加载缓存 · ' + new Date(parsed.ts).toLocaleTimeString();
           initUI();
@@ -432,48 +477,44 @@
         }
       }
 
-      document.getElementById('timeline-list').innerHTML = `<div class="text-center py-10 text-sm text-slate-400">正在同步所有关注艺人的动态（共 25 个源，请稍候）...</div>`;
+      document.getElementById('timeline-list').innerHTML = `<div class="text-center py-10 text-sm text-slate-400">正在多节点轮询抓取全平台动态（首次加载需 5-15 秒）...</div>`;
       const results = [];
+      const failedSources = [];
 
       const tasks = [];
       artistsConfig.forEach(artist => {
         artist.accounts.forEach(acc => {
           tasks.push(
             (async () => {
-              try {
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(acc.url)}`;
-                const res = await fetch(proxyUrl);
-                const data = await res.json();
-                const doc = new DOMParser().parseFromString(data.contents, 'text/xml');
-                const nodes = [...doc.querySelectorAll('item'), ...doc.querySelectorAll('entry')];
-
-                nodes.forEach(node => {
-                  const title = node.querySelector('title')?.textContent || '';
-                  const desc = node.querySelector('description')?.textContent || node.querySelector('content')?.textContent || '';
-                  const pubDate = node.querySelector('pubDate')?.textContent || node.querySelector('published')?.textContent || node.querySelector('updated')?.textContent || '';
-                  const link = node.querySelector('link')?.textContent || node.querySelector('link')?.getAttribute('href') || '#';
-
-                  const tmpDiv = document.createElement('div');
-                  tmpDiv.innerHTML = desc;
-                  const imgs = [...tmpDiv.querySelectorAll('img')].map(img => img.src).filter(Boolean);
-                  const plainText = (tmpDiv.textContent || title).trim();
-                  const timestamp = pubDate ? new Date(pubDate).getTime() : Date.now();
-
-                  results.push({
-                    artistId: artist.artistId,
-                    artistName: artist.artistName,
-                    accountId: acc.id,
-                    platformName: acc.name,
-                    platformColor: acc.color,
-                    text: plainText,
-                    imgs,
-                    link,
-                    timestamp: isNaN(timestamp) ? 0 : timestamp
-                  });
-                });
-              } catch (err) {
-                console.warn('抓取失败:', artist.artistName, acc.name, err);
+              const nodes = await fetchXmlWithFallback(acc.url);
+              if (nodes.length === 0) {
+                failedSources.push(`${artist.artistName}-${acc.name}`);
+                return;
               }
+              nodes.forEach(node => {
+                const title = node.querySelector('title')?.textContent || '';
+                const desc = node.querySelector('description')?.textContent || node.querySelector('content')?.textContent || '';
+                const pubDate = node.querySelector('pubDate')?.textContent || node.querySelector('published')?.textContent || node.querySelector('updated')?.textContent || '';
+                const link = node.querySelector('link')?.textContent || node.querySelector('link')?.getAttribute('href') || '#';
+
+                const tmpDiv = document.createElement('div');
+                tmpDiv.innerHTML = desc;
+                const imgs = [...tmpDiv.querySelectorAll('img')].map(img => img.src).filter(Boolean);
+                const plainText = (tmpDiv.textContent || title).trim();
+                const timestamp = pubDate ? new Date(pubDate).getTime() : Date.now();
+
+                results.push({
+                  artistId: artist.artistId,
+                  artistName: artist.artistName,
+                  accountId: acc.id,
+                  platformName: acc.name,
+                  platformColor: acc.color,
+                  text: plainText,
+                  imgs,
+                  link,
+                  timestamp: isNaN(timestamp) ? 0 : timestamp
+                });
+              });
             })()
           );
         });
@@ -484,11 +525,19 @@
       allPosts = results;
       localStorage.setItem(CACHE_POSTS_KEY, JSON.stringify({ ts: Date.now(), data: allPosts }));
       document.getElementById('last-sync').textContent = '刚刚更新 · ' + new Date().toLocaleTimeString();
+
+      const statusBar = document.getElementById('feed-status-bar');
+      if (failedSources.length > 0) {
+        statusBar.classList.remove('hidden');
+        statusBar.textContent = `⚠️ 部分源因平台反爬限制暂未返回数据（${failedSources.length} 个）：${failedSources.join('、')}。微博/B站/YouTube 等可用源已正常显示。`;
+      } else {
+        statusBar.classList.add('hidden');
+      }
+
       initUI();
     }
 
     function initUI() {
-      // 渲染第一层：艺人筛选胶囊（选中时自动应用专属应援色/渐变色）
       const artistTabs = [{ id: 'ALL', name: '全部艺人', badgeStyle: '#4f46e5' }, ...artistsConfig.map(a => ({
         id: a.artistId,
         name: a.artistName,
@@ -506,10 +555,8 @@
         `;
       }).join('');
 
-      // 根据当前选中的艺人过滤基础池
       const artistPosts = activeArtistId === 'ALL' ? allPosts : allPosts.filter(p => p.artistId === activeArtistId);
 
-      // 更新置顶最新动态
       const spotlightEl = document.getElementById('latest-spotlight');
       if (artistPosts.length > 0) {
         const top = artistPosts[0];
@@ -523,7 +570,6 @@
         spotlightEl.classList.add('hidden');
       }
 
-      // 渲染第二层：当前艺人旗下的账号胶囊
       let visibleAccounts = [];
       if (activeArtistId === 'ALL') {
         artistsConfig.forEach(a => a.accounts.forEach(acc => visibleAccounts.push({ id: acc.id, label: `${a.artistName}·${acc.name}`, color: acc.color })));
