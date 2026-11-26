@@ -56,6 +56,9 @@ function startEditShow(kind, cloudId) {
   document.getElementById('adm-body').value = item.venue || '';
   document.getElementById('adm-poster').value = item.posterUrl || '';
   document.getElementById('adm-slot').value = item.slot || '';
+  if (document.getElementById('adm-merch-booth')) {
+    document.getElementById('adm-merch-booth').value = item.merchBooth || '';
+  }
   document.getElementById('adm-url').value = (item.url && item.url !== '#') ? item.url : ((item.source_url && item.source_url !== '#') ? item.source_url : '');
   document.getElementById('adm-sale-time').value = ((item.rounds || [])[0]?.sale_time || '').replace(' ', 'T').slice(0, 16);
   document.getElementById('adm-sale-plat').value = (item.rounds || [])[0]?.platform || '大麦';
@@ -70,7 +73,7 @@ function resetAdminForm() {
   AppState.editingKind = null;
   adminScheduleImgs = [];
   renderAdminScheduleThumbs();
-  ['adm-title', 'adm-date', 'adm-body', 'adm-poster', 'adm-slot', 'adm-url', 'adm-sale-time'].forEach(id => {
+  ['adm-title', 'adm-date', 'adm-body', 'adm-poster', 'adm-slot', 'adm-merch-booth', 'adm-url', 'adm-sale-time'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -87,6 +90,7 @@ async function submitAdminQuickPost() {
   const venueOrBody = document.getElementById('adm-body').value.trim();
   const posterUrl = document.getElementById('adm-poster').value.trim();
   const slotText = (document.getElementById('adm-slot')?.value || '').trim();
+  const merchBooth = (document.getElementById('adm-merch-booth')?.value || '').trim();
   const url = document.getElementById('adm-url').value.trim();
   const isPinned = document.getElementById('adm-pin').checked;
   const saleTimeRaw = document.getElementById('adm-sale-time').value;
@@ -109,7 +113,14 @@ async function submitAdminQuickPost() {
       const payload = {
         title: `${artist}|${titleOrPlat}|${venueOrBody || '场馆待补充'}|${showDate}|${slotText}`,
         ticket_time: saleTimeRaw || `${showDate}T19:30`,
-        platform: `META:${JSON.stringify({ rounds, posterUrl, slot: slotText, scheduleImgs: adminScheduleImgs, theme: normalizeSeriesKey(titleOrPlat) })}`,
+        platform: `META:${JSON.stringify({
+          rounds,
+          posterUrl,
+          slot: slotText,
+          merchBooth,
+          scheduleImgs: adminScheduleImgs,
+          theme: normalizeSeriesKey(titleOrPlat)
+        })}`,
         url
       };
       const isPatch = Boolean(AppState.editingTicketId);
@@ -131,6 +142,7 @@ async function submitAdminQuickPost() {
           prices: existing?.prices || '',
           seatUrl: existing?.seatUrl || '',
           slot: slotText,
+          merchBooth,
           scheduleImgs: adminScheduleImgs,
           viewImgs: existing?.viewImgs || [],
           setlist: existing?.setlist || [],
