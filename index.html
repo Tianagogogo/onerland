@@ -3,708 +3,221 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ONER时光典藏纪念册</title>
+  <title>ONERLAND · 时光典藏与观演实用工具站</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <link rel="stylesheet" href="./css/theme.css" />
 </head>
 <body class="text-slate-800 min-h-screen antialiased selection:bg-slate-300 selection:text-slate-950">
 
-  <header class="sticky top-0 z-30 bg-white/85 backdrop-blur-xl border-b border-slate-300/80 shadow-2xs">
-    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2 flex-wrap">
-      <div class="flex items-center gap-2.5 sm:gap-3 flex-wrap">
-        <div class="flex items-center gap-2">
-          <span id="sync-dot" class="w-2 h-2 rounded-full bg-slate-700 animate-pulse"></span>
-          <h1 class="font-bold text-base sm:text-lg tracking-tight text-slate-900">ONER时光典藏纪念册</h1>
-        </div>
-        <div class="inline-flex items-center p-0.5 rounded-full bg-slate-200/85 border border-slate-300 text-xs">
-          <button type="button" id="nav-tab-shows" onclick="switchMainTab('shows')" class="px-3 py-1 rounded-full obsidian-btn font-semibold transition">🎫 演出典藏</button>
-          <button type="button" id="nav-tab-feeds" onclick="switchMainTab('feeds')" class="px-3 py-1 rounded-full text-slate-600 hover:text-slate-900 font-medium transition">📱 社媒动态</button>
-        </div>
-        <div class="relative" id="artist-dropdown-wrap">
-          <button type="button" onclick="toggleArtistMenu(event)" id="artist-menu-btn" class="px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-slate-800 shadow-2xs flex items-center gap-1.5 transition hover:opacity-90">
-            <span>🎤 <span id="current-artist-label">全部艺人</span></span><span class="text-[10px]">▾</span>
-          </button>
-          <div id="artist-dropdown-menu" class="hidden absolute left-0 mt-2 w-44 rounded-xl bg-white/95 backdrop-blur-xl border border-slate-300 shadow-xl py-1.5 z-40"></div>
-        </div>
+  <!-- 顶部导航栏（桌面端展示 4 项切换，移动端自动收起到顶部标题 + 底部 4 项导航） -->
+  <header class="sticky top-0 z-30 bg-white/85 backdrop-blur-xl border-b border-slate-300/80">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2 cursor-pointer select-none" onclick="handleSecretTitleTap()">
+        <span class="w-2 h-2 rounded-full bg-slate-800"></span>
+        <h1 class="font-bold text-base sm:text-lg tracking-tight text-slate-900">ONERLAND</h1>
+        <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 border border-slate-300 text-slate-600 hidden sm:inline">非盈利追星工具站</span>
       </div>
-      <div class="flex items-center gap-2 text-xs">
-        <span id="last-sync" class="text-slate-400 hidden lg:inline">准备就绪</span>
-        <button id="admin-unlock-btn" onclick="toggleAdminMode()" class="px-3 py-1.5 rounded-lg liquid-silver-btn transition font-medium">🔒 管理</button>
-        <button onclick="openManageModal()" class="px-3 py-1.5 rounded-lg liquid-silver-btn transition font-medium hidden sm:inline-block">⚙️ 订阅源</button>
-        <button onclick="refreshCurrentTab()" class="px-3 py-1.5 rounded-lg obsidian-btn transition font-semibold">刷新同步</button>
-      </div>
+
+      <!-- 桌面端 4 项主导航 -->
+      <nav class="hidden sm:inline-flex items-center p-1 rounded-full bg-slate-200/85 border border-slate-300 text-xs gap-1">
+        <button type="button" id="top-tab-home" onclick="switchMainTab('home')" class="px-3.5 py-1 rounded-full obsidian-btn text-white font-semibold transition">🏠 首页</button>
+        <button type="button" id="top-tab-shows" onclick="switchMainTab('shows')" class="px-3.5 py-1 rounded-full text-slate-600 hover:text-slate-900 transition">🏛️ 档案</button>
+        <button type="button" id="top-tab-footprint" onclick="switchMainTab('footprint')" class="px-3.5 py-1 rounded-full text-slate-600 hover:text-slate-900 transition">🎫 足迹</button>
+        <button type="button" id="top-tab-feeds" onclick="switchMainTab('feeds')" class="px-3.5 py-1 rounded-full text-slate-600 hover:text-slate-900 transition">📱 动态</button>
+      </nav>
+
+      <button type="button" onclick="loadTourData(); loadAllFeeds();" class="px-3 py-1.5 rounded-lg liquid-silver-btn text-xs font-medium">
+        刷新同步
+      </button>
     </div>
   </header>
 
-  <main class="max-w-5xl mx-auto px-4 py-6 space-y-8">
-    <section id="admin-publisher-panel" class="hidden p-4 sm:p-5 rounded-2xl chronicle-card space-y-3">
-      <div class="flex items-center justify-between flex-wrap gap-2">
-        <span class="text-sm font-bold text-slate-900">✨ 管理员云端投喂台（多设备实时同步）</span>
-        <div class="flex items-center gap-3 text-xs">
-          <button type="button" onclick="configGeminiKey()" class="text-slate-700 hover:underline font-medium">🔑 配置 AI 识图密钥 (<span id="ai-key-status">未配置</span>)</button>
-          <button onclick="lockAdminMode()" class="text-slate-400 hover:text-rose-600">退出管理</button>
+  <main class="max-w-5xl mx-auto px-4 py-5 space-y-6">
+
+    <!-- ================= 1. 首页控制台 ================= -->
+    <section id="view-home-page" class="space-y-5">
+      <div id="home-anniversary-box"></div>
+      <div class="space-y-2.5">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold text-slate-900">🗓️ 近期演出微时间轴</h2>
+          <button type="button" onclick="switchMainTab('shows')" class="text-xs text-slate-600 hover:underline">全部档案 ↗</button>
         </div>
+        <div id="home-upcoming-timeline" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
       </div>
-      <textarea id="raw-post-input" rows="2" placeholder="粘贴微博 / 小红书 / 抖音分享口令或官宣文案..." class="w-full text-xs sm:text-sm p-3 rounded-xl border border-slate-300 bg-white/95 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-500"></textarea>
-      <div class="flex items-center gap-2 flex-wrap">
-        <button id="smart-parse-btn" onclick="smartParsePost()" class="px-3.5 py-2 rounded-lg obsidian-btn text-xs font-semibold transition">🪄 智能识别文案</button>
-        <button type="button" onclick="openTicketFormDirectly()" class="px-3.5 py-2 rounded-lg liquid-silver-btn text-xs font-semibold transition">🎫 手动新增演出 / 海报识图</button>
-        <button type="button" onclick="openArchiveFormDirectly()" class="px-3.5 py-2 rounded-lg liquid-silver-btn text-xs font-semibold transition">🏛️ 录入往日演出 / 排期表识图</button>
-        <button onclick="resetConfirmForm()" class="px-3 py-2 rounded-lg bg-slate-200/80 text-slate-600 hover:text-slate-900 text-xs">清空收起</button>
-      </div>
-
-      <div id="parse-confirm-box" class="hidden pt-3 border-t border-dashed border-slate-300 space-y-3">
-        <div id="editing-banner" class="hidden px-3 py-2 rounded-lg bg-slate-200/70 border border-slate-400 text-xs text-slate-800 flex items-center justify-between">
-          <span>✏️ 正在编辑已有演出场次：<strong id="editing-target-name"></strong></span>
-          <button type="button" onclick="cancelEditMode()" class="text-rose-600 underline font-medium">取消编辑</button>
-        </div>
-        <div id="entry-type-selector" class="flex items-center gap-4 text-xs flex-wrap">
-          <span class="text-slate-500">同步至板块：</span>
-          <label class="flex items-center gap-1 cursor-pointer font-medium text-slate-800"><input type="radio" name="cloudEntryType" value="feed" checked onchange="toggleCloudFields()" /> 📱 社媒动态时间线</label>
-          <label class="flex items-center gap-1 cursor-pointer font-medium text-slate-800"><input type="radio" name="cloudEntryType" value="ticket" onchange="toggleCloudFields()" /> 🎫 近期演出（售票中 & 待开演）</label>
-          <label class="flex items-center gap-1 cursor-pointer font-medium text-slate-800"><input type="radio" name="cloudEntryType" value="archive" onchange="toggleCloudFields()" /> 🏛️ 往日演出纪念册档案</label>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-          <div>
-            <label class="text-slate-500 block mb-1">关联艺人</label>
-            <select id="cp-artist" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-800">
-              <option value="ONER">ONER</option><option value="坤音娱乐">坤音娱乐</option><option value="岳岳">岳岳</option><option value="木子洋">木子洋</option><option value="灵超">灵超</option>
-            </select>
-          </div>
-          <div id="cp-feed-platform-wrap">
-            <label class="text-slate-500 block mb-1">来源平台</label>
-            <input id="cp-platform" type="text" placeholder="微博" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-800" />
-          </div>
-          <div id="cp-ticket-url-top" class="hidden">
-            <label class="text-slate-500 block mb-1">官宣原帖 / 购票链接</label>
-            <input id="cp-url-ticket" type="text" placeholder="https://..." class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-800" />
-          </div>
-
-          <div id="cp-archive-fields" class="hidden sm:col-span-2 space-y-3 p-3.5 rounded-xl bg-white/90 border border-slate-300">
-            <div class="flex items-center gap-3 flex-wrap">
-              <span class="font-bold text-slate-800">演出类型：</span>
-              <label class="flex items-center gap-1 cursor-pointer font-medium"><input type="radio" name="archiveSubType" value="tour" checked onchange="toggleArchiveSubFields()" /> 🏟️ 巡演 / Livehouse</label>
-              <label class="flex items-center gap-1 cursor-pointer font-medium"><input type="radio" name="archiveSubType" value="festival" onchange="toggleArchiveSubFields()" /> 🎪 音乐节</label>
-            </div>
-            <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-2.5">
-              <div class="flex items-center justify-between flex-wrap gap-2">
-                <label class="font-semibold text-slate-800">🖼️ 上传官宣海报或「多场次排期表格图片」</label>
-                <div class="flex items-center gap-2 flex-wrap">
-                  <label class="cursor-pointer px-3 py-1 rounded-lg liquid-silver-btn font-medium transition">选择本地图片<input type="file" id="arc-poster-file" accept="image/*" class="hidden" onchange="handlePosterUpload(event)" /></label>
-                  <button type="button" id="arc-ocr-btn" onclick="runSmartPosterRecognition('archive')" class="px-3 py-1 rounded-lg obsidian-btn font-medium transition">🔍 识别海报自动填表</button>
-                </div>
-              </div>
-              <input id="arc-poster-url" type="text" placeholder="或粘贴海报图片链接 https://..." class="w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white text-xs" />
-              <div id="arc-ocr-status" class="hidden text-[11px] text-slate-600 font-medium"></div>
-              <img id="arc-poster-preview" class="hidden max-h-40 rounded-lg border border-slate-300 object-contain" />
-              <div id="multi-show-batch-box" class="hidden pt-2 border-t border-slate-200 space-y-2">
-                <div class="flex items-center justify-between flex-wrap gap-2">
-                  <span class="font-bold text-slate-800">📋 识别到的多场排期：</span>
-                  <div class="flex items-center gap-2">
-                    <select id="batch-target-section" class="px-2 py-1 rounded border border-slate-300 bg-white text-[11px]"><option value="archive">导入至：🏛️ 往日演出档案</option><option value="ticket">导入至：🎫 近期演出列表</option></select>
-                    <button type="button" onclick="batchImportRecognizedShows()" class="px-3 py-1 rounded-lg obsidian-btn font-semibold transition">✅ 批量导入已勾选场次</button>
-                  </div>
-                </div>
-                <div id="multi-show-list" class="space-y-1.5 max-h-64 overflow-y-auto no-scrollbar"></div>
-              </div>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div><label class="text-slate-500 block mb-1">巡演主题名称</label><input id="arc-theme" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
-              <div><label class="text-slate-500 block mb-1">具体站次 / 场次标题（必填）</label><input id="arc-title" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
-              <div><label class="text-slate-500 block mb-1">演出日期（必填）</label><input id="arc-date" type="date" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
-              <div><label class="text-slate-500 block mb-1">城市与场馆 / Livehouse</label><input id="arc-venue" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
-              <div id="arc-tour-only" class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div><label class="text-slate-700 font-medium block mb-1">💰 票价档位</label><input id="arc-prices" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
-                <div><label class="text-slate-700 font-medium block mb-1">💺 场馆座位图</label><div class="flex gap-1.5"><input id="arc-seat-url" type="text" class="flex-1 px-2.5 py-2 rounded-lg border border-slate-300 bg-white" /><label class="cursor-pointer px-2.5 py-2 rounded-lg liquid-silver-btn shrink-0 font-medium">上传图<input type="file" accept="image/*" class="hidden" onchange="handleSeatMapUpload(event)" /></label></div></div>
-              </div>
-              <div id="arc-fest-only" class="hidden sm:col-span-2 space-y-3">
-                <div><label class="text-slate-700 font-medium block mb-1">⏰ 演出时间段</label><input id="arc-slot" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
-                <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
-                  <div class="flex items-center justify-between flex-wrap gap-2"><label class="text-slate-700 font-medium">🗓️ 音乐节时间表图片</label><label class="cursor-pointer px-2.5 py-1 rounded-lg liquid-silver-btn font-medium transition">+ 多选上传时间表图片<input type="file" id="arc-schedule-files" accept="image/*" multiple class="hidden" onchange="handleMultiScheduleUpload(event, 'arc')" /></label></div>
-                  <div class="flex gap-1.5"><input id="arc-schedule-url-input" type="text" placeholder="输入单张时间表图片网址 https://..." class="flex-1 px-2.5 py-1.5 rounded border border-slate-300 bg-white text-xs" /><button type="button" onclick="addScheduleImageByUrl('arc')" class="px-2.5 py-1.5 rounded-lg liquid-silver-btn font-medium">添加链接图</button></div>
-                  <div id="arc-schedule-thumbs" class="flex gap-2 flex-wrap pt-1"></div>
-                </div>
-                <div><label class="text-slate-700 font-medium block mb-1">🎤 现场演唱歌单 Setlist</label><textarea id="arc-setlist" rows="4" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white leading-relaxed"></textarea></div>
-              </div>
-              <div class="sm:col-span-2 p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
-                <div class="flex items-center justify-between flex-wrap gap-2"><label class="text-slate-700 font-medium">🔭 场馆授权实拍视角相册</label><label class="cursor-pointer px-2.5 py-1 rounded-lg liquid-silver-btn font-medium transition">+ 上传实拍视角图<input type="file" accept="image/*" multiple class="hidden" onchange="handleMultiViewUpload(event, 'arc')" /></label></div>
-                <div id="arc-view-thumbs" class="flex gap-2 flex-wrap"></div>
-              </div>
-              <div class="sm:col-span-2"><label class="text-slate-500 block mb-1">官宣原帖 / 回顾链接</label><input id="arc-url" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
-            </div>
-          </div>
-
-          <div id="cp-tour-fields" class="hidden sm:col-span-2 space-y-3 p-3.5 rounded-xl bg-white/90 border border-slate-300">
-            <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
-              <div class="flex items-center justify-between flex-wrap gap-2">
-                <label class="font-semibold text-slate-800">🖼️ 官宣海报</label>
-                <div class="flex items-center gap-2 flex-wrap">
-                  <label class="cursor-pointer px-3 py-1 rounded-lg liquid-silver-btn font-medium transition">选择本地海报<input type="file" accept="image/*" class="hidden" onchange="handleUpcomingPosterUpload(event)" /></label>
-                  <button type="button" id="cp-ocr-btn" onclick="runSmartPosterRecognition('ticket')" class="px-3 py-1 rounded-lg obsidian-btn font-medium transition">🔍 识别海报自动填表</button>
-                </div>
-              </div>
-              <input id="cp-tour-poster" type="text" placeholder="或直接粘贴海报图片网址 https://..." class="w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white text-xs" />
-              <div id="cp-ocr-status" class="hidden text-[11px] text-slate-600 font-medium"></div>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div><label class="text-slate-700 font-medium block mb-1">巡演主题名称</label><input id="cp-tour-theme" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
-              <div><label class="text-slate-700 font-medium block mb-1">城市站次 / 场次名（必填）</label><input id="cp-tour-title" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
-              <div><label class="text-slate-500 block mb-1">演出场馆 / Livehouse</label><div class="flex gap-1.5"><input id="cp-tour-venue" type="text" class="flex-1 px-3 py-2 rounded-lg border border-slate-300 bg-white" /><button type="button" onclick="autoFillVenueTransport()" class="px-2.5 py-1.5 rounded-lg liquid-silver-btn shrink-0 font-medium">🚇 匹配路线</button></div></div>
-              <div><label class="text-slate-500 block mb-1">演出日期</label><input id="cp-tour-showdate" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
-              <div><label class="text-slate-700 font-medium block mb-1">⏰ 开场时间</label><input id="cp-tour-starttime" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
-              <div><label class="text-slate-700 font-medium block mb-1">💰 巡演票价档位</label><input id="cp-tour-prices" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
-              <div><label class="text-slate-700 font-medium block mb-1">🎤 预计演出时段</label><input id="cp-tour-slot" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
-              <div><label class="text-slate-700 font-medium block mb-1">💺 场馆座位图</label><div class="flex gap-1.5"><input id="cp-tour-seat" type="text" class="flex-1 px-2.5 py-2 rounded-lg border border-slate-300 bg-white" /><label class="cursor-pointer px-2.5 py-2 rounded-lg liquid-silver-btn shrink-0 font-medium">上传图<input type="file" accept="image/*" class="hidden" onchange="handleUpcomingSeatUpload(event)" /></label></div></div>
-              <div class="sm:col-span-2 p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
-                <div class="flex items-center justify-between flex-wrap gap-2">
-                  <div class="flex items-center gap-2 flex-wrap"><label class="text-slate-800 font-semibold">🔭 场馆舞台结构类型：</label><select id="cp-stage-type" class="px-2.5 py-1 rounded border border-slate-300 bg-white text-xs"><option value="auto">自动识别场馆结构</option><option value="arena_3">体育馆 · 三面台看台</option><option value="arena_4">体育馆 · 四面台中心舞台</option><option value="livehouse">Livehouse · 站席平面厅</option><option value="outdoor">户外音乐节 / 广场舞台</option></select></div>
-                  <label class="cursor-pointer px-2.5 py-1 rounded-lg liquid-silver-btn font-medium transition">+ 上传授权实拍视角图<input type="file" accept="image/*" multiple class="hidden" onchange="handleMultiViewUpload(event, 'cp')" /></label>
-                </div>
-                <div id="cp-view-thumbs" class="flex gap-2 flex-wrap"></div>
-              </div>
-              <div class="sm:col-span-2 p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
-                <div class="flex items-center justify-between flex-wrap gap-2"><label class="text-slate-700 font-medium">🗓️ 音乐节时间表多图</label><label class="cursor-pointer px-2.5 py-1 rounded-lg liquid-silver-btn font-medium transition">+ 多选上传时间表图片<input type="file" id="cp-schedule-files" accept="image/*" multiple class="hidden" onchange="handleMultiScheduleUpload(event, 'cp')" /></label></div>
-                <div class="flex gap-1.5"><input id="cp-schedule-url-input" type="text" placeholder="输入单张时间表图片网址 https://..." class="flex-1 px-2.5 py-1.5 rounded border border-slate-300 bg-white text-xs" /><button type="button" onclick="addScheduleImageByUrl('cp')" class="px-2.5 py-1.5 rounded-lg liquid-silver-btn font-medium">添加链接图</button></div>
-                <div id="cp-schedule-thumbs" class="flex gap-2 flex-wrap pt-1"></div>
-              </div>
-            </div>
-            <div class="pt-2 border-t border-slate-200 space-y-2">
-              <div class="flex items-center justify-between flex-wrap gap-2"><span class="text-slate-800 font-semibold">🎫 开票轮次设置</span><button type="button" onclick="addTicketRoundRow('预售', '', '大麦')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium transition">+ 添加一轮开票</button></div>
-              <div id="ticket-rounds-container" class="space-y-2"></div>
-            </div>
-            <div class="pt-2 border-t border-slate-200 space-y-1.5"><label class="text-slate-800 font-semibold block">🚇 交通枢纽到场馆具体时间与路线</label><textarea id="cp-tour-transport" rows="3" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white leading-relaxed"></textarea></div>
-          </div>
-
-          <div id="cp-feed-fields" class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div class="sm:col-span-2"><label class="text-slate-500 block mb-1">完整博文正文</label><textarea id="cp-content" rows="4" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white leading-relaxed"></textarea></div>
-            <div><label class="text-slate-700 font-semibold block mb-1">原帖实际发布时间</label><input id="cp-time" type="datetime-local" class="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white" /></div>
-            <div><label class="text-slate-500 block mb-1">直达原帖链接</label><input id="cp-url" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
-            <div class="sm:col-span-2"><label class="text-slate-500 block mb-1">配图链接</label><input id="cp-img" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
-          </div>
-        </div>
-        <button id="cp-submit-btn" onclick="submitCloudEntry()" class="px-4 py-2 rounded-lg obsidian-btn text-xs font-semibold transition">☁️ 确认发布并同步至所有设备</button>
-      </div>
+      <div id="home-feed-brief"></div>
     </section>
 
-    <div id="view-shows-page" class="space-y-8">
-      <section>
-        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <h2 class="text-base font-bold flex items-center gap-2"><span class="text-slate-900">🎫 近期演出（售票中 & 待开演场次）</span><span class="text-[11px] font-normal px-2.5 py-0.5 rounded-full bg-white text-slate-600 border border-slate-300">支持在线编辑 · 场馆视角参考</span></h2>
+    <!-- ================= 2. 演出档案库 ================= -->
+    <section id="view-shows-page" class="hidden space-y-6">
+      <div class="space-y-3">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <h2 class="text-base font-bold text-slate-900">🎫 近期演出与参演指南</h2>
           <div id="tour-themes-bar" class="flex items-center gap-1.5 flex-wrap"></div>
         </div>
         <div id="tour-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-      </section>
-      <section class="space-y-4">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <h2 class="text-base font-bold flex items-center gap-2"><span class="text-slate-900">🏛️ 往日演出回顾档案</span><span class="text-[11px] font-normal px-2.5 py-0.5 rounded-full bg-white text-slate-600 border border-slate-300">展示最新 1 站 · 其余竖行折叠</span></h2>
-          <div class="flex items-center gap-2 flex-wrap">
-            <div class="flex items-center gap-1 bg-white/90 p-1 rounded-lg border border-slate-300 text-xs">
-              <button onclick="setArchiveTypeFilter('ALL')" id="arc-filter-ALL" class="px-2.5 py-1 rounded-md obsidian-btn font-medium transition">全部</button>
-              <button onclick="setArchiveTypeFilter('tour')" id="arc-filter-tour" class="px-2.5 py-1 rounded-md text-slate-600 hover:bg-slate-100 transition">🏟️ 巡演/Livehouse</button>
-              <button onclick="setArchiveTypeFilter('festival')" id="arc-filter-festival" class="px-2.5 py-1 rounded-md text-slate-600 hover:bg-slate-100 transition">🎪 音乐节</button>
+      </div>
+
+      <div class="space-y-3">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <h2 class="text-base font-bold text-slate-900">🏛️ 往日演出回顾档案</h2>
+          <div class="flex items-center gap-2 text-xs">
+            <div class="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-300">
+              <button type="button" onclick="setArchiveTypeFilter('ALL')" id="arc-filter-ALL" class="px-2.5 py-1 rounded-md obsidian-btn font-medium">全部</button>
+              <button type="button" onclick="setArchiveTypeFilter('tour')" id="arc-filter-tour" class="px-2.5 py-1 rounded-md text-slate-600">巡演</button>
+              <button type="button" onclick="setArchiveTypeFilter('festival')" id="arc-filter-festival" class="px-2.5 py-1 rounded-md text-slate-600">音乐节</button>
             </div>
-            <select id="archive-year-filter" onchange="renderArchiveTimeline()" class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700"><option value="ALL">全部年份</option></select>
+            <select id="archive-year-filter" onchange="renderArchiveTimeline()" class="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700"></select>
           </div>
         </div>
         <div id="archive-timeline-list" class="space-y-3"></div>
-      </section>
-    </div>
+      </div>
+    </section>
 
-    <div id="view-feeds-page" class="hidden space-y-5">
-      <section id="latest-spotlight" class="hidden">
-        <div class="p-4 sm:p-5 rounded-2xl chronicle-card">
-          <div class="flex items-center justify-between gap-2 mb-2">
-            <div class="flex items-center gap-2 text-xs font-semibold text-slate-700"><span class="px-2 py-0.5 rounded obsidian-btn text-white">最新动态</span><span id="spotlight-artist" class="font-bold text-slate-900"></span><span class="text-slate-400">·</span><span id="spotlight-platform" class="text-slate-700"></span><span class="text-slate-400">·</span><span id="spotlight-time" class="text-slate-500"></span></div>
-            <a id="spotlight-link" href="#" target="_blank" class="text-xs font-medium text-slate-700 hover:text-slate-950 hover:underline">直达原帖 ↗</a>
+    <!-- ================= 3. 纯本地足迹与纪念票根 ================= -->
+    <section id="view-footprint-page" class="hidden space-y-5">
+      <div id="local-fan-pref-box"></div>
+      <div id="footprint-map-box"></div>
+
+      <!-- Canvas 纪念票根生成器 -->
+      <div class="p-4 sm:p-5 rounded-2xl chronicle-card space-y-4">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">🎟️ 专属观演纪念票根生成器（纯前端本地生成）</h3>
+            <p class="text-[11px] text-slate-500 mt-0.5">默认使用应援色底板，自动计算相识天数与线下奔赴面数，导出长图自动烧录免责水印。</p>
           </div>
-          <p id="spotlight-text" class="text-sm sm:text-base font-medium leading-relaxed text-slate-800 line-clamp-1-clean"></p>
+          <button type="button" onclick="downloadSouvenirTicket()" class="px-3.5 py-1.5 rounded-xl obsidian-btn text-xs font-semibold">
+            ⬇️ 保存纪念票根 PNG
+          </button>
         </div>
-      </section>
-      <section class="space-y-4">
-        <div class="metal-card p-4 rounded-2xl space-y-3">
-          <div class="flex items-center gap-1.5 flex-wrap"><span class="text-xs text-slate-500 font-medium mr-1">艺人：</span><div id="feed-artist-pills" class="flex items-center gap-1.5 flex-wrap"></div></div>
-          <div class="flex items-center gap-1.5 flex-wrap pt-2 border-t border-slate-200/80"><span class="text-xs text-slate-500 font-medium mr-1">平台：</span><div id="platform-tabs" class="flex items-center gap-1.5 flex-wrap"></div></div>
-          <div class="flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-slate-200/80 text-xs">
-            <div class="flex items-center gap-1.5 flex-wrap"><span class="text-slate-500">日期范围：</span><input type="date" id="date-start-filter" onchange="renderTimeline()" class="px-2 py-1 rounded-lg border border-slate-300 bg-white text-slate-700" /><span class="text-slate-400">至</span><input type="date" id="date-end-filter" onchange="renderTimeline()" class="px-2 py-1 rounded-lg border border-slate-300 bg-white text-slate-700" /><button onclick="clearDate()" class="px-2 py-1 text-slate-500 hover:text-slate-900">重置</button></div>
-            <input type="text" id="keyword-filter" oninput="renderTimeline()" placeholder="搜索动态关键词..." class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 w-44 sm:w-52" />
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+          <input id="tk-show-name" type="text" oninput="renderTicketCanvasPreview()" placeholder="演出名称（如：极尽声色巡演北京站）" class="px-3 py-2 rounded-lg border border-slate-300 bg-white" />
+          <input id="tk-show-date" type="date" oninput="renderTicketCanvasPreview()" class="px-3 py-2 rounded-lg border border-slate-300 bg-white" />
+          <div class="flex gap-2">
+            <input id="tk-seat-info" type="text" oninput="renderTicketCanvasPreview()" placeholder="位置备注（如：看台A区）" class="flex-1 px-3 py-2 rounded-lg border border-slate-300 bg-white" />
+            <input id="tk-color" type="color" value="#DD0514" oninput="renderTicketCanvasPreview()" title="选择应援色底板" class="w-10 h-9 rounded cursor-pointer border border-slate-300 bg-white" />
           </div>
         </div>
-        <div id="timeline-list" class="space-y-3"></div>
-      </section>
-    </div>
+
+        <div class="w-full overflow-x-auto flex justify-center bg-slate-100/80 p-3 rounded-xl border border-slate-200">
+          <canvas id="souvenir-ticket-canvas" class="max-w-full h-auto rounded-xl shadow-md"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 4. 多平台社媒动态 ================= -->
+    <section id="view-feeds-page" class="hidden space-y-4">
+      <div class="metal-card p-4 rounded-2xl space-y-3">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div id="feed-artist-pills" class="flex items-center gap-1.5 flex-wrap"></div>
+          <span id="feed-period-stats" class="text-xs font-medium text-slate-600"></span>
+        </div>
+        <div class="flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-slate-200/80">
+          <div id="platform-tabs" class="flex items-center gap-1.5 flex-wrap"></div>
+          <input id="keyword-filter" type="text" oninput="renderTimeline()" placeholder="搜索动态关键词..." class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs w-44 sm:w-52" />
+        </div>
+      </div>
+      <div id="timeline-list" class="space-y-3"></div>
+    </section>
+
   </main>
 
-  <div id="venue-view-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
-    <div class="chronicle-card rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden bg-white">
-      <div class="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between gap-4 bg-gradient-to-r from-slate-100 via-white to-slate-100">
-        <div class="min-w-0"><span class="text-[11px] px-2.5 py-0.5 rounded-full obsidian-btn text-white font-semibold">🔭 场馆舞台结构与视线参考</span><h3 id="vv-modal-title" class="font-bold text-lg sm:text-xl mt-1 text-slate-900 truncate"></h3><p id="vv-modal-subtitle" class="text-xs text-slate-500 mt-0.5"></p></div>
-        <button onclick="document.getElementById('venue-view-modal').classList.add('hidden')" class="w-8 h-8 rounded-full liquid-silver-btn flex items-center justify-center text-slate-700 shrink-0">✕</button>
+  <!-- 全站底部版权与非商业免责声明 -->
+  <footer class="max-w-5xl mx-auto px-4 py-6 mt-4 border-t border-slate-300/70 text-[11px] text-slate-500 space-y-1 text-center">
+    <p>ONERLAND 为非盈利、非商业粉丝档案与观演实用工具站，不接任何广告、会员、打赏或票务交易。</p>
+    <p>站内演出海报版权归原经纪公司及主办方所有，仅作非商业信息索引展示；如有侵权请通过邮箱联系核实删除。</p>
+  </footer>
+
+  <!-- 移动端底部固定 4 项导航 -->
+  <nav class="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-xl border-t border-slate-300 grid grid-cols-4 gap-1 p-1.5 text-[11px]">
+    <button type="button" id="bottom-tab-home" onclick="switchMainTab('home')" class="py-1.5 rounded-xl obsidian-btn text-white font-semibold">🏠 首页</button>
+    <button type="button" id="bottom-tab-shows" onclick="switchMainTab('shows')" class="py-1.5 rounded-xl text-slate-600">🏛️ 档案</button>
+    <button type="button" id="bottom-tab-footprint" onclick="switchMainTab('footprint')" class="py-1.5 rounded-xl text-slate-600">🎫 足迹</button>
+    <button type="button" id="bottom-tab-feeds" onclick="switchMainTab('feeds')" class="py-1.5 rounded-xl text-slate-600">📱 动态</button>
+  </nav>
+
+  <!-- 外部工具站跳转前二次确认弹窗 -->
+  <div id="external-jump-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="chronicle-card rounded-2xl max-w-md w-full p-5 space-y-3 bg-white">
+      <div class="flex items-center justify-between">
+        <span class="text-xs px-2.5 py-0.5 rounded-full obsidian-btn text-white font-semibold">外部工具站跳转提示</span>
+        <button type="button" onclick="document.getElementById('external-jump-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-800">✕</button>
       </div>
-      <div class="p-4 sm:p-6 overflow-y-auto no-scrollbar space-y-5 bg-slate-50/70">
-        <div class="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
-          <div class="flex items-center justify-between flex-wrap gap-2"><span class="text-xs font-bold text-slate-800">📐 标准舞台俯视与视线距离参考图</span><select id="vv-stage-switcher" onchange="renderVenueSvgDiagram(this.value)" class="text-xs px-2.5 py-1 rounded-lg border border-slate-300 bg-slate-50 text-slate-700"><option value="arena_3">体育馆 · 三面台看台</option><option value="arena_4">体育馆 · 四面台中心舞台</option><option value="livehouse">Livehouse · 站席平面厅</option><option value="outdoor">户外音乐节 / 广场舞台</option></select></div>
-          <div id="vv-svg-container" class="w-full flex justify-center bg-slate-50 rounded-xl border border-slate-200 p-3"></div>
-          <div id="vv-zone-tip" class="p-2.5 rounded-lg bg-slate-100 border border-slate-300 text-xs text-slate-700"></div>
+      <h3 id="ext-confirm-site" class="font-bold text-base text-slate-900"></h3>
+      <p id="ext-confirm-desc" class="text-xs text-slate-600 leading-relaxed"></p>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" onclick="document.getElementById('external-jump-modal').classList.add('hidden')" class="px-3.5 py-1.5 rounded-lg liquid-silver-btn text-xs">取消</button>
+        <button type="button" onclick="confirmExternalToolJump()" class="px-3.5 py-1.5 rounded-lg obsidian-btn text-xs font-semibold">确认前往 ↗</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 巡演专题自动聚合弹窗 -->
+  <div id="series-detail-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="chronicle-card rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden bg-white">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <h3 id="series-modal-title" class="font-bold text-base text-slate-900"></h3>
+          <p id="series-modal-sub" class="text-xs text-slate-500 mt-0.5"></p>
         </div>
-        <div id="vv-photos-section" class="p-4 rounded-xl bg-white border border-slate-200 space-y-2.5"><div class="flex items-center justify-between"><span class="text-xs font-bold text-slate-800">📸 已收录授权实拍视角相册</span><span class="text-[11px] text-slate-400">仅展示本人拍摄或已获授权图</span></div><div id="vv-photos-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div></div>
-        <div class="p-4 rounded-xl bg-white border border-slate-200 space-y-2.5"><div class="text-xs font-bold text-slate-800">🔎 前往外部平台查看特定看台/排数实拍视角</div><div id="vv-external-links" class="flex items-center gap-2.5 flex-wrap"></div></div>
+        <button type="button" onclick="document.getElementById('series-detail-modal').classList.add('hidden')" class="w-8 h-8 rounded-full liquid-silver-btn text-xs">✕</button>
       </div>
+      <div id="series-modal-body" class="p-4 overflow-y-auto no-scrollbar flex-1 bg-slate-50"></div>
     </div>
   </div>
 
-  <div id="theme-detail-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
-    <div class="chronicle-card rounded-2xl max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden bg-white">
-      <div class="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between gap-4 bg-gradient-to-r from-slate-100 via-white to-slate-100">
-        <div class="flex items-center gap-4 min-w-0"><img id="theme-modal-poster" src="" onclick="openLightbox(this.src, document.getElementById('theme-modal-title').textContent)" class="hidden w-14 h-20 object-cover rounded-lg border border-slate-300 cursor-zoom-in shrink-0 shadow-2xs" /><div class="min-w-0"><span id="theme-modal-badge" class="text-[11px] px-2.5 py-0.5 rounded-full obsidian-btn text-white font-semibold">🏛️ 巡演时光纪念册</span><h3 id="theme-modal-title" class="font-bold text-lg sm:text-xl mt-1 text-slate-900 truncate"></h3><p id="theme-modal-subtitle" class="text-xs text-slate-600 mt-0.5"></p></div></div>
-        <button onclick="document.getElementById('theme-detail-modal').classList.add('hidden')" class="w-8 h-8 rounded-full liquid-silver-btn flex items-center justify-center text-slate-700 shrink-0">✕</button>
+  <!-- 隐藏管理端（独立路由 #admin 或连点标题 5 次唤起，不在导航暴露） -->
+  <div id="hidden-admin-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="chronicle-card rounded-2xl max-w-2xl w-full max-h-[88vh] flex flex-col overflow-hidden bg-white">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between">
+        <h3 class="font-bold text-sm text-slate-900">🛠️ 独立管理台（单页投喂 & 待办队列）</h3>
+        <button type="button" onclick="document.getElementById('hidden-admin-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-800">✕</button>
       </div>
-      <div id="theme-modal-body" class="p-4 sm:p-6 overflow-y-auto no-scrollbar flex-1 bg-slate-50/80"></div>
-    </div>
-  </div>
-
-  <div id="image-lightbox" onclick="this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-zoom-out">
-    <div class="max-w-3xl max-h-[90vh] flex flex-col items-center gap-2" onclick="event.stopPropagation()">
-      <img id="lightbox-img" src="" class="max-h-[82vh] max-w-full rounded-xl shadow-2xl object-contain bg-white border border-slate-200" />
-      <div class="flex items-center gap-4 text-xs text-white"><span id="lightbox-caption"></span><button onclick="document.getElementById('image-lightbox').classList.add('hidden')" class="px-3 py-1 rounded bg-white/20 hover:bg-white/30 text-white">关闭预览</button></div>
-    </div>
-  </div>
-
-  <div id="manage-modal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="chronicle-card rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col bg-white">
-      <div class="p-4 border-b border-slate-200 flex items-center justify-between"><h3 class="font-bold text-base text-slate-900">管理关注的艺人 & 订阅源</h3><button onclick="closeManageModal()" class="text-slate-400 hover:text-slate-800 text-lg">✕</button></div>
-      <div class="p-4 overflow-y-auto space-y-5 flex-1 no-scrollbar">
-        <div class="p-3.5 rounded-xl bg-slate-50 space-y-3 border border-slate-200">
-          <p class="text-xs font-bold text-slate-800">+ 添加艺人或新平台账号</p>
-          <div class="grid grid-cols-2 gap-2"><input id="input-artist-name" type="text" placeholder="艺人名称" class="text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white" /><input id="input-platform-name" type="text" placeholder="账号标签" class="text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
-          <div class="flex gap-2"><input id="input-rss-url" type="url" placeholder="粘贴 RSS 链接" class="flex-1 text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white" /><input id="input-color" type="color" value="#DD0514" class="w-9 h-8 rounded cursor-pointer border-0 bg-transparent" /></div>
-          <button onclick="addArtistAccount()" class="w-full py-2 rounded-lg obsidian-btn text-xs font-semibold transition">添加到我的看板</button>
+      <div class="p-4 overflow-y-auto space-y-4 text-xs">
+        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+          <div class="grid grid-cols-2 gap-2">
+            <select id="adm-type" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white">
+              <option value="ticket">发布：近期演出</option>
+              <option value="archive">发布：往日档案</option>
+              <option value="feed">发布：社媒/置顶公告</option>
+            </select>
+            <select id="adm-artist" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white">
+              <option value="ONER">ONER</option><option value="岳岳">岳岳</option><option value="木子洋">木子洋</option><option value="灵超">灵超</option><option value="坤音娱乐">坤音娱乐</option>
+            </select>
+            <input id="adm-title" type="text" placeholder="站次标题 或 平台名(如:微博)" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
+            <input id="adm-date" type="text" placeholder="日期 YYYY-MM-DD（动态可留空）" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
+            <input id="adm-poster" type="text" placeholder="海报链接 https://...（选填）" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
+            <input id="adm-url" type="text" placeholder="原帖/购票链接 https://..." class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
+          </div>
+          <textarea id="adm-body" rows="2" placeholder="场馆名称 或 动态正文..." class="w-full px-2.5 py-2 rounded-lg border border-slate-300 bg-white"></textarea>
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-1.5 cursor-pointer"><input id="adm-pin" type="checkbox" /> 设为动态页置顶重要公告</label>
+            <button type="button" onclick="submitAdminQuickPost()" class="px-4 py-1.5 rounded-lg obsidian-btn font-semibold">☁️ 同步发布</button>
+          </div>
         </div>
-        <div class="space-y-3"><div class="flex items-center justify-between"><span class="text-xs font-bold text-slate-500">当前已配置列表</span><button onclick="resetToDefaultArtists()" class="text-xs text-rose-600 hover:underline">恢复默认配置</button></div><div id="manage-artist-list" class="space-y-2.5"></div></div>
+
+        <div class="space-y-2">
+          <div class="font-bold text-slate-700">📋 云端记录快捷管理队列</div>
+          <div id="admin-todo-queue" class="space-y-1.5"></div>
+        </div>
       </div>
     </div>
   </div>
 
   <script src="./js/config.js"></script>
   <script src="./js/store.js"></script>
-  <script src="./js/parser.js"></script>
+  <script src="./js/home-ui.js"></script>
   <script src="./js/shows-ui.js"></script>
+  <script src="./js/footprint-ui.js"></script>
   <script src="./js/feeds-ui.js"></script>
   <script>
-    function autoFillVenueTransport() {
-      const matched = findPresetTransport(`${document.getElementById('cp-tour-theme').value} ${document.getElementById('cp-tour-title').value} ${document.getElementById('cp-tour-venue').value}`);
-      const placeName = document.getElementById('cp-tour-venue').value || '演出现场';
-      document.getElementById('cp-tour-transport').value = matched || [`🚇 地铁/公交：点击「导航 ↗」使用高德地图搜索「${placeName}」获取最近站点`, `🚄 高铁站/机场 → ${placeName}：出站后可乘地铁换乘或网约车直达`].join('\n');
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
-
-    async function handlePosterUpload(event) {
-      const file = event.target.files?.[0];
-      if (!file) return;
-      const statusEl = document.getElementById('arc-ocr-status');
-      statusEl.classList.remove('hidden');
-      statusEl.textContent = '⏳ 正在加载高清海报图...';
-      try {
-        const dataUrl = await compressImageToDataURL(file, 760, 0.72);
-        document.getElementById('arc-poster-url').value = dataUrl;
-        const preview = document.getElementById('arc-poster-preview');
-        preview.src = dataUrl; preview.classList.remove('hidden');
-        statusEl.textContent = '✅ 图片已加载！点击「🔍 识别海报自动填表」即可提取。';
-      } catch (e) { statusEl.textContent = '❌ 图片读取失败，请重试。'; }
-    }
-
-    async function handleSeatMapUpload(event) {
-      const file = event.target.files?.[0];
-      if (file) document.getElementById('arc-seat-url').value = await compressImageToDataURL(file, 760, 0.72);
-    }
-
-    async function handleUpcomingPosterUpload(event) {
-      const file = event.target.files?.[0];
-      if (!file) return;
-      const statusEl = document.getElementById('cp-ocr-status');
-      statusEl.classList.remove('hidden');
-      document.getElementById('cp-tour-poster').value = await compressImageToDataURL(file, 760, 0.72);
-      statusEl.textContent = '✅ 海报已加载！点击「🔍 识别海报自动填表」可自动填入信息。';
-    }
-
-    async function handleUpcomingSeatUpload(event) {
-      const file = event.target.files?.[0];
-      if (file) document.getElementById('cp-tour-seat').value = await compressImageToDataURL(file, 760, 0.72);
-    }
-
-    function fillTicketFormFromRecognized(shows) {
-      if (!Array.isArray(shows) || !shows.length) return;
-      const first = shows[0];
-      if (first.artist) document.getElementById('cp-artist').value = first.artist;
-      if (first.theme) document.getElementById('cp-tour-theme').value = first.theme;
-      if (first.city_or_title) document.getElementById('cp-tour-title').value = first.city_or_title;
-      if (first.venue) { document.getElementById('cp-tour-venue').value = first.venue; autoFillVenueTransport(); }
-      if (first.date_display || first.date) document.getElementById('cp-tour-showdate').value = first.date_display || first.date;
-      if (first.start_time) document.getElementById('cp-tour-starttime').value = first.start_time;
-      if (first.prices) document.getElementById('cp-tour-prices').value = first.prices;
-      if (first.slot) document.getElementById('cp-tour-slot').value = first.slot;
-      if (first.sale_time) {
-        document.getElementById('ticket-rounds-container').innerHTML = '';
-        addTicketRoundRow('正式开票', first.sale_time.replace(' ', 'T').slice(0, 16), first.platform || '大麦');
-      }
-    }
-
-    function renderRecognizedShowsBatch(shows, defaultTheme = '') {
-      if (!Array.isArray(shows) || !shows.length) return;
-      const first = shows[0];
-      if (first.artist) document.getElementById('cp-artist').value = first.artist;
-      if (first.theme || defaultTheme) document.getElementById('arc-theme').value = first.theme || defaultTheme;
-      if (first.city_or_title) document.getElementById('arc-title').value = first.city_or_title;
-      if (first.date) document.getElementById('arc-date').value = first.date.slice(0, 10);
-      if (first.venue) document.getElementById('arc-venue').value = first.venue;
-      if (first.prices) document.getElementById('arc-prices').value = first.prices;
-      if (first.slot) document.getElementById('arc-slot').value = first.slot;
-
-      const isFest = first.type === 'festival' || /音乐节|嘉年华/.test(`${first.theme || ''} ${first.city_or_title || ''}`);
-      document.getElementsByName('archiveSubType').forEach(r => { r.checked = (r.value === (isFest ? 'festival' : 'tour')); });
-      toggleArchiveSubFields();
-
-      const batchBox = document.getElementById('multi-show-batch-box');
-      if (shows.length >= 2) {
-        batchParsedItems = shows.map((s, idx) => ({
-          checked: true,
-          artist: s.artist || document.getElementById('cp-artist').value,
-          theme: s.theme || defaultTheme || '巡回演唱会',
-          title: s.city_or_title || `第 ${idx + 1} 场`,
-          date: (s.date || '').slice(0, 10),
-          show_date_text: s.date_display || s.date || '',
-          start_time: s.start_time || '',
-          venue: s.venue || '',
-          prices: s.prices || '',
-          sale_time: s.sale_time || '',
-          platform: s.platform || '大麦',
-          slot: s.slot || '',
-          type: (s.type === 'festival' || /音乐节|嘉年华/.test(`${s.theme || ''} ${s.city_or_title || ''}`)) ? 'festival' : 'tour'
-        }));
-        document.getElementById('multi-show-list').innerHTML = batchParsedItems.map((item, idx) => `<div class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 items-center p-2 rounded-lg bg-white border border-slate-200 text-[11px]"><div class="sm:col-span-1 flex items-center gap-1"><input type="checkbox" checked onchange="batchParsedItems[${idx}].checked = this.checked" /><span class="text-slate-400">#${idx + 1}</span></div><div class="sm:col-span-2"><input type="text" value="${item.title}" onchange="batchParsedItems[${idx}].title = this.value" class="w-full px-1.5 py-1 rounded border border-slate-300 bg-transparent font-semibold" /></div><div class="sm:col-span-2"><input type="date" value="${item.date}" onchange="batchParsedItems[${idx}].date = this.value" class="w-full px-1.5 py-1 rounded border border-slate-300 bg-transparent" /></div><div class="sm:col-span-4"><input type="text" value="${item.venue}" onchange="batchParsedItems[${idx}].venue = this.value" class="w-full px-1.5 py-1 rounded border border-slate-300 bg-transparent" /></div><div class="sm:col-span-3"><input type="text" value="${item.prices || item.slot}" onchange="batchParsedItems[${idx}].prices = this.value" class="w-full px-1.5 py-1 rounded border border-slate-300 bg-transparent" /></div></div>`).join('');
-        batchBox.classList.remove('hidden');
-      } else {
-        batchBox.classList.add('hidden');
-      }
-    }
-
-    async function batchImportRecognizedShows() {
-      const selected = batchParsedItems.filter(i => i.checked);
-      if (!selected.length) return alert('请至少勾选一场演出！');
-      const targetSection = document.getElementById('batch-target-section').value;
-      const posterUrl = document.getElementById('arc-poster-url').value.trim();
-      const shareUrl = document.getElementById('arc-url').value.trim();
-
-      const payloads = selected.map(item => {
-        const showDate = item.date || new Date().toISOString().slice(0, 10);
-        const displayTitle = item.theme && !item.title.includes(item.theme) ? `${item.theme} · ${item.title}` : item.title;
-        if (targetSection === 'ticket') {
-          const saleIso = item.sale_time ? item.sale_time.replace(' ', 'T') : `${showDate}T12:00`;
-          return {
-            title: `${item.artist}|${displayTitle}|${item.venue || '场馆待补充'}|${item.show_date_text || showDate}|${item.slot || ''}`,
-            ticket_time: saleIso,
-            platform: `META:${JSON.stringify({ rounds: [{ round_name: '正式开票', sale_time: saleIso.replace('T', ' '), platform: item.platform || '大麦' }], transport: findPresetTransport(`${item.title} ${item.venue}`), slot: item.slot, theme: item.theme, prices: item.prices, startTime: item.start_time || '', posterUrl, scheduleImgs: [], viewImgs: [] })}`,
-            url: shareUrl
-          };
-        }
-        return {
-          title: `ARCHIVE|${item.artist}|${displayTitle}|${showDate}`,
-          ticket_time: `${showDate}T19:30`,
-          platform: `ARCHIVE:${JSON.stringify({ subType: item.type || 'tour', theme: item.theme || '', venue: item.venue || '演出地点待补充', posterUrl, prices: item.prices || '', seatUrl: '', slot: item.slot || '', scheduleImgs: [], viewImgs: [], setlist: [] })}`,
-          url: shareUrl
-        };
-      });
-
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/tickets`, { method: 'POST', headers: SB_HEADERS, body: JSON.stringify(payloads) });
-      if (!res.ok) return alert(`批量导入失败：HTTP ${res.status}`);
-      alert(`成功批量导入 ${payloads.length} 场演出记录！`);
-      document.getElementById('multi-show-batch-box').classList.add('hidden');
-      resetConfirmForm();
-      await loadTourData();
-    }
-
-    function resetConfirmForm() {
-      editingTicketId = null; cpScheduleImgs = []; arcScheduleImgs = []; cpViewImgs = []; arcViewImgs = [];
-      renderScheduleThumbs('cp'); renderScheduleThumbs('arc'); renderViewThumbs('cp'); renderViewThumbs('arc');
-      document.getElementById('raw-post-input').value = '';
-      document.getElementById('editing-banner').classList.add('hidden');
-      document.getElementById('entry-type-selector').classList.remove('hidden');
-      document.getElementById('cp-ocr-status').classList.add('hidden');
-      document.getElementById('arc-ocr-status').classList.add('hidden');
-      document.getElementById('cp-submit-btn').textContent = '☁️ 确认发布并同步至所有设备';
-      document.getElementById('parse-confirm-box').classList.add('hidden');
-    }
-
-    function cancelEditMode() { resetConfirmForm(); }
-
-    function editExistingTicket(cloudId) {
-      const item = cloudTickets.find(t => t.cloudId === cloudId);
-      if (!item) return;
-      editingTicketId = cloudId;
-      document.getElementsByName('cloudEntryType').forEach(r => { r.checked = (r.value === 'ticket'); });
-      toggleCloudFields();
-      document.getElementById('editing-banner').classList.remove('hidden');
-      document.getElementById('editing-target-name').textContent = item.city;
-      document.getElementById('entry-type-selector').classList.add('hidden');
-      document.getElementById('cp-submit-btn').textContent = '💾 保存修改并同步至所有设备';
-      document.getElementById('cp-artist').value = item.artist || 'ONER';
-      document.getElementById('cp-tour-theme').value = item.theme || '';
-      document.getElementById('cp-tour-title').value = item.city || '';
-      document.getElementById('cp-tour-venue').value = item.venue || '';
-      document.getElementById('cp-tour-showdate').value = item.show_date || '';
-      document.getElementById('cp-tour-starttime').value = item.startTime || '';
-      document.getElementById('cp-tour-prices').value = item.prices || '';
-      document.getElementById('cp-tour-slot').value = item.slot || '';
-      document.getElementById('cp-tour-poster').value = item.posterUrl || '';
-      document.getElementById('cp-tour-seat').value = item.seatUrl || '';
-      document.getElementById('cp-stage-type').value = item.stageType || 'auto';
-      document.getElementById('cp-tour-transport').value = item.transport || '';
-      document.getElementById('cp-url-ticket').value = (item.source_url && item.source_url !== '#') ? item.source_url : '';
-      cpScheduleImgs = Array.isArray(item.scheduleImgs) ? [...item.scheduleImgs] : [];
-      cpViewImgs = Array.isArray(item.viewImgs) ? JSON.parse(JSON.stringify(item.viewImgs)) : [];
-      renderScheduleThumbs('cp'); renderViewThumbs('cp');
-      const roundsContainer = document.getElementById('ticket-rounds-container');
-      roundsContainer.innerHTML = '';
-      if (item.rounds?.length) item.rounds.forEach(r => addTicketRoundRow(r.round_name || '正式开票', r.sale_time ? r.sale_time.replace(' ', 'T').slice(0, 16) : '', r.platform || '大麦'));
-      else addTicketRoundRow('正式开票', '', '大麦');
-      const box = document.getElementById('parse-confirm-box');
-      box.classList.remove('hidden');
-      box.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-
-    function openTicketFormDirectly() {
-      resetConfirmForm();
-      document.getElementsByName('cloudEntryType').forEach(r => { r.checked = (r.value === 'ticket'); });
-      addTicketRoundRow('正式开票', '', '大麦');
-      toggleCloudFields();
-      document.getElementById('parse-confirm-box').classList.remove('hidden');
-    }
-
-    function openArchiveFormDirectly() {
-      resetConfirmForm();
-      document.getElementsByName('cloudEntryType').forEach(r => { r.checked = (r.value === 'archive'); });
-      const rawText = document.getElementById('raw-post-input').value.trim();
-      if (rawText) renderRecognizedShowsBatch(parseMultiShowsFromPlainText(rawText));
-      toggleCloudFields();
-      document.getElementById('parse-confirm-box').classList.remove('hidden');
-    }
-
-    function toggleArchiveSubFields() {
-      const sub = document.querySelector('input[name="archiveSubType"]:checked')?.value || 'tour';
-      document.getElementById('arc-tour-only').classList.toggle('hidden', sub === 'festival');
-      document.getElementById('arc-fest-only').classList.toggle('hidden', sub !== 'festival');
-    }
-
-    function addTicketRoundRow(roundName = '正式开票', saleTime = '', platform = '大麦') {
-      const row = document.createElement('div');
-      row.className = 'ticket-round-row grid grid-cols-1 sm:grid-cols-12 gap-2 items-center p-2 rounded-lg bg-slate-50 border border-slate-200';
-      row.innerHTML = `<div class="sm:col-span-3"><input type="text" value="${roundName}" class="tr-name w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white text-xs font-medium" /></div><div class="sm:col-span-4"><input type="datetime-local" value="${saleTime}" class="tr-time w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white text-xs" /></div><div class="sm:col-span-4"><input type="text" value="${platform}" class="tr-plat w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white text-xs" /></div><div class="sm:col-span-1 text-right"><button type="button" onclick="this.closest('.ticket-round-row').remove()" class="text-xs text-slate-400 hover:text-rose-600 px-1.5 py-1">✕</button></div>`;
-      document.getElementById('ticket-rounds-container').appendChild(row);
-    }
-
-    function smartParsePost() {
-      const text = document.getElementById('raw-post-input').value.trim();
-      if (!text) return alert('请先粘贴分享链接或动态文案！');
-      resetConfirmForm();
-      document.getElementById('raw-post-input').value = text;
-
-      const url = (text.match(/https?:\/\/[^\s\u4e00-\u9fa5]+/) || [''])[0];
-      let artist = 'ONER';
-      if (text.includes('岳岳') || text.includes('PINKRAY')) artist = '岳岳';
-      else if (text.includes('木子洋') || text.includes('KWIN')) artist = '木子洋';
-      else if (text.includes('灵超') || text.includes('DIDI')) artist = '灵超';
-      else if (text.includes('坤音')) artist = '坤音娱乐';
-
-      const isTicket = /开票|预售|抢票|巡演|演唱会|音乐节|嘉年华|Livehouse|Live House|大麦|秀动|售票时间|购票平台|优先购|特权购/i.test(text);
-      document.getElementsByName('cloudEntryType').forEach(r => { r.checked = (r.value === (isTicket ? 'ticket' : 'feed')); });
-
-      let defaultPlatform = '微博';
-      if (isTicket) {
-        const platMatch = text.match(/(?:购票平台|售票平台|票务平台)[：:]\s*([^\n\r⏰📍🗓️]+)/);
-        if (platMatch) defaultPlatform = platMatch[1].trim();
-        else {
-          const found = ['大麦', '坤音商城小程序', '坤音商城', '猫眼', '携程', '票星球', '秀动', '纷玩岛'].filter(p => text.includes(p));
-          if (found.length) defaultPlatform = [...new Set(found)].join(' | ');
-        }
-      } else {
-        if (/xhslink\.com|xiaohongshu\.com|小红书/.test(text)) defaultPlatform = '小红书';
-        else if (/douyin\.com|抖音/.test(text)) defaultPlatform = '抖音';
-        else if (/b23\.tv|bilibili\.com|B站|哔哩哔哩/.test(text)) defaultPlatform = 'B站';
-        else if (/youtu\.be|youtube\.com|YouTube/i.test(text)) defaultPlatform = 'YouTube';
-        else if (/instagram\.com|ins/i.test(text)) defaultPlatform = 'Instagram';
-        else if (/tiktok\.com|TikTok/i.test(text)) defaultPlatform = 'TikTok';
-      }
-
-      const themeMatch = text.match(/[「《]([^」》]+)[」》]\s*(巡回演唱会|演唱会|巡演|音乐节|嘉年华|见面会|音乐会)?/);
-      const festDirectMatch = text.match(/([\u4e00-\u9fa5A-Za-z0-9·]{2,16}(?:音乐节|嘉年华))/);
-      const themeStr = themeMatch ? `「${themeMatch[1]}」${themeMatch[2] || (text.includes('音乐节') ? '音乐节' : '巡回演唱会')}` : (festDirectMatch ? festDirectMatch[1] : '');
-      const cityMatch = text.match(/[「【\[]?([\u4e00-\u9fa5]{2,5}站)[」】\]]?/);
-      const cityStr = cityMatch ? cityMatch[1] : (themeStr || '巡演场次');
-      const venueStr = extractVenueFromText(text);
-      const currentYear = new Date().getFullYear();
-      const showDateStr = extractShowDateRange(text, currentYear);
-      const startTimeStr = extractStartTime(text);
-      const priceLineMatch = text.match(/(?:票价|价格|门票)[：:]?\s*([^\n\r]+)/);
-      const pricesStr = priceLineMatch ? priceLineMatch[1].trim() : '';
-
-      let slotStr = '';
-      const slotLabelMatch = text.match(/(?:预计演出时段|演出时段|登台时间|出场时间)[：:]\s*([^\n\r！!。]+)/);
-      if (slotLabelMatch) slotStr = slotLabelMatch[1].trim();
-      else if (/音乐节|嘉年华/.test(text)) {
-        const rangeMatch = text.match(/\b(\d{1,2}:\d{2}\s*[-~—至]\s*\d{1,2}:\d{2})\b/);
-        if (rangeMatch) slotStr = rangeMatch[1].trim();
-      }
-
-      const roundsContainer = document.getElementById('ticket-rounds-container');
-      roundsContainer.innerHTML = '';
-      const detectedRounds = [];
-      const prioMatch = text.match(/(?:优先购|特权购|会员购)[^\n\r]{0,38}/);
-      if (prioMatch) { const t = parseDateFromSnippet(prioMatch[0], currentYear); if (t) detectedRounds.push({ round_name: '优先购', sale_time: t, platform: prioMatch[0].includes('坤音') ? '坤音商城小程序' : defaultPlatform }); }
-      const presaleMatch = text.match(/(?:全面预售|预售开启|预售时间|预售)[^\n\r]{0,38}/);
-      if (presaleMatch) { const t = parseDateFromSnippet(presaleMatch[0], currentYear); if (t && !detectedRounds.some(r => r.sale_time === t)) detectedRounds.push({ round_name: '预售', sale_time: t, platform: defaultPlatform }); }
-      const mainSaleMatch = text.match(/(?:正式开票|全面开票|售票时间|开票时间)[^\n\r]{0,40}/);
-      if (mainSaleMatch) { const t = parseDateFromSnippet(mainSaleMatch[0], currentYear); if (t && !detectedRounds.some(r => r.sale_time === t)) detectedRounds.push({ round_name: '正式开票', sale_time: t, platform: defaultPlatform }); }
-      if (!detectedRounds.length) detectedRounds.push({ round_name: /预售/.test(text) ? '预售' : '正式开票', sale_time: parseDateFromSnippet(text, currentYear), platform: defaultPlatform });
-      detectedRounds.forEach(r => addTicketRoundRow(r.round_name, r.sale_time, r.platform));
-
-      document.getElementById('cp-artist').value = artist;
-      document.getElementById('cp-platform').value = defaultPlatform;
-      document.getElementById('cp-tour-theme').value = themeStr;
-      document.getElementById('cp-tour-title').value = cityStr;
-      document.getElementById('cp-tour-venue').value = venueStr;
-      document.getElementById('cp-tour-showdate').value = showDateStr;
-      document.getElementById('cp-tour-starttime').value = startTimeStr;
-      document.getElementById('cp-tour-prices').value = pricesStr;
-      document.getElementById('cp-tour-slot').value = slotStr;
-      document.getElementById('cp-tour-transport').value = findPresetTransport(`${themeStr} ${cityStr} ${venueStr} ${text}`) || (isTicket ? `🚇 地铁/公交：点击「导航 ↗」使用高德地图搜索「${venueStr || '演出现场'}」查看最近站点` : '');
-      document.getElementById('cp-content').value = cleanSocialPostText(text);
-      document.getElementById('cp-time').value = isTicket ? '' : (parseDateFromSnippet(text, currentYear) || getLocalDatetimeString());
-      document.getElementById('cp-url').value = url;
-      document.getElementById('cp-url-ticket').value = url;
-
-      toggleCloudFields();
-      document.getElementById('parse-confirm-box').classList.remove('hidden');
-    }
-
-    function toggleCloudFields() {
-      const type = document.querySelector('input[name="cloudEntryType"]:checked').value;
-      document.getElementById('cp-tour-fields').classList.add('hidden');
-      document.getElementById('cp-archive-fields').classList.add('hidden');
-      document.getElementById('cp-feed-fields').classList.add('hidden');
-      document.getElementById('cp-feed-platform-wrap').classList.add('hidden');
-      document.getElementById('cp-ticket-url-top').classList.add('hidden');
-
-      if (type === 'ticket') {
-        document.getElementById('cp-tour-fields').classList.remove('hidden');
-        document.getElementById('cp-ticket-url-top').classList.remove('hidden');
-        renderScheduleThumbs('cp'); renderViewThumbs('cp');
-        if (!document.getElementById('ticket-rounds-container').children.length) addTicketRoundRow('正式开票', '', '大麦');
-      } else if (type === 'archive') {
-        document.getElementById('cp-archive-fields').classList.remove('hidden');
-        toggleArchiveSubFields();
-        renderScheduleThumbs('arc'); renderViewThumbs('arc');
-      } else {
-        document.getElementById('cp-feed-fields').classList.remove('hidden');
-        document.getElementById('cp-feed-platform-wrap').classList.remove('hidden');
-        if (!document.getElementById('cp-time').value) document.getElementById('cp-time').value = getLocalDatetimeString();
-      }
-    }
-
-    async function submitCloudEntry() {
-      const type = document.querySelector('input[name="cloudEntryType"]:checked').value;
-      const artist = document.getElementById('cp-artist').value;
-      const btn = document.getElementById('cp-submit-btn');
-      btn.disabled = true;
-      btn.textContent = '☁️ 正在同步至云端...';
-
-      try {
-        if (type === 'ticket') {
-          const theme = document.getElementById('cp-tour-theme').value.trim();
-          const tourTitle = document.getElementById('cp-tour-title').value.trim();
-          const venue = document.getElementById('cp-tour-venue').value.trim() || '场馆待补充';
-          const showDate = document.getElementById('cp-tour-showdate').value.trim();
-          if (!tourTitle) throw new Error('请填写城市站次或场次名！');
-
-          const rounds = [];
-          document.querySelectorAll('.ticket-round-row').forEach(row => {
-            const sale_time = row.querySelector('.tr-time').value;
-            if (sale_time) rounds.push({ round_name: row.querySelector('.tr-name').value.trim() || '正式开票', sale_time: sale_time.replace('T', ' '), platform: row.querySelector('.tr-plat').value.trim() || '大麦' });
-          });
-          rounds.sort((a, b) => new Date(a.sale_time.replace(/-/g, '/')) - new Date(b.sale_time.replace(/-/g, '/')));
-          const fallbackIso = (showDate.match(/\d{4}-\d{2}-\d{2}/)?.[0] || new Date().toISOString().slice(0, 10)) + 'T19:30';
-          const earliestIsoTime = rounds.length ? rounds[0].sale_time.replace(' ', 'T') : fallbackIso;
-          const displayTitle = theme && !tourTitle.includes(theme) ? `${theme} · ${tourTitle}` : tourTitle;
-          const payload = {
-            title: `${artist}|${displayTitle}|${venue}|${showDate || earliestIsoTime.slice(0, 10)}|${document.getElementById('cp-tour-slot').value.trim()}`,
-            ticket_time: earliestIsoTime,
-            platform: `META:${JSON.stringify({ rounds, transport: document.getElementById('cp-tour-transport').value.trim(), slot: document.getElementById('cp-tour-slot').value.trim(), theme, prices: document.getElementById('cp-tour-prices').value.trim(), startTime: document.getElementById('cp-tour-starttime').value.trim(), posterUrl: document.getElementById('cp-tour-poster').value.trim(), seatUrl: document.getElementById('cp-tour-seat').value.trim(), stageType: document.getElementById('cp-stage-type').value, scheduleImgs: cpScheduleImgs, viewImgs: cpViewImgs })}`,
-            url: document.getElementById('cp-url-ticket').value.trim()
-          };
-          const res = await fetch(editingTicketId ? `${SUPABASE_URL}/rest/v1/tickets?id=eq.${editingTicketId}` : `${SUPABASE_URL}/rest/v1/tickets`, { method: editingTicketId ? 'PATCH' : 'POST', headers: SB_HEADERS, body: JSON.stringify(payload) });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          resetConfirmForm(); await loadTourData(); switchMainTab('shows');
-        } else if (type === 'archive') {
-          const subType = document.querySelector('input[name="archiveSubType"]:checked')?.value || 'tour';
-          const theme = document.getElementById('arc-theme').value.trim();
-          const title = document.getElementById('arc-title').value.trim();
-          const showDate = document.getElementById('arc-date').value;
-          if (!title) throw new Error('请填写具体站次或场次标题！');
-          if (!showDate) throw new Error('请选择演出日期！');
-          const setlist = document.getElementById('arc-setlist').value.trim().split('\n').map(s => s.replace(/^\d+[\.、\s]+/, '').trim()).filter(Boolean);
-          const displayTitle = theme && !title.includes(theme) ? `${theme} · ${title}` : title;
-          const payload = {
-            title: `ARCHIVE|${artist}|${displayTitle}|${showDate}`,
-            ticket_time: `${showDate}T19:30`,
-            platform: `ARCHIVE:${JSON.stringify({ subType, theme, venue: document.getElementById('arc-venue').value.trim() || '演出地点待补充', posterUrl: document.getElementById('arc-poster-url').value.trim(), prices: document.getElementById('arc-prices').value.trim(), seatUrl: document.getElementById('arc-seat-url').value.trim(), slot: document.getElementById('arc-slot').value.trim(), scheduleImgs: arcScheduleImgs, viewImgs: arcViewImgs, setlist })}`,
-            url: document.getElementById('arc-url').value.trim()
-          };
-          const res = await fetch(`${SUPABASE_URL}/rest/v1/tickets`, { method: 'POST', headers: SB_HEADERS, body: JSON.stringify(payload) });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          document.getElementById('arc-poster-preview').classList.add('hidden');
-          resetConfirmForm(); await loadTourData(); switchMainTab('shows');
-        } else {
-          const content = cleanSocialPostText(document.getElementById('cp-content').value.trim());
-          if (!content) throw new Error('请填写博文正文！');
-          let storedContent = content;
-          const imgUrl = document.getElementById('cp-img').value.trim();
-          const customTimeVal = document.getElementById('cp-time').value;
-          if (imgUrl) storedContent += `\n[IMG:${imgUrl}]`;
-          if (customTimeVal) { const pubTs = new Date(customTimeVal).getTime(); if (!isNaN(pubTs)) storedContent += `\n[PUB:${pubTs}]`; }
-          const res = await fetch(`${SUPABASE_URL}/rest/v1/feeds`, { method: 'POST', headers: SB_HEADERS, body: JSON.stringify({ platform: document.getElementById('cp-platform').value.trim() || '微博', artist, content: storedContent, url: document.getElementById('cp-url').value.trim() }) });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          resetConfirmForm(); await loadAllFeeds(true); switchMainTab('feeds');
-        }
-      } catch (e) {
-        alert(`同步失败 (${e.message})`);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = editingTicketId ? '💾 保存修改并同步至所有设备' : '☁️ 确认发布并同步至所有设备';
-      }
-    }
-
-    async function archiveExistingTicket(cloudId) {
-      const item = cloudTickets.find(t => t.cloudId === cloudId);
-      if (!item || !confirm(`确定将「${item.city}」归档到往日演出回顾时间线吗？`)) return;
-      const dateOnly = (item.show_date || '').match(/\d{4}-\d{2}-\d{2}/)?.[0] || new Date().toISOString().slice(0, 10);
-      const isFest = /音乐节|嘉年华/.test(`${item.city} ${item.theme || ''}`);
-      const payload = {
-        title: `ARCHIVE|${item.artist}|${item.city}|${dateOnly}`,
-        ticket_time: `${dateOnly}T19:30`,
-        platform: `ARCHIVE:${JSON.stringify({ subType: isFest ? 'festival' : 'tour', theme: item.theme || '', venue: item.venue || '', posterUrl: item.posterUrl || '', prices: item.prices || '', seatUrl: item.seatUrl || '', slot: item.slot || '', scheduleImgs: item.scheduleImgs || [], viewImgs: item.viewImgs || [], setlist: [] })}`,
-        url: item.source_url !== '#' ? item.source_url : ''
-      };
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/tickets?id=eq.${cloudId}`, { method: 'PATCH', headers: SB_HEADERS, body: JSON.stringify(payload) });
-      if (!res.ok) return alert(`归档失败：HTTP ${res.status}`);
-      await loadTourData();
-    }
-
-    syncArtistDropdownUI();
-    syncAdminUI();
+    if (location.hash === '#admin') openHiddenAdminDrawer();
+    switchMainTab('home');
     loadTourData();
     loadAllFeeds();
-    setInterval(updateCountdowns, 1000);
-    setInterval(() => { loadAllFeeds(); }, 60000);
   </script>
 </body>
 </html>
-```[cite: 1]
