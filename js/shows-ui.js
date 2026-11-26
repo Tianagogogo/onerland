@@ -113,6 +113,149 @@ function buildSlotHoverBadgeHTML(slotText, scheduleImgs, popoverId, titleLabel) 
   `;
 }
 
+// ================= 场馆体验客观采集与聚合统计 UI =================
+function submitVenueExperienceForm(venueName, formPrefix, rerenderScope) {
+  const queueTime = document.getElementById(`${formPrefix}-queue`)?.value || '10-30分钟';
+  const bagCheck = document.getElementById(`${formPrefix}-bag`)?.value || 'strict';
+  const storageType = document.getElementById(`${formPrefix}-storage`)?.value || '场馆自助寄存柜';
+  const showTitle = document.getElementById(`${formPrefix}-show`)?.value || '';
+  const note = (document.getElementById(`${formPrefix}-note`)?.value || '').trim();
+
+  addVenueExperience(venueName, {
+    queueTime,
+    bagCheck,
+    storageType,
+    showTitle,
+    note
+  });
+
+  if (rerenderScope === 'archive') renderArchiveTimeline();
+  else renderTourCards();
+}
+
+function removeVenueExperienceItem(venueName, recordId, rerenderScope) {
+  deleteVenueExperience(venueName, recordId);
+  if (rerenderScope === 'archive') renderArchiveTimeline();
+  else renderTourCards();
+}
+
+function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTitle, rerenderScope) {
+  const cleanVenue = normalizeVenueKey(venueName) || '未命名场馆';
+  const stats = computeVenueExperienceStats(cleanVenue);
+  const safeVenueAttr = cleanVenue.replace(/['"<>]/g, '');
+  const safeShowAttr = String(showTitle || '').replace(/['"<>]/g, '');
+
+  const statsPanelHtml = stats.unlocked
+    ? `
+      <div class="p-3 rounded-xl bg-white border border-slate-300 space-y-3">
+        <div class="flex items-center justify-between flex-wrap gap-1">
+          <span class="font-bold text-slate-900">📊 场馆客观体验聚合统计（已汇总 ${stats.total} 条样本）</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">样本 ≥ 5 已解锁</span>
+        </div>
+
+        <!-- 1. 翻包/严检比例 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+            <div class="text-[11px] text-slate-500">🎒 翻包/严检比例</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">${stats.bagCheckPct}% <span class="text-xs font-normal text-slate-500">(${stats.bagCheckCount}/${stats.total} 场次反馈开包检查)</span></div>
+          </div>
+          <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+            <div class="text-[11px] text-slate-500">🛅 高频寄存方式</div>
+            <div class="mt-1 flex flex-wrap gap-1">
+              ${stats.storageDist.map(s => `<span class="text-[11px] px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-800">${s.label} <strong>${s.pct}%</strong></span>`).join('')}
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 安检排队时长分布 -->
+        <div class="space-y-1.5">
+          <div class="text-[11px] font-semibold text-slate-700">⏱️ 安检排队耗时分布：</div>
+          ${stats.queueDist.map(q => `
+            <div class="flex items-center gap-2 text-[11px]">
+              <span class="w-20 text-slate-600 shrink-0">${q.label}</span>
+              <div class="flex-1 h-2 rounded-full bg-slate-200 overflow-hidden">
+                <div class="h-full bg-slate-800 rounded-full" style="width:${q.pct}%"></div>
+              </div>
+              <span class="w-14 text-right font-mono text-slate-700 shrink-0">${q.pct}% (${q.count})</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `
+    : `
+      <div class="p-3 rounded-xl bg-white border border-dashed border-slate-300 flex items-center justify-between flex-wrap gap-2">
+        <div class="text-xs text-slate-600">
+          📊 <strong>${safeVenueAttr}</strong> 客观统计面板待解锁：当前已收集 <strong>${stats.total} / 5</strong> 条样本，还差 <strong>${stats.remaining}</strong> 条即可展示安检排队分布、翻包比例与寄存统计。
+        </div>
+      </div>
+    `;
+
+  return `
+    <div id="${drawerId}" class="hidden p-3.5 rounded-xl bg-slate-50 border border-slate-300 text-xs space-y-3">
+      ${statsPanelHtml}
+
+      <!-- 提交新的客观场馆体验样本 -->
+      <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
+        <div class="font-bold text-slate-800">✍️ 贡献一条本场馆客观体验（同场馆多场演出自动合并统计）</div>
+        <input type="hidden" id="${formPrefix}-show" value="${safeShowAttr}" />
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div>
+            <label class="text-[11px] text-slate-500 block mb-1">⏱️ 安检排队耗时</label>
+            <select id="${formPrefix}-queue" class="w-full px-2 py-1.5 rounded-lg border border-slate-300 bg-white">
+              <option value="10分钟内">10分钟内（极快）</option>
+              <option value="10-30分钟" selected>10-30分钟（正常）</option>
+              <option value="30-60分钟">30-60分钟（较慢）</option>
+              <option value="60分钟以上">60分钟以上（拥堵）</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[11px] text-slate-500 block mb-1">🎒 安检翻包强度</label>
+            <select id="${formPrefix}-bag" class="w-full px-2 py-1.5 rounded-lg border border-slate-300 bg-white">
+              <option value="strict">严格开包/查相机灯牌</option>
+              <option value="light">仅过机/简单目视检查</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[11px] text-slate-500 block mb-1">🛅 现场寄存方式</label>
+            <select id="${formPrefix}-storage" class="w-full px-2 py-1.5 rounded-lg border border-slate-300 bg-white">
+              <option value="场馆自助寄存柜">场馆自助寄存柜</option>
+              <option value="现场人工寄存处">现场人工寄存处</option>
+              <option value="附近地铁/商圈寄存">附近地铁/商圈寄存</option>
+              <option value="无寄存点（需轻装）">无寄存点（需轻装）</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex gap-1.5">
+          <input id="${formPrefix}-note" type="text" placeholder="补充客观细节（如：东门安检口更快、禁止带长柄伞/充电宝限制）..." class="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white" />
+          <button type="button" onclick="submitVenueExperienceForm('${safeVenueAttr}', '${formPrefix}', '${rerenderScope}')" class="px-3 py-1.5 rounded-lg obsidian-btn font-semibold shrink-0">提交样本</button>
+        </div>
+      </div>
+
+      <!-- 原始体验样本列表 -->
+      <div class="space-y-1.5">
+        <div class="text-[11px] font-semibold text-slate-600">📋 场馆历史样本明细（${stats.total} 条）：</div>
+        ${stats.list.length
+          ? stats.list.map(r => `
+              <div class="p-2.5 rounded-lg bg-white border border-slate-200 flex items-start justify-between gap-2">
+                <div class="space-y-1 min-w-0">
+                  <div class="flex items-center gap-1.5 flex-wrap text-[11px]">
+                    <span class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-800 font-medium">⏱️ ${r.queueTime}</span>
+                    <span class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-800 font-medium">${r.bagCheck === 'strict' ? '🎒 严格翻包' : '✅ 宽松过检'}</span>
+                    <span class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-800 font-medium">🛅 ${r.storageType}</span>
+                    ${r.showTitle ? `<span class="text-slate-400">· ${r.showTitle}</span>` : ''}
+                  </div>
+                  ${r.note ? `<p class="text-xs text-slate-700 break-words">${r.note}</p>` : ''}
+                </div>
+                <button type="button" onclick="removeVenueExperienceItem('${safeVenueAttr}', ${r.id}, '${rerenderScope}')" class="text-[11px] text-rose-600 hover:underline shrink-0">删除</button>
+              </div>
+            `).join('')
+          : `<div class="p-2 rounded-lg bg-white border border-dashed border-slate-300 text-[11px] text-slate-400 text-center">暂无该场馆体验样本，提交后自动累计。</div>`
+        }
+      </div>
+    </div>
+  `;
+}
+
 function renderThemeQuickBar() {
   const bar = document.getElementById('tour-themes-bar');
   if (!bar) return;
@@ -287,6 +430,7 @@ function renderTourCards() {
     const slotPopoverId = `tour-slot-pop-${item.cloudId || idx}`;
     const buddyEntries = getBuddyListByShow(item.cloudId);
     const safeBooth = String(item.merchBooth || '').replace(/['"<>]/g, '');
+    const venueStats = computeVenueExperienceStats(item.venue);
 
     const roundsHtml = item.activeRounds.length ? `
       <div class="space-y-1.5 pt-1">
@@ -331,6 +475,7 @@ function renderTourCards() {
           <div class="flex items-center gap-1.5 flex-wrap">
             <button type="button" onclick="document.getElementById('guide-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🚇 交通 ▾</button>
             <button type="button" onclick="requestExternalToolJump('${shiyeLiveUrl}', '视野 live（非官方座位视野工具站）', '${cleanVenue || safeCity}')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🔭 视野 live ↗</button>
+            <button type="button" onclick="document.getElementById('vexp-tour-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">📊 场馆体验 (${venueStats.total}${venueStats.unlocked ? '·已聚合' : '/5'}) ▾</button>
             <button type="button" onclick="document.getElementById('buddy-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg obsidian-btn text-white font-medium">🤝 找搭子 (${buddyEntries.length}) ▾</button>
           </div>
           <div class="flex items-center gap-1.5">
@@ -343,6 +488,8 @@ function renderTourCards() {
           <div class="font-bold text-slate-900">🚇 交通与入场指南：</div>
           <div class="whitespace-pre-line">${item.transport || '• 建议提前 60–90 分钟到达场馆核验身份证入场\n• 禁止携带打火机、专业长焦相机及超尺寸灯牌'}</div>
         </div>
+
+        ${buildVenueExperienceDrawerHTML(item.venue, `vexp-tour-drawer-${idx}`, `vexp-tour-${item.cloudId || idx}`, safeCity, 'ticket')}
 
         <div id="buddy-drawer-${idx}" class="hidden p-3.5 rounded-xl bg-slate-50 border border-slate-300 text-xs space-y-3">
           <div class="flex items-center justify-between flex-wrap gap-1">
@@ -479,26 +626,33 @@ function renderArchiveTimeline() {
     const safeTitle = String(item.title || '').replace(/['"<>]/g, '');
     const slotPopoverId = `arc-slot-pop-${item.cloudId || idx}`;
     const safeBooth = String(item.merchBooth || '').replace(/['"<>]/g, '');
+    const venueStats = computeVenueExperienceStats(item.venue);
+
     return `
-      <div class="p-4 rounded-2xl metal-card flex items-center justify-between gap-3">
-        <div class="flex items-center gap-3.5 min-w-0">
-          <div class="w-16 h-16 poster-square-box shrink-0">
-            ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" data-cap="${safeTitle} · 往日海报" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs text-slate-400">ONER</div>`}
-          </div>
-          <div class="min-w-0 space-y-1">
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <span class="text-[10px] px-2 py-0.5 rounded text-white font-semibold" style="background:${badge}">${item.artist}</span>
-              <span class="font-bold text-sm text-slate-900 truncate">${safeTitle}</span>
-              ${safeBooth ? `<span class="text-[10px] px-2 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-900 font-medium" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</span>` : ''}
-              ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeTitle)}
+      <div class="p-4 rounded-2xl metal-card space-y-3">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3.5 min-w-0">
+            <div class="w-16 h-16 poster-square-box shrink-0">
+              ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" data-cap="${safeTitle} · 往日海报" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs text-slate-400">ONER</div>`}
             </div>
-            <p class="text-xs text-slate-500">🗓️ ${item.showDate} ｜ 📍 ${item.venue}</p>
+            <div class="min-w-0 space-y-1">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-[10px] px-2 py-0.5 rounded text-white font-semibold" style="background:${badge}">${item.artist}</span>
+                <span class="font-bold text-sm text-slate-900 truncate">${safeTitle}</span>
+                ${safeBooth ? `<span class="text-[10px] px-2 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-900 font-medium" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</span>` : ''}
+                ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeTitle)}
+              </div>
+              <p class="text-xs text-slate-500">🗓️ ${item.showDate} ｜ 📍 ${item.venue}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+            <button type="button" onclick="document.getElementById('vexp-arc-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1.5 rounded-lg liquid-silver-btn text-xs font-medium">📊 场馆体验 (${venueStats.total}${venueStats.unlocked ? '·已聚合' : '/5'}) ▾</button>
+            ${AppState.isAdmin ? `<button type="button" onclick="startEditShow('archive', ${item.cloudId})" class="px-2.5 py-1.5 rounded-lg liquid-silver-btn text-xs font-semibold">✏️ 编辑</button>` : ''}
+            <button type="button" onclick="recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="px-2.5 py-1.5 rounded-lg liquid-silver-btn text-xs font-medium">+ 足迹</button>
           </div>
         </div>
-        <div class="flex items-center gap-1.5 shrink-0">
-          ${AppState.isAdmin ? `<button type="button" onclick="startEditShow('archive', ${item.cloudId})" class="px-2.5 py-1.5 rounded-lg liquid-silver-btn text-xs font-semibold">✏️ 编辑</button>` : ''}
-          <button type="button" onclick="recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="px-2.5 py-1.5 rounded-lg liquid-silver-btn text-xs font-medium">+ 足迹</button>
-        </div>
+
+        ${buildVenueExperienceDrawerHTML(item.venue, `vexp-arc-drawer-${idx}`, `vexp-arc-${item.cloudId || idx}`, safeTitle, 'archive')}
       </div>
     `;
   }).join('');
