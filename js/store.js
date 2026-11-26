@@ -506,3 +506,171 @@ function computeVenueExperienceStats(venueName) {
     list
   };
 }
+// ================= 1. 私人观演评语（仅保存在本机浏览器，绝不公开上传） =================
+const PRIVATE_NOTE_KEY = 'onerland_private_show_notes_v1';
+
+function getPrivateShowNotes(showKey) {
+  try {
+    const all = JSON.parse(localStorage.getItem(PRIVATE_NOTE_KEY) || '{}');
+    return Array.isArray(all[showKey]) ? all[showKey] : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function addPrivateShowNote(showKey, noteText) {
+  const clean = (noteText || '').trim();
+  if (!clean) return;
+  const all = JSON.parse(localStorage.getItem(PRIVATE_NOTE_KEY) || '{}');
+  const list = Array.isArray(all[showKey]) ? all[showKey] : [];
+  list.unshift({
+    id: Date.now(),
+    text: clean,
+    createdAt: new Date().toLocaleDateString()
+  });
+  all[showKey] = list;
+  localStorage.setItem(PRIVATE_NOTE_KEY, JSON.stringify(all));
+}
+
+function deletePrivateShowNote(showKey, noteId) {
+  const all = JSON.parse(localStorage.getItem(PRIVATE_NOTE_KEY) || '{}');
+  const list = Array.isArray(all[showKey]) ? all[showKey] : [];
+  all[showKey] = list.filter(item => String(item.id) !== String(noteId));
+  localStorage.setItem(PRIVATE_NOTE_KEY, JSON.stringify(all));
+}
+
+// ================= 2. 脱敏票根核验状态（有票根核验才允许发布客观体验评分） =================
+const VERIFIED_TICKETS_KEY = 'onerland_verified_ticket_shows_v1';
+
+function getVerifiedTicketMap() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(VERIFIED_TICKETS_KEY) || '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function isShowTicketVerified(showKey) {
+  const map = getVerifiedTicketMap();
+  return Boolean(map[showKey]?.verified);
+}
+
+// 脱敏票根登记（只记录场次与脱敏区号，不保存原图/订单号/姓名/二维码）
+function saveDesensitizedTicketProof(showKey, areaLabel) {
+  const map = getVerifiedTicketMap();
+  map[showKey] = {
+    verified: true,
+    area: (areaLabel || '已脱敏核验').trim(),
+    verifiedAt: new Date().toLocaleDateString()
+  };
+  localStorage.setItem(VERIFIED_TICKETS_KEY, JSON.stringify(map));
+}
+
+// ================= 3. 公共场馆客观体验评分（不含评语，仅统计客观选项，样本 >= 5 解锁） =================
+const VENUE_EXP_STORAGE_KEY = 'onerland_venue_objective_scores_v3';
+
+function normalizeVenueKey(venueName = '') {
+  return (venueName || '').replace(/·/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function getVenueExperienceList(venueName) {
+  const key = normalizeVenueKey(venueName);
+  if (!key) return [];
+  try {
+    const all = JSON.parse(localStorage.getItem(VENUE_EXP_STORAGE_KEY) || '{}');
+    return Array.isArray(all[key]) ? all[key] : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+// 仅写入纯客观评分选项，强制剥离任何文字评语
+function addVerifiedVenueObjectiveScore(venueName, showKey, objectiveScores) {
+  if (!isShowTicketVerified(showKey)) {
+    throw new Error('未完成本场次票根核验，无法公开发布体验评分');
+  }
+  const key = normalizeVenueKey(venueName);
+  if (!key) return;
+  const all = JSON.parse(localStorage.getItem(VENUE_EXP_STORAGE_KEY) || '{}');
+  const list = Array.isArray(all[key]) ? all[key] : [];
+
+  list.unshift({
+    id: Date.now(),
+    venue: key,
+    showKey,
+    verified: true,
+    queueTime: objectiveScores.queueTime,
+    bagCheck: objectiveScores.bagCheck,
+    storageType: objectiveScores.storageType,
+    acLevel: objectiveScores.acLevel,
+    seatSpacing: objectiveScores.seatSpacing,
+    viewQuality: objectiveScores.viewQuality,
+    showExperience: objectiveScores.showExperience,
+    createdAt: new Date().toLocaleDateString()
+  });
+
+  all[key] = list;
+  localStorage.setItem(VENUE_EXP_STORAGE_KEY, JSON.stringify(all));
+}
+
+function deleteVenueExperience(venueName, recordId) {
+  const key = normalizeVenueKey(venueName);
+  if (!key) return;
+  const all = JSON.parse(localStorage.getItem(VENUE_EXP_STORAGE_KEY) || '{}');
+  const list = Array.isArray(all[key]) ? all[key] : [];
+  all[key] = list.filter(x => String(x.id) !== String(recordId));
+  localStorage.setItem(VENUE_EXP_STORAGE_KEY, JSON.stringify(all));
+}
+
+function buildDistArray(countsMap, total, orderedKeys = null) {
+  const keys = orderedKeys
+    ? [...orderedKeys, ...Object.keys(countsMap).filter(k => !orderedKeys.includes(k))]
+    : Object.keys(countsMap).sort((a, b) => countsMap[b] - countsMap[a]);
+  return keys
+    .filter(k => (countsMap[k] || 0) > 0 || orderedKeys)
+    .map(label => {
+      const count = countsMap[label] || 0;
+      return { label, count, pct: total ? Math.round((count / total) * 100) : 0 };
+    });
+}
+
+function computeVenueExperienceStats(venueName) {
+  const list = getVenueExperienceList(venueName);
+  const total = list.length;
+  if (total < 5) {
+    return { unlocked: false, total, remaining: 5 - total, list };
+  }
+
+  const queueBuckets = { '10分钟内': 0, '10-30分钟': 0, '30-60分钟': 0, '60分钟以上': 0 };
+  let bagCheckCount = 0;
+  const storageCounts = {};
+  const acCounts = {};
+  const spacingCounts = {};
+  const viewCounts = {};
+  const showExpCounts = {};
+
+  list.forEach(item => {
+    if (queueBuckets[item.queueTime] !== undefined) queueBuckets[item.queueTime]++;
+    if (item.bagCheck === 'strict') bagCheckCount++;
+    storageCounts[item.storageType] = (storageCounts[item.storageType] || 0) + 1;
+    acCounts[item.acLevel] = (acCounts[item.acLevel] || 0) + 1;
+    spacingCounts[item.seatSpacing] = (spacingCounts[item.seatSpacing] || 0) + 1;
+    viewCounts[item.viewQuality] = (viewCounts[item.viewQuality] || 0) + 1;
+    showExpCounts[item.showExperience] = (showExpCounts[item.showExperience] || 0) + 1;
+  });
+
+  return {
+    unlocked: true,
+    total,
+    bagCheckPct: Math.round((bagCheckCount / total) * 100),
+    bagCheckCount,
+    queueDist: buildDistArray(queueBuckets, total, ['10分钟内', '10-30分钟', '30-60分钟', '60分钟以上']),
+    storageDist: buildDistArray(storageCounts, total),
+    acDist: buildDistArray(acCounts, total),
+    spacingDist: buildDistArray(spacingCounts, total),
+    viewDist: buildDistArray(viewCounts, total),
+    showExpDist: buildDistArray(showExpCounts, total),
+    list
+  };
+}
