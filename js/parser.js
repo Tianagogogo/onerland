@@ -90,7 +90,7 @@ async function runPosterOCRRecognition() {
   btn.disabled = true;
   btn.textContent = '⏳ 识别中...';
 
-  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+const models = ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-3.5-flash-lite'];
   const promptText = '识别海报或排期表中的演出场次，仅返回JSON数组：[{"artist":"","theme":"","city_or_title":"","date":"YYYY-MM-DD","venue":""}]';
 
   try {
