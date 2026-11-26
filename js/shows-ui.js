@@ -1,25 +1,16 @@
-// 1. 相同前缀自动归一化（例如 chillparty / chillpartyplus / chillpartyplus+ 归为一类）
 function normalizeSeriesKey(rawTitle = '', savedTheme = '') {
   const base = (savedTheme || rawTitle || '').trim();
   if (!base) return '';
-
-  if (/^chill\s*party/i.test(base)) {
-    return 'ChillParty 系列';
-  }
-
+  if (/^chill\s*party/i.test(base)) return 'ChillParty 系列';
   const quoteSeries = base.match(/^([「《][^」》]+[」》]\s*(?:巡回演唱会|演唱会|巡演|音乐节|嘉年华|见面会|派对)?)/);
   if (quoteSeries) return quoteSeries[1].trim();
-
   const alphaPrefix = base.match(/^([A-Za-z]{3,20})(?:plus|\+|\s|·|-|_|$)/i);
   if (alphaPrefix) return `${alphaPrefix[1]} 系列`;
-
   const dashMatch = base.match(/^([^·\-—|]+?)\s*[·\-—|]\s*.+站$/);
   if (dashMatch && dashMatch[1].trim().length >= 2) return dashMatch[1].trim();
-
   return '';
 }
 
-// 2. 外部工具站（视野 live）跳转前二次确认
 function requestExternalToolJump(url, siteName, venueName = '') {
   AppState.pendingExternalUrl = url;
   document.getElementById('ext-confirm-site').textContent = siteName;
@@ -66,7 +57,6 @@ function exportShowICS(cloudId) {
   a.click();
 }
 
-// 3. 音乐节时间表悬停/点击弹出浮层
 const slotTimers = {};
 function openSlotPopover(id) {
   if (slotTimers[id]) { clearTimeout(slotTimers[id]); delete slotTimers[id]; }
@@ -123,7 +113,6 @@ function buildSlotHoverBadgeHTML(slotText, scheduleImgs, popoverId, titleLabel) 
   `;
 }
 
-// 4. 专题快捷栏
 function renderThemeQuickBar() {
   const bar = document.getElementById('tour-themes-bar');
   if (!bar) return;
@@ -194,7 +183,30 @@ function openSeriesModal(themeKey) {
   document.getElementById('series-detail-modal').classList.remove('hidden');
 }
 
-// 5. 本地搭子意向保存（防黄牛敏感词拦截）
+// 切换默认粉籍（团粉 / 唯粉 / CP）及删除标签
+function changeBuddyBiasMode(mode) {
+  const cur = getFanPrefState();
+  saveFanPrefState({
+    biasType: mode,
+    biasMembers: mode === 'solo' && !cur.biasMembers.length ? ['岳岳'] : cur.biasMembers
+  });
+}
+
+function toggleBuddySoloMember(memberName) {
+  const cur = getFanPrefState();
+  const exists = cur.biasMembers.includes(memberName);
+  const next = exists ? cur.biasMembers.filter(m => m !== memberName) : [...cur.biasMembers, memberName];
+  saveFanPrefState({ biasType: 'solo', biasMembers: next });
+}
+
+function handleAddBuddyTag(cloudId) {
+  const inp = document.getElementById(`buddy-tag-input-${cloudId}`);
+  const val = (inp?.value || '').trim();
+  if (!val) return;
+  addFanCustomTag(val);
+  if (inp) inp.value = '';
+}
+
 function saveLocalBuddyIntent(cloudId, showTitle) {
   const input = document.getElementById(`buddy-note-${cloudId}`);
   const text = (input?.value || '').trim();
@@ -202,26 +214,35 @@ function saveLocalBuddyIntent(cloudId, showTitle) {
   if (/出票|转票|收票|定金|闲鱼|溢价|代抢/.test(text)) {
     return alert('⚠️ 为防范票务诈骗，搭子意向禁止包含“出票/转票/定金/闲鱼”等交易词汇！');
   }
-  const key = 'onerland_local_buddy_intents_v1';
-  const saved = JSON.parse(localStorage.getItem(key) || '{}');
-  saved[cloudId] = {
+  const pref = getFanPrefState();
+  const biasText = pref.biasType === 'solo'
+    ? `唯粉(${(pref.biasMembers || []).join('/') || '自选'})`
+    : pref.biasType === 'cp'
+      ? 'CP偏好'
+      : '团粉';
+
+  addBuddyEntryForShow(cloudId, {
     showTitle,
     note: text,
-    biasLabel: AppState.fanPref.biasType === 'solo' ? `唯粉(${AppState.fanPref.biasMembers.join('/')})` : AppState.fanPref.biasType === 'cp' ? 'CP偏好' : '团粉',
-    updatedAt: new Date().toLocaleDateString()
-  };
-  localStorage.setItem(key, JSON.stringify(saved));
+    biasLabel: biasText,
+    tags: [...(pref.customTags || [])],
+    createdAt: new Date().toLocaleDateString()
+  });
   renderTourCards();
 }
 
-// 6. 近期演出卡片（有开票倒计时的场次优先排在第一位）
+function removeLocalBuddyIntent(cloudId, entryId) {
+  deleteBuddyEntryForShow(cloudId, entryId);
+  renderTourCards();
+}
+
 function renderTourCards() {
   const container = document.getElementById('tour-grid');
   if (!container) return;
 
   const now = Date.now();
-  const { autoFilterShows, biasType, biasMembers } = AppState.fanPref;
-  const buddyStore = JSON.parse(localStorage.getItem('onerland_local_buddy_intents_v1') || '{}');
+  const pref = getFanPrefState();
+  const { autoFilterShows, biasType, biasMembers } = pref;
 
   const list = AppState.cloudTickets
     .filter(t => {
@@ -245,7 +266,6 @@ function renderTourCards() {
         nextSaleTs: futureRounds.length ? futureRounds[0].ts : Infinity
       };
     })
-    // 核心排序：有未结束开票倒计时的排最前面，并按距离开票最近排序
     .sort((a, b) => {
       const aHas = a.nextSaleTs < Infinity ? 0 : 1;
       const bHas = b.nextSaleTs < Infinity ? 0 : 1;
@@ -266,7 +286,7 @@ function renderTourCards() {
     const shiyeLiveUrl = `https://shijiao.xingpaste.com/?q=${encodeURIComponent(cleanVenue || safeCity)}`;
     const amapUrl = `https://uri.amap.com/search?keyword=${encodeURIComponent(cleanVenue || safeCity)}`;
     const slotPopoverId = `tour-slot-pop-${item.cloudId || idx}`;
-    const myBuddy = buddyStore[item.cloudId];
+    const buddyEntries = getBuddyListByShow(item.cloudId);
 
     const roundsHtml = item.activeRounds.length ? `
       <div class="space-y-1.5 pt-1">
@@ -306,12 +326,11 @@ function renderTourCards() {
 
         ${roundsHtml}
 
-        <!-- 操作栏：参演指南 / 视野 live / 找搭子 / 日历 / 地图 -->
         <div class="flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-slate-200/80 text-xs">
           <div class="flex items-center gap-1.5 flex-wrap">
             <button type="button" onclick="document.getElementById('guide-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🧭 指南 ▾</button>
             <button type="button" onclick="requestExternalToolJump('${shiyeLiveUrl}', '视野 live（非官方座位视野工具站）', '${cleanVenue || safeCity}')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🔭 视野 live ↗</button>
-            <button type="button" onclick="document.getElementById('buddy-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🤝 找搭子 ▾</button>
+            <button type="button" onclick="document.getElementById('buddy-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg obsidian-btn text-white font-medium">🤝 找搭子 (${buddyEntries.length}) ▾</button>
           </div>
           <div class="flex items-center gap-1.5">
             <button type="button" onclick="exportShowICS(${item.cloudId})" class="px-2 py-1 rounded-lg bg-white border border-slate-300 text-slate-700">📅 日历</button>
@@ -319,23 +338,87 @@ function renderTourCards() {
           </div>
         </div>
 
-        <!-- 参演指南折叠抽屉 -->
         <div id="guide-drawer-${idx}" class="hidden p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-1.5 leading-relaxed">
           <div class="font-bold text-slate-900">🚇 交通与入场指南：</div>
           <div class="whitespace-pre-line">${item.transport || '• 建议提前 60–90 分钟到达场馆核验身份证入场\n• 禁止携带打火机、专业长焦相机及超尺寸灯牌'}</div>
         </div>
 
-        <!-- 同场找搭子折叠抽屉 -->
-        <div id="buddy-drawer-${idx}" class="hidden p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2">
-          <div class="flex items-center justify-between">
-            <span class="font-bold text-slate-900">🤝 同场观演搭子登记（隐私优先 · 本地偏好过滤）</span>
-            <span class="text-[11px] text-slate-500">${AppState.currentUser ? `已登录：${AppState.currentUser.email}` : '访客本地模式'}</span>
+        <!-- 完整同场搭子广场与粉籍标签切换界面 -->
+        <div id="buddy-drawer-${idx}" class="hidden p-3.5 rounded-xl bg-slate-50 border border-slate-300 text-xs space-y-3">
+          <div class="flex items-center justify-between flex-wrap gap-1">
+            <span class="font-bold text-slate-900">🤝 同场观演搭子界面 · ${safeCity}</span>
+            <span class="text-[11px] text-slate-500">隐私保护 · 严禁转票定金</span>
           </div>
-          <p class="text-[11px] text-slate-500">当前本机偏好：<strong>${AppState.fanPref.biasType === 'solo' ? '唯粉模式' : AppState.fanPref.biasType === 'cp' ? 'CP偏好' : '团粉模式'}</strong>（不公开联系方式，严禁出票/转票/定金）。</p>
-          ${myBuddy ? `<div class="p-2 rounded-lg bg-white border border-slate-300 text-slate-700">✅ 我的本机登记（${myBuddy.biasLabel}）：${myBuddy.note}</div>` : ''}
+
+          <!-- 1. 直接更改默认粉籍 -->
+          <div class="p-2.5 rounded-lg bg-white border border-slate-200 space-y-2">
+            <div class="flex items-center justify-between flex-wrap gap-1.5">
+              <span class="font-semibold text-slate-700">默认粉籍属性：</span>
+              <div class="inline-flex gap-1">
+                <button type="button" onclick="changeBuddyBiasMode('group')" class="px-2 py-0.5 rounded ${pref.biasType === 'group' ? 'obsidian-btn text-white' : 'bg-slate-100 text-slate-700'}">团粉</button>
+                <button type="button" onclick="changeBuddyBiasMode('solo')" class="px-2 py-0.5 rounded ${pref.biasType === 'solo' ? 'obsidian-btn text-white' : 'bg-slate-100 text-slate-700'}">唯粉</button>
+                <button type="button" onclick="changeBuddyBiasMode('cp')" class="px-2 py-0.5 rounded ${pref.biasType === 'cp' ? 'obsidian-btn text-white' : 'bg-slate-100 text-slate-700'}">CP偏好</button>
+              </div>
+            </div>
+
+            ${pref.biasType === 'solo' ? `
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-[11px] text-slate-500">选择本命：</span>
+                ${['岳岳', '木子洋', '灵超'].map(m => `
+                  <button type="button" onclick="toggleBuddySoloMember('${m}')"
+                    class="px-2 py-0.5 rounded text-[11px] border ${pref.biasMembers.includes(m) ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-600 border-slate-300'}">
+                    ${m}
+                  </button>
+                `).join('')}
+              </div>
+            ` : ''}
+
+            <!-- 2. 可随时删除的自定义标签 -->
+            <div class="space-y-1.5">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-[11px] text-slate-500">我的标签：</span>
+                ${(pref.customTags || []).length
+                  ? pref.customTags.map((tag, tIdx) => `
+                      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-300 text-[11px] text-slate-800">
+                        <span>#${tag}</span>
+                        <button type="button" onclick="removeFanCustomTag(${tIdx})" class="text-slate-400 hover:text-rose-600 font-bold" title="删除此标签">✕</button>
+                      </span>
+                    `).join('')
+                  : `<span class="text-[11px] text-slate-400">暂无标签（可添加如“散场拼车”“看台A区”）</span>`
+                }
+              </div>
+              <div class="flex gap-1.5">
+                <input id="buddy-tag-input-${item.cloudId}" type="text" placeholder="添加新标签（如：i人互拍 / 酒店拼房）" class="flex-1 px-2 py-1 rounded border border-slate-300 bg-white text-[11px]" />
+                <button type="button" onclick="handleAddBuddyTag(${item.cloudId})" class="px-2.5 py-1 rounded liquid-silver-btn text-[11px] font-medium">+ 添加标签</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. 发布搭子意向 -->
           <div class="flex gap-1.5">
-            <input id="buddy-note-${item.cloudId}" type="text" value="${myBuddy?.note || ''}" placeholder="输入同行需求（如：散场拼车回高铁站/互拍打卡）..." class="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white" />
-            <button type="button" onclick="saveLocalBuddyIntent(${item.cloudId}, '${safeCity}')" class="px-3 py-1.5 rounded-lg obsidian-btn font-semibold shrink-0">保存意向</button>
+            <input id="buddy-note-${item.cloudId}" type="text" placeholder="发布本场搭子说明（如：同城高铁出发，看台一起应援）..." class="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white" />
+            <button type="button" onclick="saveLocalBuddyIntent(${item.cloudId}, '${safeCity}')" class="px-3 py-1.5 rounded-lg obsidian-btn font-semibold shrink-0">发布搭子</button>
+          </div>
+
+          <!-- 4. 本场已发布的搭子列表（支持删除） -->
+          <div class="space-y-1.5">
+            <div class="text-[11px] font-semibold text-slate-600">📋 本场搭子动态列表（${buddyEntries.length} 条）：</div>
+            ${buddyEntries.length
+              ? buddyEntries.map(b => `
+                  <div class="p-2.5 rounded-lg bg-white border border-slate-200 flex items-start justify-between gap-2">
+                    <div class="space-y-1 min-w-0">
+                      <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="px-1.5 py-0.5 rounded bg-slate-900 text-white text-[10px] font-medium">${b.biasLabel}</span>
+                        ${(b.tags || []).map(tg => `<span class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] text-slate-600">#${tg}</span>`).join('')}
+                        <span class="text-[10px] text-slate-400">${b.createdAt || ''}</span>
+                      </div>
+                      <p class="text-xs text-slate-800 break-words">${b.note}</p>
+                    </div>
+                    <button type="button" onclick="removeLocalBuddyIntent(${item.cloudId}, ${b.id})" class="text-[11px] text-rose-600 hover:underline shrink-0">删除</button>
+                  </div>
+                `).join('')
+              : `<div class="p-2.5 rounded-lg bg-white border border-dashed border-slate-300 text-[11px] text-slate-400 text-center">暂无搭子记录，填写上方意向即可生成第一条同场搭子卡片。</div>`
+            }
           </div>
         </div>
       </div>
@@ -379,7 +462,6 @@ function setArchiveTypeFilter(type) {
   renderArchiveTimeline();
 }
 
-// 7. 往日档案卡片（支持海报灯箱、音乐节时间表悬浮大图、管理员编辑）
 function renderArchiveTimeline() {
   const box = document.getElementById('archive-timeline-list');
   if (!box) return;
