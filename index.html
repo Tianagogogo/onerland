@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>艺人动态与巡演抢票中心</title>
+  <title>ONER & 坤音娱乐 动态与巡演中心</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .line-clamp-4 {
@@ -18,17 +18,26 @@
 
   <!-- 顶部导航 -->
   <header class="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-800">
-    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
       <div class="flex items-center gap-2">
         <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-        <h1 class="font-bold text-lg tracking-tight">艺人动态 & 巡演日程中心</h1>
+        <h1 class="font-bold text-base sm:text-lg tracking-tight">ONER & 坤音 动态与巡演中心</h1>
       </div>
       <div class="flex items-center gap-2 text-xs">
-        <span id="last-sync" class="text-slate-400 hidden sm:inline">加载中...</span>
+        <span id="last-sync" class="text-slate-400 hidden md:inline">准备就绪</span>
+        <button onclick="openManageModal()" class="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium">
+          ⚙️ 管理艺人
+        </button>
         <button onclick="loadAllFeeds(true)" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white dark:bg-indigo-600 hover:opacity-90 transition font-medium">
           刷新动态
         </button>
       </div>
+    </div>
+
+    <!-- 第一层筛选：艺人切换栏 -->
+    <div class="max-w-5xl mx-auto px-4 py-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center gap-2 overflow-x-auto">
+      <span class="text-xs text-slate-400 whitespace-nowrap">艺人：</span>
+      <div id="artist-tabs" class="flex items-center gap-1.5"></div>
     </div>
   </header>
 
@@ -42,11 +51,7 @@
           <span class="text-xs font-normal px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">AI 自动追踪</span>
         </h2>
       </div>
-      <div id="tour-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-slate-400">
-          正在加载巡演日程...
-        </div>
-      </div>
+      <div id="tour-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
     </section>
 
     <!-- ================= 板块二：置顶最新动态 ================= -->
@@ -55,6 +60,8 @@
         <div class="flex items-center justify-between gap-2 mb-2">
           <div class="flex items-center gap-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
             <span class="px-2 py-0.5 rounded bg-indigo-600 text-white">最新更新</span>
+            <span id="spotlight-artist" class="font-bold"></span>
+            <span>·</span>
             <span id="spotlight-platform"></span>
             <span>·</span>
             <span id="spotlight-time"></span>
@@ -67,10 +74,10 @@
       </div>
     </section>
 
-    <!-- ================= 板块三：多维筛选 + 全局时间线 ================= -->
+    <!-- ================= 板块三：平台/日期筛选 + 全局时间线 ================= -->
     <section class="space-y-4">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
-        <!-- 平台胶囊 -->
+        <!-- 第二层筛选：当前艺人的平台胶囊 -->
         <div id="platform-tabs" class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0"></div>
         <!-- 日期筛选 & 搜索 -->
         <div class="flex items-center gap-2">
@@ -86,19 +93,252 @@
 
   </main>
 
+  <!-- ================= 弹窗：管理/添加艺人及账号 ================= -->
+  <div id="manage-modal" class="fixed inset-0 z-50 hidden bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl">
+      <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <h3 class="font-bold text-base">管理关注的艺人 & 订阅源</h3>
+        <button onclick="closeManageModal()" class="text-slate-400 hover:text-slate-700 dark:hover:text-white text-lg">✕</button>
+      </div>
+
+      <div class="p-4 overflow-y-auto space-y-5 flex-1">
+        <!-- 新增表单 -->
+        <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 space-y-3 border border-slate-200 dark:border-slate-700">
+          <p class="text-xs font-bold text-indigo-600 dark:text-indigo-400">+ 添加艺人或新平台账号</p>
+          <div class="grid grid-cols-2 gap-2">
+            <input id="input-artist-name" type="text" placeholder="艺人名称 (如: 木子洋)" class="text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900" />
+            <input id="input-platform-name" type="text" placeholder="账号标签 (如: 抖音直播)" class="text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900" />
+          </div>
+          <div class="flex gap-2">
+            <input id="input-rss-url" type="url" placeholder="粘贴 RSS 链接 (https://rsshub.app/...)" class="flex-1 text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900" />
+            <input id="input-color" type="color" value="#DD0514" title="选择标签颜色" class="w-9 h-8 rounded cursor-pointer border-0 bg-transparent" />
+          </div>
+          <button onclick="addArtistAccount()" class="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition">
+            添加到我的看板
+          </button>
+        </div>
+
+        <!-- 已添加列表 -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-500">当前已配置列表（保存在本机浏览器）</span>
+            <button onclick="resetToDefaultArtists()" class="text-xs text-rose-500 hover:underline">恢复默认配置</button>
+          </div>
+          <div id="manage-artist-list" class="space-y-2.5"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
-    // ================= 1. 预设社交平台 RSS 列表（修改为你的艺人链接） =================
-    const FEEDS = [
-      { id: 'weibo', name: '微博', color: '#E6162D', url: 'https://rsshub.app/weibo/user/1195230310' },
-      { id: 'bilibili', name: 'B站', color: '#FB7299', url: 'https://rsshub.app/bilibili/user/dynamic/2' },
-      { id: 'youtube', name: 'YouTube', color: '#FF0000', url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC_x5XG1OV2P6uZZ5FSM9Ttw' }
+    // ================= 1. 专属应援色/品牌色定义 =================
+    const COLOR_ONER = 'linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)'; // 图一：猩绯 -> 赤铜色
+    const COLOR_QINS = '#111827';                                          // 坤音娱乐：黑色
+    const COLOR_YY   = '#9C73EF';                                          // 图二：岳岳 - 藤紫
+    const COLOR_MZY  = '#F90092';                                          // 图三：木子洋 - 洋红
+    const COLOR_LC   = '#32B5E1';                                          // 图四：灵超 - 天色
+
+    // ================= 2. 预设全员与官方账号列表 =================
+    const DEFAULT_ARTISTS = [
+      {
+        artistId: 'oner',
+        artistName: 'ONER',
+        badgeStyle: COLOR_ONER,
+        accounts: [
+          { id: 'oner_wb', name: '微博', color: COLOR_ONER, url: 'https://rsshub.app/weibo/user/6524267181' },
+          { id: 'oner_xhs', name: '小红书', color: COLOR_ONER, url: 'https://rsshub.app/xiaohongshu/user/64d9d216000000000100646b/notes' },
+          { id: 'oner_dy', name: '抖音', color: COLOR_ONER, url: 'https://rsshub.app/douyin/user/MS4wLjABAAAAX2dJKmn9ZDVnsNdM_VPT_Lco3l8fpRp0PCRQ24uSzG4' },
+          { id: 'oner_tt', name: 'TikTok', color: COLOR_ONER, url: 'https://rsshub.app/tiktok/user/@oner0830official' },
+          { id: 'oner_ig', name: 'Instagram', color: COLOR_ONER, url: 'https://rsshub.app/instagram/user/oner_official' },
+          { id: 'oner_bili', name: 'B站', color: COLOR_ONER, url: 'https://rsshub.app/bilibili/user/video/670365731' }
+        ]
+      },
+      {
+        artistId: 'qins',
+        artistName: '坤音娱乐',
+        badgeStyle: COLOR_QINS,
+        accounts: [
+          { id: 'qins_wb', name: '微博', color: COLOR_QINS, url: 'https://rsshub.app/weibo/user/6062604272' },
+          { id: 'qins_dy', name: '抖音', color: COLOR_QINS, url: 'https://rsshub.app/douyin/user/MS4wLjABAAAAWTvzHZq48nC6rktRVvjlqv1-4b7ewFs1jy2qrzFHzyU' },
+          { id: 'qins_ig', name: 'Instagram', color: COLOR_QINS, url: 'https://rsshub.app/instagram/user/qinsentertainment' },
+          { id: 'qins_bili', name: 'B站', color: COLOR_QINS, url: 'https://rsshub.app/bilibili/user/video/172392717' },
+          { id: 'qins_yt', name: 'YouTube', color: COLOR_QINS, url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCF-kpt07kZx9RMsBB2k-QlQ' }
+        ]
+      },
+      {
+        artistId: 'pinkray',
+        artistName: '岳岳',
+        badgeStyle: COLOR_YY,
+        accounts: [
+          { id: 'yy_wb', name: '微博', color: COLOR_YY, url: 'https://rsshub.app/weibo/user/6392771552' },
+          { id: 'yy_xhs', name: '小红书', color: COLOR_YY, url: 'https://rsshub.app/xiaohongshu/user/5a5c65f811be106a7251d287/notes' },
+          { id: 'yy_dy', name: '抖音', color: COLOR_YY, url: 'https://rsshub.app/douyin/user/MS4wLjABAAAAXzN1GfvLXnG3-CSbB9ODEawvgowtEwCLbH1CrgbWShv_uAbweB8mqdVkMHqYVZ-S' },
+          { id: 'yy_tt', name: 'TikTok', color: COLOR_YY, url: 'https://rsshub.app/tiktok/user/@pinkray_oner' },
+          { id: 'yy_ig', name: 'Instagram', color: COLOR_YY, url: 'https://rsshub.app/instagram/user/pinkray_official' }
+        ]
+      },
+      {
+        artistId: 'kwin',
+        artistName: '木子洋',
+        badgeStyle: COLOR_MZY,
+        accounts: [
+          { id: 'mzy_wb', name: '微博', color: COLOR_MZY, url: 'https://rsshub.app/weibo/user/6400910760' },
+          { id: 'mzy_xhs', name: '小红书', color: COLOR_MZY, url: 'https://rsshub.app/xiaohongshu/user/5a5c7e6111be1064506d7edf/notes' },
+          { id: 'mzy_dy', name: '抖音', color: COLOR_MZY, url: 'https://rsshub.app/douyin/user/MS4wLjABAAAAQeNwNv0VAWX3IcnMTqaHgpBFbLEMs5YVQ2U702OVYBSHVKw9T1Aab4P_7BmWI7GK' },
+          { id: 'mzy_tt', name: 'TikTok', color: COLOR_MZY, url: 'https://rsshub.app/tiktok/user/@kwin_oner' },
+          { id: 'mzy_ig', name: 'Instagram', color: COLOR_MZY, url: 'https://rsshub.app/instagram/user/kwin0421_official' }
+        ]
+      },
+      {
+        artistId: 'didi',
+        artistName: '灵超',
+        badgeStyle: COLOR_LC,
+        accounts: [
+          { id: 'lc_wb', name: '微博', color: COLOR_LC, url: 'https://rsshub.app/weibo/user/6400910962' },
+          { id: 'lc_xhs', name: '小红书', color: COLOR_LC, url: 'https://rsshub.app/xiaohongshu/user/5a5ca2e2e8ac2b239b29d3a6/notes' },
+          { id: 'lc_dy', name: '抖音', color: COLOR_LC, url: 'https://rsshub.app/douyin/user/MS4wLjABAAAAaCStczPllk8yRlFr3QLnEAJQAtgSfgO3tDZ1Jz8R1uW4Ot3fu4UYivRqMmEJ_OX0' },
+          { id: 'lc_tt', name: 'TikTok', color: COLOR_LC, url: 'https://rsshub.app/tiktok/user/@didi_oner' },
+          { id: 'lc_ig', name: 'Instagram', color: COLOR_LC, url: 'https://rsshub.app/instagram/user/didichao_official' }
+        ]
+      }
     ];
 
+    const STORAGE_ARTISTS_KEY = 'onerland_custom_artists_v3';
+    const CACHE_POSTS_KEY = 'onerland_posts_cache_v4';
+
+    let artistsConfig = loadArtistsConfig();
+    let activeArtistId = 'ALL';
+    let activeAccountId = 'ALL';
     let allPosts = [];
-    let activePlatform = 'ALL';
     let tourSchedules = [];
 
-    // ================= 2. 巡演日程与实时倒计时渲染 =================
+    function loadArtistsConfig() {
+      const saved = localStorage.getItem(STORAGE_ARTISTS_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (e) {}
+      }
+      return JSON.parse(JSON.stringify(DEFAULT_ARTISTS));
+    }
+
+    function saveArtistsConfig() {
+      localStorage.setItem(STORAGE_ARTISTS_KEY, JSON.stringify(artistsConfig));
+    }
+
+    // ================= 3. 弹窗增删管理逻辑 =================
+    function openManageModal() {
+      renderManageList();
+      document.getElementById('manage-modal').classList.remove('hidden');
+    }
+
+    function closeManageModal() {
+      document.getElementById('manage-modal').classList.add('hidden');
+    }
+
+    function renderManageList() {
+      const box = document.getElementById('manage-artist-list');
+      if (!artistsConfig.length) {
+        box.innerHTML = `<p class="text-xs text-slate-400 text-center py-4">暂无艺人，请在上方添加</p>`;
+        return;
+      }
+      box.innerHTML = artistsConfig.map((artist, aIdx) => `
+        <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full border border-white/20" style="background:${artist.badgeStyle || artist.accounts[0]?.color || '#6366f1'}"></span>
+              <span class="font-bold text-sm">${artist.artistName}</span>
+            </div>
+            <button onclick="removeArtist(${aIdx})" class="text-xs text-rose-500 hover:underline">删除整组</button>
+          </div>
+          <div class="space-y-1.5">
+            ${artist.accounts.map((acc, accIdx) => `
+              <div class="flex items-center justify-between text-xs bg-slate-50 dark:bg-slate-800/50 px-2.5 py-1.5 rounded-lg">
+                <div class="flex items-center gap-2 truncate pr-2">
+                  <span class="w-2.5 h-2.5 rounded-full shrink-0 border border-white/20" style="background:${acc.color}"></span>
+                  <span class="font-medium shrink-0">${acc.name}</span>
+                  <span class="text-slate-400 truncate">${acc.url}</span>
+                </div>
+                <button onclick="removeAccount(${aIdx}, ${accIdx})" class="text-slate-400 hover:text-rose-500 shrink-0">移除</button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function addArtistAccount() {
+      const artistName = document.getElementById('input-artist-name').value.trim();
+      const platformName = document.getElementById('input-platform-name').value.trim();
+      const rssUrl = document.getElementById('input-rss-url').value.trim();
+      const color = document.getElementById('input-color').value;
+
+      if (!artistName || !platformName || !rssUrl) {
+        alert('请完整填写艺人名称、账号标签和 RSS 链接！');
+        return;
+      }
+
+      const existingArtist = artistsConfig.find(a => a.artistName === artistName);
+      const finalColor = existingArtist?.badgeStyle || color;
+
+      const newAcc = {
+        id: 'acc_' + Date.now(),
+        name: platformName,
+        color: finalColor,
+        url: rssUrl
+      };
+
+      if (existingArtist) {
+        existingArtist.accounts.push(newAcc);
+      } else {
+        artistsConfig.push({
+          artistId: 'artist_' + Date.now(),
+          artistName: artistName,
+          badgeStyle: color,
+          accounts: [newAcc]
+        });
+      }
+
+      saveArtistsConfig();
+      document.getElementById('input-platform-name').value = '';
+      document.getElementById('input-rss-url').value = '';
+      renderManageList();
+      loadAllFeeds(true);
+    }
+
+    function removeAccount(artistIdx, accIdx) {
+      artistsConfig[artistIdx].accounts.splice(accIdx, 1);
+      if (artistsConfig[artistIdx].accounts.length === 0) {
+        artistsConfig.splice(artistIdx, 1);
+      }
+      saveArtistsConfig();
+      activeArtistId = 'ALL';
+      activeAccountId = 'ALL';
+      renderManageList();
+      loadAllFeeds(true);
+    }
+
+    function removeArtist(artistIdx) {
+      artistsConfig.splice(artistIdx, 1);
+      saveArtistsConfig();
+      activeArtistId = 'ALL';
+      activeAccountId = 'ALL';
+      renderManageList();
+      loadAllFeeds(true);
+    }
+
+    function resetToDefaultArtists() {
+      if (!confirm('确定清空自定义配置并恢复默认艺人列表吗？')) return;
+      localStorage.removeItem(STORAGE_ARTISTS_KEY);
+      artistsConfig = loadArtistsConfig();
+      activeArtistId = 'ALL';
+      activeAccountId = 'ALL';
+      renderManageList();
+      loadAllFeeds(true);
+    }
+
+    // ================= 4. 巡演日程加载（支持按艺人过滤） =================
     async function loadTourData() {
       try {
         const res = await fetch('./tour_data.json?t=' + Date.now());
@@ -112,13 +352,23 @@
 
     function renderTourCards() {
       const container = document.getElementById('tour-grid');
-      if (!tourSchedules.length) {
-        container.innerHTML = `<div class="text-sm text-slate-400">暂无已公布的巡演日程</div>`;
+      const currentArtistObj = artistsConfig.find(a => a.artistId === activeArtistId);
+      const filteredTours = tourSchedules.filter(t => {
+        if (activeArtistId === 'ALL' || !currentArtistObj) return true;
+        if (!t.artist) return true;
+        return t.artist.toLowerCase() === currentArtistObj.artistName.toLowerCase();
+      });
+
+      if (!filteredTours.length) {
+        container.innerHTML = `<div class="text-sm text-slate-400">当前艺人暂无已公布的巡演日程</div>`;
         return;
       }
 
-      container.innerHTML = tourSchedules.map((item, idx) => {
-        const roundsHtml = (item.rounds || []).map((r, rIdx) => {
+      container.innerHTML = filteredTours.map(item => {
+        const matchedArtist = artistsConfig.find(a => a.artistName.toLowerCase() === (item.artist || '').toLowerCase());
+        const artistBadgeBg = matchedArtist?.badgeStyle || '#4f46e5';
+
+        const roundsHtml = (item.rounds || []).map(r => {
           const targetTs = new Date(r.sale_time.replace(/-/g, '/')).getTime();
           const isPast = !isNaN(targetTs) && targetTs < Date.now();
           return `
@@ -133,7 +383,10 @@
           <div class="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between gap-3">
             <div>
               <div class="flex items-center justify-between">
-                <span class="font-bold text-base">${item.city}</span>
+                <div class="flex items-center gap-2">
+                  ${item.artist ? `<span class="text-xs px-2 py-0.5 rounded text-white font-semibold border border-white/15" style="background:${artistBadgeBg}">${item.artist}</span>` : ''}
+                  <span class="font-bold text-base">${item.city}</span>
+                </div>
                 <a href="${item.source_url || '#'}" target="_blank" class="text-xs text-slate-400 hover:text-indigo-500">官宣原帖 ↗</a>
               </div>
               <p class="text-xs text-slate-500 mt-1">📍 ${item.venue} ｜ 🗓️ ${item.show_date}</p>
@@ -166,10 +419,9 @@
       });
     }
 
-    // ================= 3. RSS 社交动态聚合抓取与时间线渲染 =================
+    // ================= 5. 动态抓取与双层筛选渲染 =================
     async function loadAllFeeds(force = false) {
-      const cacheKey = 'artist_feeds_cache_v1';
-      const cached = localStorage.getItem(cacheKey);
+      const cached = localStorage.getItem(CACHE_POSTS_KEY);
       if (!force && cached) {
         const parsed = JSON.parse(cached);
         if (Date.now() - parsed.ts < 5 * 60 * 1000) {
@@ -180,79 +432,135 @@
         }
       }
 
-      document.getElementById('timeline-list').innerHTML = `<div class="text-center py-10 text-sm text-slate-400">正在同步各平台最新动态...</div>`;
+      document.getElementById('timeline-list').innerHTML = `<div class="text-center py-10 text-sm text-slate-400">正在同步所有关注艺人的动态（共 25 个源，请稍候）...</div>`;
       const results = [];
 
-      await Promise.all(FEEDS.map(async feed => {
-        try {
-          const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(feed.url)}`;
-          const res = await fetch(proxyUrl);
-          const data = await res.json();
-          const doc = new DOMParser().parseFromString(data.contents, 'text/xml');
-          const nodes = [...doc.querySelectorAll('item'), ...doc.querySelectorAll('entry')];
+      const tasks = [];
+      artistsConfig.forEach(artist => {
+        artist.accounts.forEach(acc => {
+          tasks.push(
+            (async () => {
+              try {
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(acc.url)}`;
+                const res = await fetch(proxyUrl);
+                const data = await res.json();
+                const doc = new DOMParser().parseFromString(data.contents, 'text/xml');
+                const nodes = [...doc.querySelectorAll('item'), ...doc.querySelectorAll('entry')];
 
-          nodes.forEach(node => {
-            const title = node.querySelector('title')?.textContent || '';
-            const desc = node.querySelector('description')?.textContent || node.querySelector('content')?.textContent || '';
-            const pubDate = node.querySelector('pubDate')?.textContent || node.querySelector('published')?.textContent || node.querySelector('updated')?.textContent || '';
-            const link = node.querySelector('link')?.textContent || node.querySelector('link')?.getAttribute('href') || '#';
+                nodes.forEach(node => {
+                  const title = node.querySelector('title')?.textContent || '';
+                  const desc = node.querySelector('description')?.textContent || node.querySelector('content')?.textContent || '';
+                  const pubDate = node.querySelector('pubDate')?.textContent || node.querySelector('published')?.textContent || node.querySelector('updated')?.textContent || '';
+                  const link = node.querySelector('link')?.textContent || node.querySelector('link')?.getAttribute('href') || '#';
 
-            const tmpDiv = document.createElement('div');
-            tmpDiv.innerHTML = desc;
-            const imgs = [...tmpDiv.querySelectorAll('img')].map(img => img.src).filter(Boolean);
-            const plainText = (tmpDiv.textContent || title).trim();
-            const timestamp = pubDate ? new Date(pubDate).getTime() : Date.now();
+                  const tmpDiv = document.createElement('div');
+                  tmpDiv.innerHTML = desc;
+                  const imgs = [...tmpDiv.querySelectorAll('img')].map(img => img.src).filter(Boolean);
+                  const plainText = (tmpDiv.textContent || title).trim();
+                  const timestamp = pubDate ? new Date(pubDate).getTime() : Date.now();
 
-            results.push({
-              platformId: feed.id,
-              platformName: feed.name,
-              platformColor: feed.color,
-              text: plainText,
-              imgs,
-              link,
-              timestamp: isNaN(timestamp) ? 0 : timestamp
-            });
-          });
-        } catch (err) {
-          console.warn('抓取失败:', feed.name, err);
-        }
-      }));
+                  results.push({
+                    artistId: artist.artistId,
+                    artistName: artist.artistName,
+                    accountId: acc.id,
+                    platformName: acc.name,
+                    platformColor: acc.color,
+                    text: plainText,
+                    imgs,
+                    link,
+                    timestamp: isNaN(timestamp) ? 0 : timestamp
+                  });
+                });
+              } catch (err) {
+                console.warn('抓取失败:', artist.artistName, acc.name, err);
+              }
+            })()
+          );
+        });
+      });
 
+      await Promise.all(tasks);
       results.sort((a, b) => b.timestamp - a.timestamp);
       allPosts = results;
-      localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: allPosts }));
+      localStorage.setItem(CACHE_POSTS_KEY, JSON.stringify({ ts: Date.now(), data: allPosts }));
       document.getElementById('last-sync').textContent = '刚刚更新 · ' + new Date().toLocaleTimeString();
       initUI();
     }
 
     function initUI() {
-      // 渲染置顶最新动态
-      if (allPosts.length > 0) {
-        const top = allPosts[0];
-        document.getElementById('latest-spotlight').classList.remove('hidden');
+      // 渲染第一层：艺人筛选胶囊（选中时自动应用专属应援色/渐变色）
+      const artistTabs = [{ id: 'ALL', name: '全部艺人', badgeStyle: '#4f46e5' }, ...artistsConfig.map(a => ({
+        id: a.artistId,
+        name: a.artistName,
+        badgeStyle: a.badgeStyle || a.accounts[0]?.color || '#4f46e5'
+      }))];
+
+      document.getElementById('artist-tabs').innerHTML = artistTabs.map(t => {
+        const isActive = activeArtistId === t.id;
+        return `
+          <button onclick="selectArtist('${t.id}')"
+            style="${isActive ? `background:${t.badgeStyle}` : ''}"
+            class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition border ${isActive ? 'text-white border-white/20 shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-transparent'}">
+            ${t.name}
+          </button>
+        `;
+      }).join('');
+
+      // 根据当前选中的艺人过滤基础池
+      const artistPosts = activeArtistId === 'ALL' ? allPosts : allPosts.filter(p => p.artistId === activeArtistId);
+
+      // 更新置顶最新动态
+      const spotlightEl = document.getElementById('latest-spotlight');
+      if (artistPosts.length > 0) {
+        const top = artistPosts[0];
+        spotlightEl.classList.remove('hidden');
+        document.getElementById('spotlight-artist').textContent = top.artistName;
         document.getElementById('spotlight-platform').textContent = top.platformName;
         document.getElementById('spotlight-time').textContent = formatTimeAgo(top.timestamp);
         document.getElementById('spotlight-text').textContent = top.text.slice(0, 140) + (top.text.length > 140 ? '...' : '');
         document.getElementById('spotlight-link').href = top.link;
+      } else {
+        spotlightEl.classList.add('hidden');
       }
 
-      // 渲染平台胶囊
-      const tabs = [{ id: 'ALL', name: `全部 (${allPosts.length})` }, ...FEEDS.map(f => ({
-        id: f.id,
-        name: `${f.name} (${allPosts.filter(p => p.platformId === f.id).length})`
+      // 渲染第二层：当前艺人旗下的账号胶囊
+      let visibleAccounts = [];
+      if (activeArtistId === 'ALL') {
+        artistsConfig.forEach(a => a.accounts.forEach(acc => visibleAccounts.push({ id: acc.id, label: `${a.artistName}·${acc.name}`, color: acc.color })));
+      } else {
+        const currentA = artistsConfig.find(a => a.artistId === activeArtistId);
+        if (currentA) visibleAccounts = currentA.accounts.map(acc => ({ id: acc.id, label: acc.name, color: acc.color }));
+      }
+
+      const platformTabs = [{ id: 'ALL', label: `全部 (${artistPosts.length})`, color: '#1e293b' }, ...visibleAccounts.map(acc => ({
+        id: acc.id,
+        label: `${acc.label} (${artistPosts.filter(p => p.accountId === acc.id).length})`,
+        color: acc.color
       }))];
 
-      document.getElementById('platform-tabs').innerHTML = tabs.map(t => `
-        <button onclick="setPlatform('${t.id}')" class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition ${activePlatform === t.id ? 'bg-slate-900 text-white dark:bg-indigo-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}">
-          ${t.name}
-        </button>
-      `).join('');
+      document.getElementById('platform-tabs').innerHTML = platformTabs.map(t => {
+        const isActive = activeAccountId === t.id;
+        return `
+          <button onclick="selectAccount('${t.id}')"
+            style="${isActive ? `background:${t.color}` : ''}"
+            class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition border ${isActive ? 'text-white border-white/20 shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-transparent'}">
+            ${t.label}
+          </button>
+        `;
+      }).join('');
 
+      renderTourCards();
       renderTimeline();
     }
 
-    function setPlatform(id) {
-      activePlatform = id;
+    function selectArtist(id) {
+      activeArtistId = id;
+      activeAccountId = 'ALL';
+      initUI();
+    }
+
+    function selectAccount(id) {
+      activeAccountId = id;
       initUI();
     }
 
@@ -266,7 +574,8 @@
       const kw = document.getElementById('keyword-filter').value.trim().toLowerCase();
 
       const filtered = allPosts.filter(p => {
-        if (activePlatform !== 'ALL' && p.platformId !== activePlatform) return false;
+        if (activeArtistId !== 'ALL' && p.artistId !== activeArtistId) return false;
+        if (activeAccountId !== 'ALL' && p.accountId !== activeAccountId) return false;
         if (dateVal) {
           const d = new Date(p.timestamp);
           const localDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -293,11 +602,13 @@
         return `
           <article class="p-4 sm:p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
             <div class="flex items-center justify-between text-xs">
-              <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded text-white font-semibold" style="background:${p.platformColor}">${p.platformName}</span>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-2.5 py-0.5 rounded-full text-white font-semibold border border-white/15 shadow-xs" style="background:${p.platformColor}">
+                  ${p.artistName} · ${p.platformName}
+                </span>
                 <span class="text-slate-500">${formatTimeAgo(p.timestamp)} · ${dateStr}</span>
               </div>
-              <a href="${p.link}" target="_blank" class="text-slate-400 hover:text-indigo-500">原帖 ↗</a>
+              <a href="${p.link}" target="_blank" class="text-slate-400 hover:text-indigo-500 shrink-0">原帖 ↗</a>
             </div>
             <p class="text-sm leading-relaxed whitespace-pre-line line-clamp-4 cursor-pointer" onclick="this.classList.toggle('line-clamp-4')">${p.text}</p>
             ${imgsHtml ? `<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">${imgsHtml}</div>` : ''}
