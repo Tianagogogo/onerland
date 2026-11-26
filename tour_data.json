@@ -1,4 +1,3 @@
-[]
 import os
 import json
 import re
@@ -82,6 +81,22 @@ FEEDS_FILE = "feeds_data.json"
 API_KEY = os.environ.get("LLM_API_KEY", "")
 BASE_URL = os.environ.get("LLM_BASE_URL", "https://api.deepseek.com/chat/completions")
 MODEL_NAME = os.environ.get("LLM_MODEL", "deepseek-flash")
+
+
+def load_tour_list_safe(filepath):
+    """安全加载 JSON 列表，即使文件为空或格式损坏也不会报错"""
+    if not os.path.exists(filepath):
+        return []
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            if not content:
+                return []
+            data = json.loads(content)
+            return data if isinstance(data, list) else []
+    except Exception as e:
+        print(f"读取 {filepath} 异常，自动重置为空列表: {e}")
+        return []
 
 
 def parse_timestamp(date_str):
@@ -196,15 +211,22 @@ def call_ai_extract(text, default_artist):
 
 
 def main():
-    tour_list = json.load(open(TOUR_FILE, "r", encoding="utf-8")) if os.path.exists(TOUR_FILE) else []
-    processed_links = {item.get("source_url") for item in tour_list if item.get("source_url")}
+    tour_list = load_tour_list_safe(TOUR_FILE)
+    processed_links = set()
+    for item in tour_list:
+        if item.get("source_url"):
+            processed_links.add(item["source_url"])
+        for url in item.get("related_urls", []):
+            processed_links.add(url)
+
     seen_fps = set()
     tour_updated = False
-
     all_feed_posts = []
     failed_sources = []
 
-    for artist in ARTISTS_CONFIG:
+    sorted_artists = sorted(ARTISTS_CONFIG, key=lambda x: x.get("priority", 99))
+
+    for artist in sorted_artists:
         for acc in artist["accounts"]:
             items = fetch_rss_with_mirrors(acc["url"])
             if not items:
@@ -224,7 +246,7 @@ def main():
                     "timestamp": item["timestamp"]
                 })
 
-                # 巡演 AI 提取（仅检查微博与B站等文字公告源）
+                # 巡演 AI 提取（检查微博与B站等公告源）
                 if acc["name"] in ("微博", "B站") and item["link"] not in processed_links:
                     if any(kw in item["text"] for kw in KEYWORDS):
                         fp = get_text_fingerprint(item["text"])
@@ -234,22 +256,50 @@ def main():
                             if ext and ext.get("is_tour") and ext.get("city"):
                                 a_name = "ONER" if ext.get("artist") == "坤音娱乐" else (ext.get("artist") or artist["artistName"])
                                 city = normalize_city(ext["city"])
-                                existing = next((x for x in tour_list if x.get("artist") == a_name and normalize_city(x.get("city")) == city), None)
-                                new_round = {"round_name": ext.get("round_name") or "开票", "sale_time": ext.get("sale_time") or "", "platform": ext.get("platform") or "官方渠道"}
+                                show_date = (ext.get("show_date") or "").strip()
+                                venue = (ext.get("venue") or "").strip()
+
+                                existing = None
+                                for x in tour_list:
+                                    if x.get("artist") == a_name and normalize_city(x.get("city")) == city:
+                                        old_day = (x.get("show_date") or "")[:10]
+                                        new_day = show_date[:10]
+                                        if not old_day or old_day == "待公布" or not new_day or old_day == new_day:
+                                            existing = x
+                                            break
+
+                                new_round = {
+                                    "round_name": (ext.get("round_name") or "开票").strip(),
+                                    "sale_time": (ext.get("sale_time") or "").strip(),
+                                    "platform": (ext.get("platform") or "官方渠道").strip()
+                                }
+
                                 if existing:
-                                    if ext.get("venue") and existing.get("venue") in ("", "待公布"):
-                                        existing["venue"] = ext["venue"]
-                                    if ext.get("show_date") and existing.get("show_date") in ("", "待公布"):
-                                        existing["show_date"] = ext["show_date"]
-                                    if new_round["sale_time"] and not any(r.get("sale_time") == new_round["sale_time"] for r in existing.get("rounds", [])):
-                                        existing.setdefault("rounds", []).append(new_round)
+                                    if venue and existing.get("venue") in ("", "待公布", None):
+                                        existing["venue"] = venue
+                                    if show_date and existing.get("show_date") in ("", "待公布", None):
+                                        existing["show_date"] = show_date
+                                    if artist.get("priority", 99) <= existing.get("_priority", 99):
+                                        existing["source_url"] = item["link"]
+                                        existing["_priority"] = artist.get("priority", 99)
+                                    related = existing.setdefault("related_urls", [])
+                                    if item["link"] not in related:
+                                        related.append(item["link"])
+                                    if new_round["sale_time"]:
+                                        is_dup = any(r.get("sale_time") == new_round["sale_time"] for r in existing.get("rounds", []))
+                                        if not is_dup:
+                                            existing.setdefault("rounds", []).append(new_round)
+                                            existing["rounds"].sort(key=lambda r: r.get("sale_time", ""))
                                 else:
                                     tour_list.append({
-                                        "artist": a_name, "city": city,
-                                        "venue": ext.get("venue") or "待公布",
-                                        "show_date": ext.get("show_date") or "待公布",
+                                        "artist": a_name,
+                                        "city": city,
+                                        "venue": venue or "待公布",
+                                        "show_date": show_date or "待公布",
                                         "rounds": [new_round] if new_round["sale_time"] else [],
-                                        "source_url": item["link"]
+                                        "source_url": item["link"],
+                                        "related_urls": [item["link"]],
+                                        "_priority": artist.get("priority", 99)
                                     })
                                 processed_links.add(item["link"])
                                 tour_updated = True
@@ -263,7 +313,8 @@ def main():
     with open(FEEDS_FILE, "w", encoding="utf-8") as f:
         json.dump(feeds_payload, f, ensure_ascii=False, indent=2)
 
-    if tour_updated:
+    # 确保 tour_data.json 始终为合法 JSON 数组
+    if tour_updated or not os.path.exists(TOUR_FILE):
         with open(TOUR_FILE, "w", encoding="utf-8") as f:
             json.dump(tour_list, f, ensure_ascii=False, indent=2)
 
