@@ -90,33 +90,48 @@ async function runPosterOCRRecognition() {
   btn.disabled = true;
   btn.textContent = '⏳ 识别中...';
 
+  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+  const promptText = '识别海报或排期表中的演出场次，仅返回JSON数组：[{"artist":"","theme":"","city_or_title":"","date":"YYYY-MM-DD","venue":""}]';
+
   try {
-    const apiKey = localStorage.getItem(GEMINI_KEY_STORAGE);
+    const apiKey = (localStorage.getItem(GEMINI_KEY_STORAGE) || '').trim();
     let shows = [];
+    let aiSucceeded = false;
 
     if (apiKey && posterUrl.startsWith('data:image/')) {
-      statusEl.textContent = '🤖 正在通过 Gemini 视觉识别海报场次...';
       const base64 = posterUrl.split(',')[1];
       const mime = posterUrl.split(';')[0].split(':')[1] || 'image/jpeg';
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: '识别海报或排期表中的演出场次，仅返回JSON数组：[{"artist":"","theme":"","city_or_title":"","date":"YYYY-MM-DD","venue":""}]' },
-              { inline_data: { mime_type: mime, data: base64 } }
-            ]
-          }]
-        })
-      });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const json = await resp.json();
-      const txt = json.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
-      shows = JSON.parse(txt.replace(/```json|```/gi, '').trim());
-    } else {
-      if (typeof Tesseract === 'undefined') throw new Error('Tesseract 未加载，请配置 AI 识图密钥或检查网络');
-      statusEl.textContent = '🔍 正在运行本地中文 OCR 识别...';
+
+      for (const model of models) {
+        statusEl.textContent = `🤖 正在尝试模型 ${model} 识别海报...`;
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const resp = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: promptText },
+                { inline_data: { mime_type: mime, data: base64 } }
+              ]
+            }]
+          })
+        });
+        if (resp.status === 404) continue;
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const json = await resp.json();
+        const txt = json.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+        shows = JSON.parse(txt.replace(/```json|```/gi, '').trim());
+        aiSucceeded = true;
+        break;
+      }
+    }
+
+    if (!aiSucceeded) {
+      if (typeof Tesseract === 'undefined') {
+        throw new Error('AI 接口返回 404 且本地 OCR 未加载，请检查 AI 密钥或稍后再试');
+      }
+      statusEl.textContent = '🔍 AI 节点不可用，已自动切换本地中文 OCR 识别...';
       const enhanced = posterUrl.startsWith('data:image/') ? await preprocessImageForLocalOCR(posterUrl) : posterUrl;
       const res = await Tesseract.recognize(enhanced, 'chi_sim+eng');
       shows = parseShowsFromOCRText((res.data?.text || '').trim());
@@ -136,7 +151,7 @@ async function runPosterOCRRecognition() {
     if (first.venue) document.getElementById('adm-body').value = first.venue;
 
     renderOCRBatchList(shows);
-    statusEl.textContent = `✅ 识别完成（共 ${shows.length} 场），可勾选下方多场次一键导入或直接发布单场。`;
+    statusEl.textContent = `✅ 识别完成（共 ${shows.length} 场），请核对后保存。`;
   } catch (e) {
     statusEl.textContent = `❌ 识图失败：${e.message}`;
   } finally {
@@ -144,6 +159,7 @@ async function runPosterOCRRecognition() {
     btn.textContent = '🔍 识别海报场次';
   }
 }
+
 
 let ocrBatchDrafts = [];
 function renderOCRBatchList(shows) {
