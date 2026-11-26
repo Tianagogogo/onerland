@@ -1,5 +1,5 @@
 {
-  "updatedAt": 1795689802790,
+  "updatedAt": 1795693439670,
   "failedSources": [
     "ONER-小红书",
     "ONER-抖音",
@@ -7,7 +7,6 @@
     "ONER-B站",
     "坤音娱乐-抖音",
     "坤音娱乐-Instagram",
-    "坤音娱乐-B站",
     "岳岳-小红书",
     "岳岳-抖音",
     "岳岳-Instagram",
@@ -159,6 +158,19 @@
       "timestamp": 1795320018000
     },
     {
+      "artistId": "qins",
+      "artistName": "坤音娱乐",
+      "accountId": "qins_bili",
+      "platformName": "B站",
+      "platformColor": "#111827",
+      "text": "BC221·3rd★Shooting Stars「Choreography Moving ver.」",
+      "imgs": [
+        "https://i0.hdslb.com/bfs/archive/17a133f0a45d728dbfe98c57dd8caebdce6217f4.jpg"
+      ],
+      "link": "https://www.bilibili.com/video/BV1sgsm6MEjG",
+      "timestamp": 1795320000000
+    },
+    {
       "artistId": "oner",
       "artistName": "ONER",
       "accountId": "oner_wb",
@@ -188,6 +200,19 @@
     {
       "artistId": "qins",
       "artistName": "坤音娱乐",
+      "accountId": "qins_bili",
+      "platformName": "B站",
+      "platformColor": "#111827",
+      "text": "BC221·3rd★Shooting Stars 舞蹈练习室「Dance Practice Moving ver.」",
+      "imgs": [
+        "https://i1.hdslb.com/bfs/archive/6adccd955472534f9de7c9d0ee978b183c771320.jpg"
+      ],
+      "link": "https://www.bilibili.com/video/BV1xTsm6gEdL",
+      "timestamp": 1795233660000
+    },
+    {
+      "artistId": "qins",
+      "artistName": "坤音娱乐",
       "accountId": "qins_yt",
       "platformName": "YouTube",
       "platformColor": "#111827",
@@ -206,6 +231,19 @@
       "imgs": [],
       "link": "https://www.youtube.com/watch?v=tNoliWY1QQ4",
       "timestamp": 1795233608000
+    },
+    {
+      "artistId": "qins",
+      "artistName": "坤音娱乐",
+      "accountId": "qins_bili",
+      "platformName": "B站",
+      "platformColor": "#111827",
+      "text": "BC221·3rd★Shooting Stars舞蹈练习室固定机位「Dance Practice Fix ver.」",
+      "imgs": [
+        "https://i1.hdslb.com/bfs/archive/e99b8927b2837569df566a536c96f29ab30e0001.jpg"
+      ],
+      "link": "https://www.bilibili.com/video/BV1pVsm6KE2m",
+      "timestamp": 1795233600000
     },
     {
       "artistId": "kwin",
@@ -250,6 +288,19 @@
       "imgs": [],
       "link": "https://www.youtube.com/watch?v=3vOvR5l8kxY",
       "timestamp": 1795194614000
+    },
+    {
+      "artistId": "qins",
+      "artistName": "坤音娱乐",
+      "accountId": "qins_bili",
+      "platformName": "B站",
+      "platformColor": "#111827",
+      "text": "BC221·3rd★Shooting Stars「MV REACTION」",
+      "imgs": [
+        "https://i0.hdslb.com/bfs/archive/a51694ace38d7e7f6876be3afd04770d2361fd94.jpg"
+      ],
+      "link": "https://www.bilibili.com/video/BV1irysztEmk",
+      "timestamp": 1795189230000
     },
     {
       "artistId": "oner",
@@ -414,6 +465,19 @@
       "timestamp": 1795060808000
     },
     {
+      "artistId": "qins",
+      "artistName": "坤音娱乐",
+      "accountId": "qins_bili",
+      "platformName": "B站",
+      "platformColor": "#111827",
+      "text": "BC221·3rd★Shooting Stars「Official MV」\n 等最后一点喧哗沉进低频，\n光才落下来，像一场来不及许愿的流星雨。\n每一个节拍里，都藏着你和我。\n把音量调到最大，\n星光之下我们就这样住进梦里，不必醒来。",
+      "imgs": [
+        "https://i2.hdslb.com/bfs/archive/e7427e3e37685fc23e38cd1821c989a09007017f.jpg"
+      ],
+      "link": "https://www.bilibili.com/video/BV1bCsm61EM8",
+      "timestamp": 1795060800000
+    },
+    {
       "artistId": "kwin",
       "artistName": "木子洋",
       "accountId": "mzy_tt",
@@ -458,6 +522,19 @@
       "timestamp": 1795012985000
     },
     {
+      "artistId": "qins",
+      "artistName": "坤音娱乐",
+      "accountId": "qins_bili",
+      "platformName": "B站",
+      "platformColor": "#111827",
+      "text": "HIGH5限定西游的一天",
+      "imgs": [
+        "https://i1.hdslb.com/bfs/archive/943cb960d86984ba368eafde6129e9cd7b100f54.jpg"
+      ],
+      "link": "https://www.bilibili.com/video/BV1u7sA6REmg",
+      "timestamp": 1794831304000
+    },
+    {
       "artistId": "oner",
       "artistName": "ONER",
       "accountId": "oner_wb",
@@ -472,6 +549,58 @@
       ],
       "link": "https://weibo.com/6524267181/RrFdemlxO",
       "timestamp": 1794821538000
+    },
+    {
+      "artistId": "qins",
+      "artistName": "坤音娱乐",
+      "accountId": "qins_bili",
+      "platformName": "B站",
+      "platformColor": "#111827",
+      "text": "ONER西游篇\n -",
+      "imgs": [
+        "https://i2.hdslb.com/bfs/archive/eac93908d37ccf28bd5c44855c05005a644a1604.jpg"
+      ],
+      "link": "https://www.bilibili.com/video/BV1C8s56LEnm",
+      "timestamp": 1794657089000
+    },
+    {
+      "artistId": "qins",
+      "artistName": "坤音娱乐",
+      "accountId": "qins_bili",
+      "platformName": "B站",
+      "platformColor": "#111827",
+      "text": "HIGH5太湖湾gogo！\n -",
+      "imgs": [
+        "https://i0.hdslb.com/bfs/archive/0c48b2bc9c061cd3750c391f71a876524068e5a9.jpg"
+      ],
+      "link": "https://www.bilibili.com/video/BV1C34z6pER4",
+      "timestamp": 1793974848000
+    },
+    {
+      "artistId": "qins",
+      "artistName": "坤音娱乐",
+      "accountId": "qins_bili",
+      "platformName": "B站",
+      "platformColor": "#111827",
+      "text": "所有人躺在一起\n -",
+      "imgs": [
+        "https://i1.hdslb.com/bfs/archive/300c3d6f99560aa0a8df1d0d09b1e524e7d08685.jpg"
+      ],
+      "link": "https://www.bilibili.com/video/BV1T4x16kERs",
+      "timestamp": 1793448110000
+    },
+    {
+      "artistId": "qins",
+      "artistName": "坤音娱乐",
+      "accountId": "qins_bili",
+      "platformName": "B站",
+      "platformColor": "#111827",
+      "text": "BC221·3rd｜太湖湾音乐节幕后花絮",
+      "imgs": [
+        "https://i2.hdslb.com/bfs/archive/7b87525311bdcb348664d08db94260defbba567c.jpg"
+      ],
+      "link": "https://www.bilibili.com/video/BV1grsf62EgQ",
+      "timestamp": 1793274175000
     },
     {
       "artistId": "oner",
@@ -516,6 +645,32 @@
       "imgs": [],
       "link": "https://www.tiktok.com/@kwin_oner/video/7701728833149422878",
       "timestamp": 1793198481000
+    },
+    {
+      "artistId": "qins",
+      "artistName": "坤音娱乐",
+      "accountId": "qins_bili",
+      "platformName": "B站",
+      "platformColor": "#111827",
+      "text": "HIGH5快到浙里来\n -",
+      "imgs": [
+        "https://i2.hdslb.com/bfs/archive/9cf303815324b7b92ea89cd4ef9563a50ba0a4c9.jpg"
+      ],
+      "link": "https://www.bilibili.com/video/BV1DGxE6TEeg",
+      "timestamp": 1793187843000
+    },
+    {
+      "artistId": "qins",
+      "artistName": "坤音娱乐",
+      "accountId": "qins_bili",
+      "platformName": "B站",
+      "platformColor": "#111827",
+      "text": "北京的秋天好舒爽～\n -",
+      "imgs": [
+        "https://i0.hdslb.com/bfs/archive/1e09cf6e2c3b5e518392e345ddab4ef5fd103107.jpg"
+      ],
+      "link": "https://www.bilibili.com/video/BV1ren963EM9",
+      "timestamp": 1793013300000
     },
     {
       "artistId": "oner",
@@ -650,6 +805,19 @@
       "timestamp": 1792488072000
     },
     {
+      "artistId": "qins",
+      "artistName": "坤音娱乐",
+      "accountId": "qins_bili",
+      "platformName": "B站",
+      "platformColor": "#111827",
+      "text": "家族音乐节！耍起！\n -",
+      "imgs": [
+        "https://i1.hdslb.com/bfs/archive/ebebdc42c3441ed10c703899a96c88fc2e4ed1d0.jpg"
+      ],
+      "link": "https://www.bilibili.com/video/BV1SRnJ6fEbr",
+      "timestamp": 1792408800000
+    },
+    {
       "artistId": "pinkray",
       "artistName": "岳岳",
       "accountId": "yy_tt",
@@ -694,6 +862,19 @@
       "timestamp": 1792319243000
     },
     {
+      "artistId": "qins",
+      "artistName": "坤音娱乐",
+      "accountId": "qins_bili",
+      "platformName": "B站",
+      "platformColor": "#111827",
+      "text": "在聊城来一场味觉PK？\n -",
+      "imgs": [
+        "https://i2.hdslb.com/bfs/archive/ad033c053c1e413fec2e323866b741b9098361f2.jpg"
+      ],
+      "link": "https://www.bilibili.com/video/BV17yJ46dEVa",
+      "timestamp": 1792235400000
+    },
+    {
       "artistId": "oner",
       "artistName": "ONER",
       "accountId": "oner_tt",
@@ -736,6 +917,19 @@
       "imgs": [],
       "link": "https://www.tiktok.com/@pinkray_oner/video/7697318883463613727",
       "timestamp": 1792171710000
+    },
+    {
+      "artistId": "qins",
+      "artistName": "坤音娱乐",
+      "accountId": "qins_bili",
+      "platformName": "B站",
+      "platformColor": "#111827",
+      "text": "HIGH5开启三巡第一站—南京！\n -",
+      "imgs": [
+        "https://i2.hdslb.com/bfs/archive/a20af7600690048b258a31b0ba364de0f4e98375.jpg"
+      ],
+      "link": "https://www.bilibili.com/video/BV1PGJt6qEPi",
+      "timestamp": 1792158417000
     },
     {
       "artistId": "pinkray",
