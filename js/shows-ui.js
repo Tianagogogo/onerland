@@ -113,61 +113,102 @@ function buildSlotHoverBadgeHTML(slotText, scheduleImgs, popoverId, titleLabel) 
   `;
 }
 
-// ================= 场馆体验客观采集与聚合统计 UI =================
-function submitVenueExperienceForm(venueName, formPrefix, rerenderScope) {
-  const queueTime = document.getElementById(`${formPrefix}-queue`)?.value || '10-30分钟';
-  const bagCheck = document.getElementById(`${formPrefix}-bag`)?.value || 'strict';
-  const storageType = document.getElementById(`${formPrefix}-storage`)?.value || '场馆自助寄存柜';
-  const showTitle = document.getElementById(`${formPrefix}-show`)?.value || '';
-  const note = (document.getElementById(`${formPrefix}-note`)?.value || '').trim();
-
-  addVenueExperience(venueName, {
-    queueTime,
-    bagCheck,
-    storageType,
-    showTitle,
-    note
-  });
-
+// 1. 提交本机私人评语（默认仅自己可见，绝不进入公共评分池）
+function submitPrivateNoteForm(showKey, formPrefix, rerenderScope) {
+  const input = document.getElementById(`${formPrefix}-priv-note`);
+  const text = (input?.value || '').trim();
+  if (!text) return alert('请先填写你的私人观演评语！');
+  addPrivateShowNote(showKey, text);
+  if (input) input.value = '';
   if (rerenderScope === 'archive') renderArchiveTimeline();
   else renderTourCards();
 }
 
-function removeVenueExperienceItem(venueName, recordId, rerenderScope) {
-  deleteVenueExperience(venueName, recordId);
+function removePrivateNoteItem(showKey, noteId, rerenderScope) {
+  deletePrivateShowNote(showKey, noteId);
   if (rerenderScope === 'archive') renderArchiveTimeline();
   else renderTourCards();
+}
+
+// 2. 脱敏票根核验（验证后解锁本场次公开发布客观评分）
+function handleTicketProofVerify(showKey, formPrefix, rerenderScope) {
+  const fileInput = document.getElementById(`${formPrefix}-proof-file`);
+  const areaInput = document.getElementById(`${formPrefix}-proof-area`);
+  const areaText = (areaInput?.value || '').trim();
+
+  if (!fileInput?.files?.length && !areaText) {
+    return alert('请上传已打码订单号/二维码的脱敏票根截图，或填写脱敏区域信息进行核验！');
+  }
+
+  saveDesensitizedTicketProof(showKey, areaText || '已核验脱敏票根');
+  if (rerenderScope === 'archive') renderArchiveTimeline();
+  else renderTourCards();
+  alert('✅ 本场脱敏票根已核验（系统未保存敏感原图），现已解锁公开发布客观体验评分！');
+}
+
+// 3. 公开发布客观体验评分（仅提交结构化选项，不包含任何文字评语）
+function submitVenueExperienceForm(venueName, showKey, formPrefix, rerenderScope) {
+  if (!isShowTicketVerified(showKey)) {
+    return alert('🔒 需先完成本场次「脱敏票根核验」，才能公开发布客观体验评分！');
+  }
+
+  const objectiveScores = {
+    queueTime: document.getElementById(`${formPrefix}-queue`)?.value || '10-30分钟',
+    bagCheck: document.getElementById(`${formPrefix}-bag`)?.value || 'strict',
+    storageType: document.getElementById(`${formPrefix}-storage`)?.value || '场馆自助寄存柜',
+    acLevel: document.getElementById(`${formPrefix}-ac`)?.value || '体感适中',
+    seatSpacing: document.getElementById(`${formPrefix}-spacing`)?.value || '常规间距',
+    viewQuality: document.getElementById(`${formPrefix}-view`)?.value || '视角尚可',
+    showExperience: document.getElementById(`${formPrefix}-showexp`)?.value || '声场/舞美正常'
+  };
+
+  try {
+    addVerifiedVenueObjectiveScore(venueName, showKey, objectiveScores);
+    if (rerenderScope === 'archive') renderArchiveTimeline();
+    else renderTourCards();
+    alert('✅ 客观体验评分已发布（你的私人文字评语仍仅保存在本机，未对外公开）。');
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+function renderDistTags(distList) {
+  return (distList || [])
+    .filter(d => d.count > 0)
+    .map(d => `<span class="text-[11px] px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-800">${d.label} <strong>${d.pct}%</strong> (${d.count})</span>`)
+    .join('');
 }
 
 function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTitle, rerenderScope) {
   const cleanVenue = normalizeVenueKey(venueName) || '未命名场馆';
-  const stats = computeVenueExperienceStats(cleanVenue);
+  const showKey = `${cleanVenue}::${String(showTitle || '').trim()}`;
+  const safeShowKey = showKey.replace(/['"<>]/g, '');
   const safeVenueAttr = cleanVenue.replace(/['"<>]/g, '');
-  const safeShowAttr = String(showTitle || '').replace(/['"<>]/g, '');
 
-  const statsPanelHtml = stats.unlocked
+  const verified = isShowTicketVerified(showKey);
+  const stats = computeVenueExperienceStats(cleanVenue);
+  const privateNotes = getPrivateShowNotes(showKey);
+
+  // 公共聚合统计区（仅含客观评分分布，绝无他人评语）
+  const publicStatsHtml = stats.unlocked
     ? `
       <div class="p-3 rounded-xl bg-white border border-slate-300 space-y-3">
         <div class="flex items-center justify-between flex-wrap gap-1">
-          <span class="font-bold text-slate-900">📊 场馆客观体验聚合统计（已汇总 ${stats.total} 条样本）</span>
+          <span class="font-bold text-slate-900">📊 公共场馆客观体验聚合（已核验 ${stats.total} 条样本）</span>
           <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">样本 ≥ 5 已解锁</span>
         </div>
 
-        <!-- 1. 翻包/严检比例 -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
             <div class="text-[11px] text-slate-500">🎒 翻包/严检比例</div>
             <div class="text-lg font-bold text-slate-900 mt-0.5">${stats.bagCheckPct}% <span class="text-xs font-normal text-slate-500">(${stats.bagCheckCount}/${stats.total} 场次反馈开包检查)</span></div>
           </div>
-          <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-            <div class="text-[11px] text-slate-500">🛅 高频寄存方式</div>
-            <div class="mt-1 flex flex-wrap gap-1">
-              ${stats.storageDist.map(s => `<span class="text-[11px] px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-800">${s.label} <strong>${s.pct}%</strong></span>`).join('')}
-            </div>
+          <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+            <div class="text-[11px] text-slate-500">🛅 寄存方式分布</div>
+            <div class="flex flex-wrap gap-1">${renderDistTags(stats.storageDist)}</div>
           </div>
         </div>
 
-        <!-- 2. 安检排队时长分布 -->
         <div class="space-y-1.5">
           <div class="text-[11px] font-semibold text-slate-700">⏱️ 安检排队耗时分布：</div>
           ${stats.queueDist.map(q => `
@@ -176,28 +217,46 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
               <div class="flex-1 h-2 rounded-full bg-slate-200 overflow-hidden">
                 <div class="h-full bg-slate-800 rounded-full" style="width:${q.pct}%"></div>
               </div>
-              <span class="w-14 text-right font-mono text-slate-700 shrink-0">${q.pct}% (${q.count})</span>
+              <span class="w-16 text-right font-mono text-slate-700 shrink-0">${q.pct}% (${q.count})</span>
             </div>
           `).join('')}
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 border-t border-slate-100">
+          <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+            <div class="text-[11px] font-semibold text-slate-700">❄️ 场馆空调体感分布</div>
+            <div class="flex flex-wrap gap-1">${renderDistTags(stats.acDist)}</div>
+          </div>
+          <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+            <div class="text-[11px] font-semibold text-slate-700">💺 座位间距/站席拥挤分布</div>
+            <div class="flex flex-wrap gap-1">${renderDistTags(stats.spacingDist)}</div>
+          </div>
+          <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+            <div class="text-[11px] font-semibold text-slate-700">🔭 视角遮挡与视线分布</div>
+            <div class="flex flex-wrap gap-1">${renderDistTags(stats.viewDist)}</div>
+          </div>
+          <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+            <div class="text-[11px] font-semibold text-slate-700">🎤 演出体验（声场/舞美/散场）</div>
+            <div class="flex flex-wrap gap-1">${renderDistTags(stats.showExpDist)}</div>
+          </div>
         </div>
       </div>
     `
     : `
-      <div class="p-3 rounded-xl bg-white border border-dashed border-slate-300 flex items-center justify-between flex-wrap gap-2">
-        <div class="text-xs text-slate-600">
-          📊 <strong>${safeVenueAttr}</strong> 客观统计面板待解锁：当前已收集 <strong>${stats.total} / 5</strong> 条样本，还差 <strong>${stats.remaining}</strong> 条即可展示安检排队分布、翻包比例与寄存统计。
-        </div>
+      <div class="p-3 rounded-xl bg-white border border-dashed border-slate-300 text-xs text-slate-600">
+        📊 <strong>${safeVenueAttr}</strong> 公共客观评分聚合待解锁：当前已收集 <strong>${stats.total} / 5</strong> 条已核验票根样本，还差 <strong>${stats.remaining}</strong> 条即可公开展示客观统计分布（仅统计选项，不包含文字评语）。
       </div>
     `;
 
-  return `
-    <div id="${drawerId}" class="hidden p-3.5 rounded-xl bg-slate-50 border border-slate-300 text-xs space-y-3">
-      ${statsPanelHtml}
+  // 票根核验门槛区
+  const verifyGateHtml = verified
+    ? `
+      <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-2.5">
+        <div class="flex items-center justify-between flex-wrap gap-1">
+          <span class="font-bold text-slate-900">✅ 已通过本场脱敏票根核验 · 可公开发布客观体验评分</span>
+          <span class="text-[11px] text-emerald-700 font-medium">仅发布客观选项，不含评语</span>
+        </div>
 
-      <!-- 提交新的客观场馆体验样本 -->
-      <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
-        <div class="font-bold text-slate-800">✍️ 贡献一条本场馆客观体验（同场馆多场演出自动合并统计）</div>
-        <input type="hidden" id="${formPrefix}-show" value="${safeShowAttr}" />
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <div>
             <label class="text-[11px] text-slate-500 block mb-1">⏱️ 安检排队耗时</label>
@@ -225,36 +284,103 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
             </select>
           </div>
         </div>
-        <div class="flex gap-1.5">
-          <input id="${formPrefix}-note" type="text" placeholder="补充客观细节（如：东门安检口更快、禁止带长柄伞/充电宝限制）..." class="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white" />
-          <button type="button" onclick="submitVenueExperienceForm('${safeVenueAttr}', '${formPrefix}', '${rerenderScope}')" class="px-3 py-1.5 rounded-lg obsidian-btn font-semibold shrink-0">提交样本</button>
+
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+          <div>
+            <label class="text-[11px] text-slate-500 block mb-1">❄️ 场馆空调</label>
+            <select id="${formPrefix}-ac" class="w-full px-2 py-1.5 rounded-lg border border-slate-300 bg-white">
+              <option value="冷气很足（建议薄外套）">冷气很足（建议薄外套）</option>
+              <option value="体感适中" selected>体感适中</option>
+              <option value="偏闷热/空调弱">偏闷热/空调弱</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[11px] text-slate-500 block mb-1">💺 座位间距/站席</label>
+            <select id="${formPrefix}-spacing" class="w-full px-2 py-1.5 rounded-lg border border-slate-300 bg-white">
+              <option value="前后排宽敞">前后排宽敞</option>
+              <option value="常规间距" selected>常规间距</option>
+              <option value="偏窄/站席拥挤">偏窄/站席拥挤</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[11px] text-slate-500 block mb-1">🔭 视角体验</label>
+            <select id="${formPrefix}-view" class="w-full px-2 py-1.5 rounded-lg border border-slate-300 bg-white">
+              <option value="无遮挡/视线通透">无遮挡/视线通透</option>
+              <option value="视角尚可" selected>视角尚可</option>
+              <option value="有立柱/栏杆/控台遮挡">有立柱/栏杆/控台遮挡</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[11px] text-slate-500 block mb-1">🎤 演出体验</label>
+            <select id="${formPrefix}-showexp" class="w-full px-2 py-1.5 rounded-lg border border-slate-300 bg-white">
+              <option value="声场清晰·舞美到位">声场清晰·舞美到位</option>
+              <option value="声场/舞美正常" selected>声场/舞美正常</option>
+              <option value="回声重/散场拥堵">回声重/散场拥堵</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex justify-end">
+          <button type="button" onclick="submitVenueExperienceForm('${safeVenueAttr}', '${safeShowKey}', '${formPrefix}', '${rerenderScope}')" class="px-3.5 py-1.5 rounded-lg obsidian-btn font-semibold">
+            发布客观体验评分
+          </button>
         </div>
       </div>
-
-      <!-- 原始体验样本列表 -->
-      <div class="space-y-1.5">
-        <div class="text-[11px] font-semibold text-slate-600">📋 场馆历史样本明细（${stats.total} 条）：</div>
-        ${stats.list.length
-          ? stats.list.map(r => `
-              <div class="p-2.5 rounded-lg bg-white border border-slate-200 flex items-start justify-between gap-2">
-                <div class="space-y-1 min-w-0">
-                  <div class="flex items-center gap-1.5 flex-wrap text-[11px]">
-                    <span class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-800 font-medium">⏱️ ${r.queueTime}</span>
-                    <span class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-800 font-medium">${r.bagCheck === 'strict' ? '🎒 严格翻包' : '✅ 宽松过检'}</span>
-                    <span class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-800 font-medium">🛅 ${r.storageType}</span>
-                    ${r.showTitle ? `<span class="text-slate-400">· ${r.showTitle}</span>` : ''}
-                  </div>
-                  ${r.note ? `<p class="text-xs text-slate-700 break-words">${r.note}</p>` : ''}
-                </div>
-                <button type="button" onclick="removeVenueExperienceItem('${safeVenueAttr}', ${r.id}, '${rerenderScope}')" class="text-[11px] text-rose-600 hover:underline shrink-0">删除</button>
-              </div>
-            `).join('')
-          : `<div class="p-2 rounded-lg bg-white border border-dashed border-slate-300 text-[11px] text-slate-400 text-center">暂无该场馆体验样本，提交后自动累计。</div>`
-        }
+    `
+    : `
+      <div class="p-3 rounded-xl bg-white border border-amber-300 space-y-2">
+        <div class="font-bold text-slate-900">🔒 公开发布客观体验评分需先完成「脱敏票根核验」</div>
+        <p class="text-[11px] text-slate-500 leading-relaxed">请先涂抹掉票根/订单截图上的<strong>订单号、条形码、二维码、姓名与身份证号</strong>，仅保留演出场次与大区信息；核验后仅允许提交结构化客观评分（不包含评语）。</p>
+        <div class="flex flex-col sm:flex-row gap-2">
+          <label class="cursor-pointer px-3 py-1.5 rounded-lg liquid-silver-btn font-medium text-center shrink-0">
+            上传脱敏票根图
+            <input id="${formPrefix}-proof-file" type="file" accept="image/*" class="hidden" />
+          </label>
+          <input id="${formPrefix}-proof-area" type="text" placeholder="或填写脱敏区域（如：一层看台A区 / 站席中区）" class="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white" />
+          <button type="button" onclick="handleTicketProofVerify('${safeShowKey}', '${formPrefix}', '${rerenderScope}')" class="px-3 py-1.5 rounded-lg obsidian-btn font-semibold shrink-0">
+            核验票根并解锁评分
+          </button>
+        </div>
       </div>
+    `;
+
+  // 私人评语区（默认仅自己本机可见，无需票根即可自己记手账，也绝不外传）
+  const privateNotesHtml = `
+    <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
+      <div class="flex items-center justify-between flex-wrap gap-1">
+        <span class="font-bold text-slate-900">🔒 我的私人观演评语（默认仅自己本机可见）</span>
+        <span class="text-[11px] text-slate-400">仅存当前浏览器 · 绝不公开发布</span>
+      </div>
+      <div class="flex gap-1.5">
+        <input id="${formPrefix}-priv-note" type="text" placeholder="记录仅自己看的观演感受、座位号细节、舞台回忆..." class="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white" />
+        <button type="button" onclick="submitPrivateNoteForm('${safeShowKey}', '${formPrefix}', '${rerenderScope}')" class="px-3 py-1.5 rounded-lg liquid-silver-btn font-semibold shrink-0">仅自己保存</button>
+      </div>
+      ${privateNotes.length
+        ? `<div class="space-y-1.5 pt-1">
+            ${privateNotes.map(n => `
+              <div class="p-2 rounded-lg bg-slate-50 border border-slate-200 flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="text-xs text-slate-800 break-words">${n.text}</p>
+                  <span class="text-[10px] text-slate-400">🔒 仅自己可见 · ${n.createdAt}</span>
+                </div>
+                <button type="button" onclick="removePrivateNoteItem('${safeShowKey}', ${n.id}, '${rerenderScope}')" class="text-[11px] text-rose-600 hover:underline shrink-0">删除</button>
+              </div>
+            `).join('')}
+          </div>`
+        : `<div class="text-[11px] text-slate-400">暂无私人评语（你可以随时写下仅自己可见的观演手账）。</div>`
+      }
+    </div>
+  `;
+
+  return `
+    <div id="${drawerId}" class="hidden p-3.5 rounded-xl bg-slate-50 border border-slate-300 text-xs space-y-3">
+      ${publicStatsHtml}
+      ${verifyGateHtml}
+      ${privateNotesHtml}
     </div>
   `;
 }
+
 
 function renderThemeQuickBar() {
   const bar = document.getElementById('tour-themes-bar');
