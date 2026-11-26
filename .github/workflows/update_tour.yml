@@ -2,8 +2,8 @@ name: Auto Extract Tour Schedule
 
 on:
   schedule:
-    - cron: '*/15 * * * *' # 每 15 分钟自动运行一次
-  workflow_dispatch:        # 支持在 GitHub 网页上手动点按钮立刻运行测试
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -25,9 +25,9 @@ jobs:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
         run: python scripts/fetch_and_extract.py
 
-      - name: Commit updated tour_data.json
+      - name: Commit updated data files
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add tour_data.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: 自动更新巡演开票信息" && git push)
+          git add -f tour_data.json feeds_data.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: 自动更新动态与巡演信息" && git push)
