@@ -10,7 +10,6 @@
 </head>
 <body class="text-slate-800 min-h-screen antialiased selection:bg-slate-300 selection:text-slate-950">
 
-  <!-- 顶部导航栏 -->
   <header class="sticky top-0 z-30 bg-white/85 backdrop-blur-xl border-b border-slate-300/80">
     <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
       <div class="flex items-center gap-2 cursor-pointer select-none" onclick="handleSecretTitleTap()">
@@ -26,15 +25,14 @@
         <button type="button" id="top-tab-feeds" onclick="switchMainTab('feeds')" class="px-3.5 py-1 rounded-full text-slate-600 hover:text-slate-900 transition">📱 动态</button>
       </nav>
 
-      <button type="button" onclick="loadTourData(); loadAllFeeds();" class="px-3 py-1.5 rounded-lg liquid-silver-btn text-xs font-medium">
-        刷新同步
-      </button>
+      <div class="flex items-center gap-2">
+        <button type="button" id="user-auth-btn" onclick="openUserAuthModal()" class="px-3 py-1.5 rounded-lg liquid-silver-btn text-xs font-medium">👤 登录</button>
+        <button type="button" onclick="loadTourData(); loadAllFeeds();" class="px-3 py-1.5 rounded-lg liquid-silver-btn text-xs font-medium">刷新同步</button>
+      </div>
     </div>
   </header>
 
   <main class="max-w-5xl mx-auto px-4 py-5 space-y-6">
-
-    <!-- 1. 首页控制台 -->
     <section id="view-home-page" class="space-y-5">
       <div id="home-anniversary-box"></div>
       <div class="space-y-2.5">
@@ -47,7 +45,6 @@
       <div id="home-feed-brief"></div>
     </section>
 
-    <!-- 2. 演出档案库 -->
     <section id="view-shows-page" class="hidden space-y-6">
       <div class="space-y-3">
         <div class="flex items-center justify-between flex-wrap gap-2">
@@ -73,38 +70,31 @@
       </div>
     </section>
 
-    <!-- 3. 纯本地足迹与纪念票根 -->
     <section id="view-footprint-page" class="hidden space-y-5">
       <div id="local-fan-pref-box"></div>
       <div id="footprint-map-box"></div>
-
       <div class="p-4 sm:p-5 rounded-2xl chronicle-card space-y-4">
         <div class="flex items-center justify-between flex-wrap gap-2">
           <div>
             <h3 class="text-sm font-bold text-slate-900">🎟️ 专属观演纪念票根生成器（纯前端本地生成）</h3>
             <p class="text-[11px] text-slate-500 mt-0.5">默认使用应援色底板，自动计算相识天数与线下奔赴面数，导出长图自动烧录免责水印。</p>
           </div>
-          <button type="button" onclick="downloadSouvenirTicket()" class="px-3.5 py-1.5 rounded-xl obsidian-btn text-xs font-semibold">
-            ⬇️ 保存纪念票根 PNG
-          </button>
+          <button type="button" onclick="downloadSouvenirTicket()" class="px-3.5 py-1.5 rounded-xl obsidian-btn text-xs font-semibold">⬇️ 保存纪念票根 PNG</button>
         </div>
-
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-          <input id="tk-show-name" type="text" oninput="renderTicketCanvasPreview()" placeholder="演出名称（如：极尽声色巡演北京站）" class="px-3 py-2 rounded-lg border border-slate-300 bg-white" />
+          <input id="tk-show-name" type="text" oninput="renderTicketCanvasPreview()" placeholder="演出名称" class="px-3 py-2 rounded-lg border border-slate-300 bg-white" />
           <input id="tk-show-date" type="date" oninput="renderTicketCanvasPreview()" class="px-3 py-2 rounded-lg border border-slate-300 bg-white" />
           <div class="flex gap-2">
-            <input id="tk-seat-info" type="text" oninput="renderTicketCanvasPreview()" placeholder="位置备注（如：看台A区）" class="flex-1 px-3 py-2 rounded-lg border border-slate-300 bg-white" />
-            <input id="tk-color" type="color" value="#DD0514" oninput="renderTicketCanvasPreview()" title="选择应援色底板" class="w-10 h-9 rounded cursor-pointer border border-slate-300 bg-white" />
+            <input id="tk-seat-info" type="text" oninput="renderTicketCanvasPreview()" placeholder="位置备注" class="flex-1 px-3 py-2 rounded-lg border border-slate-300 bg-white" />
+            <input id="tk-color" type="color" value="#DD0514" oninput="renderTicketCanvasPreview()" class="w-10 h-9 rounded cursor-pointer border border-slate-300 bg-white" />
           </div>
         </div>
-
         <div class="w-full overflow-x-auto flex justify-center bg-slate-100/80 p-3 rounded-xl border border-slate-200">
           <canvas id="souvenir-ticket-canvas" class="max-w-full h-auto rounded-xl shadow-md"></canvas>
         </div>
       </div>
     </section>
 
-    <!-- 4. 多平台社媒动态 -->
     <section id="view-feeds-page" class="hidden space-y-4">
       <div class="metal-card p-4 rounded-2xl space-y-3">
         <div class="flex items-center justify-between flex-wrap gap-2">
@@ -118,7 +108,6 @@
       </div>
       <div id="timeline-list" class="space-y-3"></div>
     </section>
-
   </main>
 
   <footer class="max-w-5xl mx-auto px-4 py-6 mt-4 border-t border-slate-300/70 text-[11px] text-slate-500 space-y-1 text-center">
@@ -126,7 +115,6 @@
     <p>站内演出海报版权归原经纪公司及主办方所有，仅作非商业信息索引展示；如有侵权请通过邮箱联系核实删除。</p>
   </footer>
 
-  <!-- 移动端底部固定 4 项导航 -->
   <nav class="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-xl border-t border-slate-300 grid grid-cols-4 gap-1 p-1.5 text-[11px]">
     <button type="button" id="bottom-tab-home" onclick="switchMainTab('home')" class="py-1.5 rounded-xl obsidian-btn text-white font-semibold">🏠 首页</button>
     <button type="button" id="bottom-tab-shows" onclick="switchMainTab('shows')" class="py-1.5 rounded-xl text-slate-600">🏛️ 档案</button>
@@ -134,7 +122,6 @@
     <button type="button" id="bottom-tab-feeds" onclick="switchMainTab('feeds')" class="py-1.5 rounded-xl text-slate-600">📱 动态</button>
   </nav>
 
-  <!-- 图片灯箱大图预览弹窗 -->
   <div id="image-lightbox" onclick="this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-zoom-out">
     <div class="max-w-3xl max-h-[90vh] flex flex-col items-center gap-2" onclick="event.stopPropagation()">
       <img id="lightbox-img" src="" class="max-h-[82vh] max-w-full rounded-xl shadow-2xl object-contain bg-white border border-slate-200" />
@@ -145,7 +132,6 @@
     </div>
   </div>
 
-  <!-- 外部工具站跳转前二次确认弹窗 -->
   <div id="external-jump-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="chronicle-card rounded-2xl max-w-md w-full p-5 space-y-3 bg-white">
       <div class="flex items-center justify-between">
@@ -161,7 +147,6 @@
     </div>
   </div>
 
-  <!-- 巡演专题自动聚合弹窗 -->
   <div id="series-detail-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="chronicle-card rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden bg-white">
       <div class="p-4 border-b border-slate-200 flex items-center justify-between">
@@ -175,11 +160,31 @@
     </div>
   </div>
 
-  <!-- 隐藏管理端 -->
+  <div id="user-auth-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="chronicle-card rounded-2xl max-w-md w-full p-5 space-y-3 bg-white text-xs">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-sm text-slate-900">👤 邮箱无密码验证码登录</h3>
+        <button type="button" onclick="document.getElementById('user-auth-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-800">✕</button>
+      </div>
+      <p id="auth-current-status" class="text-slate-500 leading-relaxed"></p>
+      <div class="flex gap-2">
+        <input id="auth-email-input" type="email" placeholder="输入邮箱地址" class="flex-1 px-3 py-2 rounded-lg border border-slate-300 bg-white" />
+        <button type="button" onclick="sendEmailOTP()" class="px-3 py-2 rounded-lg liquid-silver-btn font-semibold shrink-0">发验证码</button>
+      </div>
+      <div class="flex gap-2">
+        <input id="auth-otp-input" type="text" placeholder="输入邮箱收到的 6 位验证码" class="flex-1 px-3 py-2 rounded-lg border border-slate-300 bg-white" />
+        <button type="button" onclick="verifyEmailOTP()" class="px-3 py-2 rounded-lg obsidian-btn font-semibold shrink-0">验证登录</button>
+      </div>
+      <div class="flex justify-end pt-1">
+        <button type="button" onclick="logoutEmailUser()" class="text-rose-600 hover:underline">退出当前邮箱</button>
+      </div>
+    </div>
+  </div>
+
   <div id="hidden-admin-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="chronicle-card rounded-2xl max-w-2xl w-full max-h-[88vh] flex flex-col overflow-hidden bg-white">
       <div class="p-4 border-b border-slate-200 flex items-center justify-between">
-        <h3 class="font-bold text-sm text-slate-900">🛠️ 独立管理台（单页投喂 · 海报识图 · 编辑队列）</h3>
+        <h3 class="font-bold text-sm text-slate-900">🛠️ 独立管理台</h3>
         <button type="button" onclick="document.getElementById('hidden-admin-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-800">✕</button>
       </div>
       <div class="p-4 overflow-y-auto space-y-4 text-xs">
@@ -190,13 +195,11 @@
               <input type="file" accept="image/*" class="hidden" onchange="handleAdminPosterFile(event)" />
             </label>
             <button type="button" id="adm-ocr-btn" onclick="runPosterOCRRecognition()" class="px-3 py-1.5 rounded-lg liquid-silver-btn font-semibold">🔍 识别海报场次</button>
-            <button type="button" onclick="configGeminiKey()" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-600">🔑 AI密钥</button>
+            <button type="button" onclick="configGeminiKey()" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-600">🔑 AI密钥 (<span id="ai-key-status">未配置</span>)</button>
             <button type="button" onclick="resetAdminForm()" class="px-2.5 py-1.5 rounded-lg text-slate-500 hover:text-slate-900">重置</button>
           </div>
-
           <div id="adm-ocr-status" class="hidden text-[11px] text-slate-600 font-medium"></div>
           <img id="adm-poster-preview" class="hidden max-h-36 rounded-lg border border-slate-300 object-contain" />
-
           <div id="adm-ocr-batch-box" class="hidden p-2.5 rounded-lg bg-white border border-slate-200 space-y-2">
             <div class="flex items-center justify-between">
               <span class="font-bold text-slate-800">识别到的多场排期：</span>
@@ -204,7 +207,6 @@
             </div>
             <div id="adm-ocr-batch-list" class="space-y-1 max-h-40 overflow-y-auto no-scrollbar"></div>
           </div>
-
           <div class="grid grid-cols-2 gap-2">
             <select id="adm-type" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white">
               <option value="ticket">发布：近期演出</option>
@@ -221,14 +223,27 @@
             <input id="adm-sale-time" type="datetime-local" title="开票时间（用于倒计时）" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
             <input id="adm-sale-plat" type="text" placeholder="购票平台（如:大麦）" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
           </div>
-
+          <input id="adm-slot" type="text" placeholder="音乐节演出时段（如：16:20-17:00，填后卡片悬停可看时间表）" class="w-full px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
+          <div class="p-2.5 rounded-lg bg-white border border-slate-200 space-y-2">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <span class="font-semibold text-slate-700">🗓️ 音乐节时间表图片（多图）</span>
+              <label class="cursor-pointer px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">
+                + 上传时间表图
+                <input type="file" accept="image/*" multiple class="hidden" onchange="handleAdminScheduleFiles(event)" />
+              </label>
+            </div>
+            <div class="flex gap-1.5">
+              <input id="adm-schedule-url" type="text" placeholder="或粘贴单张时间表链接 https://..." class="flex-1 px-2 py-1 rounded border border-slate-300 bg-white" />
+              <button type="button" onclick="addAdminScheduleUrl()" class="px-2.5 py-1 rounded-lg liquid-silver-btn">添加</button>
+            </div>
+            <div id="adm-schedule-thumbs" class="flex gap-2 flex-wrap"></div>
+          </div>
           <textarea id="adm-body" rows="2" placeholder="场馆名称 或 动态正文..." class="w-full px-2.5 py-2 rounded-lg border border-slate-300 bg-white"></textarea>
           <div class="flex items-center justify-between">
             <label class="flex items-center gap-1.5 cursor-pointer"><input id="adm-pin" type="checkbox" /> 设为动态页置顶重要公告</label>
             <button id="adm-submit-btn" type="button" onclick="submitAdminQuickPost()" class="px-4 py-1.5 rounded-lg obsidian-btn font-semibold">☁️ 同步发布</button>
           </div>
         </div>
-
         <div class="space-y-2">
           <div class="font-bold text-slate-700">📋 云端记录快捷管理队列</div>
           <div id="admin-todo-queue" class="space-y-1.5"></div>
@@ -249,6 +264,8 @@
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
+    updateAuthButtonUI();
+    updateAiKeyStatusUI();
     if (location.hash === '#admin') openHiddenAdminDrawer();
     switchMainTab('home');
     loadTourData();
