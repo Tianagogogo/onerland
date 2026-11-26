@@ -319,3 +319,86 @@ function configGeminiKey() {
   }
   updateAiKeyStatusUI();
 }
+// ================= 全局图片灯箱（修复海报点击无法放大） =================
+function openLightbox(src, caption = '') {
+  if (!src) return;
+  const box = document.getElementById('image-lightbox');
+  const img = document.getElementById('lightbox-img');
+  const cap = document.getElementById('lightbox-caption');
+  if (!box || !img) return;
+  img.src = src;
+  if (cap) cap.textContent = caption;
+  box.classList.remove('hidden');
+}
+
+// ================= 本地粉籍与自定义标签管理 =================
+function getFanPrefState() {
+  const defaultPref = {
+    biasType: 'group', // 'group' 团粉 | 'solo' 唯粉 | 'cp' CP偏好
+    biasMembers: [],
+    customTags: [],
+    autoFilterShows: false
+  };
+  try {
+    const saved = JSON.parse(localStorage.getItem('onerland_fan_pref_v1') || 'null');
+    if (saved && typeof saved === 'object') {
+      AppState.fanPref = { ...defaultPref, ...saved };
+    } else if (!AppState.fanPref) {
+      AppState.fanPref = defaultPref;
+    }
+  } catch (e) {
+    AppState.fanPref = defaultPref;
+  }
+  return AppState.fanPref;
+}
+
+function saveFanPrefState(patch = {}) {
+  const cur = getFanPrefState();
+  AppState.fanPref = { ...cur, ...patch };
+  localStorage.setItem('onerland_fan_pref_v1', JSON.stringify(AppState.fanPref));
+  if (typeof renderTourCards === 'function') renderTourCards();
+  if (typeof renderLocalFanPrefBox === 'function') renderLocalFanPrefBox();
+}
+
+function addFanCustomTag(tagText) {
+  const clean = (tagText || '').trim();
+  if (!clean) return;
+  const cur = getFanPrefState();
+  const nextTags = [...new Set([...(cur.customTags || []), clean])];
+  saveFanPrefState({ customTags: nextTags });
+}
+
+function removeFanCustomTag(idx) {
+  const cur = getFanPrefState();
+  const nextTags = [...(cur.customTags || [])];
+  nextTags.splice(idx, 1);
+  saveFanPrefState({ customTags: nextTags });
+}
+
+// ================= 同场搭子本地记录读写与删除 =================
+const BUDDY_STORAGE_KEY = 'onerland_local_buddy_intents_v2';
+
+function getBuddyListByShow(cloudId) {
+  try {
+    const all = JSON.parse(localStorage.getItem(BUDDY_STORAGE_KEY) || '{}');
+    return Array.isArray(all[cloudId]) ? all[cloudId] : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function addBuddyEntryForShow(cloudId, entry) {
+  const all = JSON.parse(localStorage.getItem(BUDDY_STORAGE_KEY) || '{}');
+  const list = Array.isArray(all[cloudId]) ? all[cloudId] : [];
+  list.unshift({ id: Date.now(), ...entry });
+  all[cloudId] = list;
+  localStorage.setItem(BUDDY_STORAGE_KEY, JSON.stringify(all));
+}
+
+function deleteBuddyEntryForShow(cloudId, entryId) {
+  const all = JSON.parse(localStorage.getItem(BUDDY_STORAGE_KEY) || '{}');
+  const list = Array.isArray(all[cloudId]) ? all[cloudId] : [];
+  all[cloudId] = list.filter(x => String(x.id) !== String(entryId));
+  localStorage.setItem(BUDDY_STORAGE_KEY, JSON.stringify(all));
+}
+
