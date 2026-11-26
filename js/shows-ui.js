@@ -1,21 +1,17 @@
-// 规范化专题前缀：例如 chillparty / chillpartyplus / chillpartyplus+ 归入同一系列前缀
+// 1. 相同前缀自动归一化（例如 chillparty / chillpartyplus / chillpartyplus+ 归为一类）
 function normalizeSeriesKey(rawTitle = '', savedTheme = '') {
   const base = (savedTheme || rawTitle || '').trim();
   if (!base) return '';
 
-  const bracketMatch = base.match(/^([「《【\[]?chillparty(?:\s*plus\+?)?)/i);
-  if (bracketMatch) {
-    const clean = bracketMatch[1].replace(/^[「《【\[]+/, '').trim();
-    return clean.toLowerCase().startsWith('chillparty') ? 'ChillParty 系列' : clean;
+  if (/^chill\s*party/i.test(base)) {
+    return 'ChillParty 系列';
   }
 
   const quoteSeries = base.match(/^([「《][^」》]+[」》]\s*(?:巡回演唱会|演唱会|巡演|音乐节|嘉年华|见面会|派对)?)/);
   if (quoteSeries) return quoteSeries[1].trim();
 
-  const prefixMatch = base.match(/^([A-Za-z0-9_-]{3,24})/);
-  if (prefixMatch && !/^\d+$/.test(prefixMatch[1])) {
-    return prefixMatch[1].trim();
-  }
+  const alphaPrefix = base.match(/^([A-Za-z]{3,20})(?:plus|\+|\s|·|-|_|$)/i);
+  if (alphaPrefix) return `${alphaPrefix[1]} 系列`;
 
   const dashMatch = base.match(/^([^·\-—|]+?)\s*[·\-—|]\s*.+站$/);
   if (dashMatch && dashMatch[1].trim().length >= 2) return dashMatch[1].trim();
@@ -23,21 +19,26 @@ function normalizeSeriesKey(rawTitle = '', savedTheme = '') {
   return '';
 }
 
+// 2. 外部工具站（视野 live）跳转前二次确认
 function requestExternalToolJump(url, siteName, venueName = '') {
   AppState.pendingExternalUrl = url;
   document.getElementById('ext-confirm-site').textContent = siteName;
   document.getElementById('ext-confirm-desc').textContent =
-    `即将前往「${siteName}」查看${venueName ? `【${venueName}】` : ''}相关座位视角参考（非官方工具站）。请勿在外部页面填写订单号或支付定金。`;
+    `即将离开 ONERLAND 前往「${siteName}」检索${venueName ? `【${venueName}】` : ''}座位视野参考（非官方工具站）。请勿在外部页面泄露订单号或支付定金。`;
   document.getElementById('external-jump-modal').classList.remove('hidden');
 }
 
 function confirmExternalToolJump() {
   const url = AppState.pendingExternalUrl;
   document.getElementById('external-jump-modal').classList.add('hidden');
-  if (url) {
-    const win = window.open(url, '_blank', 'noopener,noreferrer');
-    if (!win) location.href = url;
-  }
+  if (!url) return;
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 function exportShowICS(cloudId) {
@@ -65,6 +66,64 @@ function exportShowICS(cloudId) {
   a.click();
 }
 
+// 3. 音乐节时间表悬停/点击弹出浮层
+const slotTimers = {};
+function openSlotPopover(id) {
+  if (slotTimers[id]) { clearTimeout(slotTimers[id]); delete slotTimers[id]; }
+  document.querySelectorAll('.slot-hover-popover').forEach(el => { if (el.id !== id) el.classList.add('hidden'); });
+  document.getElementById(id)?.classList.remove('hidden');
+}
+function scheduleCloseSlotPopover(id) {
+  slotTimers[id] = setTimeout(() => { document.getElementById(id)?.classList.add('hidden'); }, 220);
+}
+function toggleSlotPopover(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.classList.contains('hidden')) openSlotPopover(id);
+  else el.classList.add('hidden');
+}
+
+function buildSlotHoverBadgeHTML(slotText, scheduleImgs, popoverId, titleLabel) {
+  const imgs = Array.isArray(scheduleImgs) ? scheduleImgs : [];
+  if (!slotText && !imgs.length) return '';
+  const hasImgs = imgs.length > 0;
+  const safeTitle = String(titleLabel || '').replace(/['"<>]/g, '');
+
+  const popoverHtml = hasImgs ? `
+    <div id="${popoverId}"
+      onmouseenter="openSlotPopover('${popoverId}')"
+      onmouseleave="scheduleCloseSlotPopover('${popoverId}')"
+      class="slot-hover-popover hidden absolute left-0 bottom-full pb-2 z-50 w-72 sm:w-80">
+      <div class="p-3 rounded-xl bg-white border border-slate-300 shadow-2xl">
+        <div class="flex items-center justify-between text-[11px] text-slate-800 font-semibold mb-2">
+          <span>🗓️ ${safeTitle} · 时间表（点击看大图）</span>
+          <button type="button" onclick="event.stopPropagation(); document.getElementById('${popoverId}').classList.add('hidden')" class="text-slate-400 hover:text-slate-800 px-1">✕</button>
+        </div>
+        <div class="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto no-scrollbar">
+          ${imgs.map((src, i) => `
+            <img src="${src}" data-cap="${safeTitle} · 时间表 #${i + 1}"
+              onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)"
+              class="w-full h-24 object-cover rounded-lg border border-slate-200 cursor-zoom-in hover:opacity-90 bg-slate-50" />
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  ` : '';
+
+  return `
+    <div class="relative inline-block"
+      ${hasImgs ? `onmouseenter="openSlotPopover('${popoverId}')" onmouseleave="scheduleCloseSlotPopover('${popoverId}')"` : ''}>
+      <span ${hasImgs ? `onclick="event.stopPropagation(); toggleSlotPopover('${popoverId}')"` : ''}
+        class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-slate-100 border border-slate-300 text-slate-800 font-medium ${hasImgs ? 'cursor-pointer hover:bg-slate-200' : ''}">
+        <span>🗓️ ${slotText || '音乐节时间表'}</span>
+        ${hasImgs ? `<span class="text-[10px] px-1 rounded bg-white border border-slate-300">×${imgs.length}</span>` : ''}
+      </span>
+      ${popoverHtml}
+    </div>
+  `;
+}
+
+// 4. 专题快捷栏
 function renderThemeQuickBar() {
   const bar = document.getElementById('tour-themes-bar');
   if (!bar) return;
@@ -74,14 +133,9 @@ function renderThemeQuickBar() {
   [...AppState.cloudTickets, ...AppState.cloudArchives].forEach(item => {
     const label = item.city || item.title || '';
     const isFest = item.subType === 'festival' || /音乐节|嘉年华/.test(`${label} ${item.theme || ''}`);
-    if (isFest) {
-      festCount++;
-      return;
-    }
+    if (isFest) { festCount++; return; }
     const seriesKey = normalizeSeriesKey(label, item.theme);
-    if (seriesKey) {
-      themeMap.set(seriesKey, (themeMap.get(seriesKey) || 0) + 1);
-    }
+    if (seriesKey) themeMap.set(seriesKey, (themeMap.get(seriesKey) || 0) + 1);
   });
 
   const btns = [];
@@ -122,7 +176,7 @@ function openSeriesModal(themeKey) {
         return `
           <div class="p-3 rounded-xl bg-white border border-slate-200 flex gap-3 text-xs">
             <div class="w-16 h-16 poster-square-box shrink-0">
-              ${s.posterUrl ? `<img src="${s.posterUrl}" alt="${safeTitle}" data-cap="${safeTitle} · 海报" onclick="openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" />` : `<div class="w-full h-full flex items-center justify-center text-[10px] text-slate-400">ONER</div>`}
+              ${s.posterUrl ? `<img src="${s.posterUrl}" alt="${safeTitle}" data-cap="${safeTitle} · 海报" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" />` : `<div class="w-full h-full flex items-center justify-center text-[10px] text-slate-400">ONER</div>`}
             </div>
             <div class="min-w-0 flex-1 space-y-1">
               <div class="flex items-center justify-between gap-1">
@@ -140,21 +194,65 @@ function openSeriesModal(themeKey) {
   document.getElementById('series-detail-modal').classList.remove('hidden');
 }
 
+// 5. 本地搭子意向保存（防黄牛敏感词拦截）
+function saveLocalBuddyIntent(cloudId, showTitle) {
+  const input = document.getElementById(`buddy-note-${cloudId}`);
+  const text = (input?.value || '').trim();
+  if (!text) return alert('请填写你的观演搭子意向（如：坐标北京，看台同区拼车/互拍）');
+  if (/出票|转票|收票|定金|闲鱼|溢价|代抢/.test(text)) {
+    return alert('⚠️ 为防范票务诈骗，搭子意向禁止包含“出票/转票/定金/闲鱼”等交易词汇！');
+  }
+  const key = 'onerland_local_buddy_intents_v1';
+  const saved = JSON.parse(localStorage.getItem(key) || '{}');
+  saved[cloudId] = {
+    showTitle,
+    note: text,
+    biasLabel: AppState.fanPref.biasType === 'solo' ? `唯粉(${AppState.fanPref.biasMembers.join('/')})` : AppState.fanPref.biasType === 'cp' ? 'CP偏好' : '团粉',
+    updatedAt: new Date().toLocaleDateString()
+  };
+  localStorage.setItem(key, JSON.stringify(saved));
+  renderTourCards();
+}
+
+// 6. 近期演出卡片（有开票倒计时的场次优先排在第一位）
 function renderTourCards() {
   const container = document.getElementById('tour-grid');
   if (!container) return;
 
+  const now = Date.now();
   const { autoFilterShows, biasType, biasMembers } = AppState.fanPref;
-  const list = AppState.cloudTickets.filter(t => {
-    if (AppState.activeArtistId !== 'ALL') {
-      const meta = ARTIST_COLORS[t.artist];
-      if (meta && meta.id !== AppState.activeArtistId) return false;
-    }
-    if (autoFilterShows && biasType !== 'group' && biasMembers.length) {
-      return biasMembers.includes(t.artist) || t.artist === 'ONER';
-    }
-    return true;
-  });
+  const buddyStore = JSON.parse(localStorage.getItem('onerland_local_buddy_intents_v1') || '{}');
+
+  const list = AppState.cloudTickets
+    .filter(t => {
+      if (AppState.activeArtistId !== 'ALL') {
+        const meta = ARTIST_COLORS[t.artist];
+        if (meta && meta.id !== AppState.activeArtistId) return false;
+      }
+      if (autoFilterShows && biasType !== 'group' && biasMembers.length) {
+        return biasMembers.includes(t.artist) || t.artist === 'ONER';
+      }
+      return true;
+    })
+    .map(item => {
+      const futureRounds = (item.rounds || [])
+        .map(r => ({ ...r, ts: new Date((r.sale_time || '').replace(/-/g, '/')).getTime() }))
+        .filter(r => !isNaN(r.ts) && r.ts > now)
+        .sort((a, b) => a.ts - b.ts);
+      return {
+        ...item,
+        activeRounds: futureRounds,
+        nextSaleTs: futureRounds.length ? futureRounds[0].ts : Infinity
+      };
+    })
+    // 核心排序：有未结束开票倒计时的排最前面，并按距离开票最近排序
+    .sort((a, b) => {
+      const aHas = a.nextSaleTs < Infinity ? 0 : 1;
+      const bHas = b.nextSaleTs < Infinity ? 0 : 1;
+      if (aHas !== bHas) return aHas - bHas;
+      if (aHas === 0 && bHas === 0) return a.nextSaleTs - b.nextSaleTs;
+      return (a.show_date || '').localeCompare(b.show_date || '');
+    });
 
   if (!list.length) {
     container.innerHTML = `<div class="col-span-full text-xs text-slate-400 py-4">当前筛选条件下暂无待开演场次。</div>`;
@@ -165,20 +263,17 @@ function renderTourCards() {
     const badge = (ARTIST_COLORS[item.artist] || ARTIST_COLORS['ONER']).bg;
     const safeCity = String(item.city || '').replace(/['"<>]/g, '');
     const cleanVenue = (item.venue || '').replace(/·/g, ' ').trim();
-    const shijiaoLiveUrl = `https://www.shijiao.live/search?q=${encodeURIComponent(cleanVenue || safeCity)}`;
+    const shiyeLiveUrl = `https://www.shiyelive.com/?q=${encodeURIComponent(cleanVenue || safeCity)}`;
     const amapUrl = `https://uri.amap.com/search?keyword=${encodeURIComponent(cleanVenue || safeCity)}`;
+    const slotPopoverId = `tour-slot-pop-${item.cloudId || idx}`;
+    const myBuddy = buddyStore[item.cloudId];
 
-    const activeRounds = (item.rounds || []).filter(r => {
-      const ts = new Date((r.sale_time || '').replace(/-/g, '/')).getTime();
-      return isNaN(ts) || ts > Date.now();
-    });
-
-    const roundsHtml = activeRounds.length ? `
+    const roundsHtml = item.activeRounds.length ? `
       <div class="space-y-1.5 pt-1">
-        ${activeRounds.map(r => `
-          <div class="flex items-center justify-between gap-2 text-xs py-1.5 px-2.5 rounded-lg bg-white border border-slate-300">
-            <span class="truncate"><strong>${r.round_name || '开票'}</strong>：${r.sale_time} <span class="text-slate-500">(${r.platform || '大麦'})</span></span>
-            <span class="countdown-badge font-mono font-bold text-slate-900 shrink-0" data-time="${r.sale_time}"></span>
+        ${item.activeRounds.map(r => `
+          <div class="flex items-center justify-between gap-2 text-xs py-1.5 px-2.5 rounded-lg bg-slate-900 text-white">
+            <span class="truncate">🔥 <strong>${r.round_name || '开票'}</strong>：${r.sale_time} <span class="opacity-75">(${r.platform || '大麦'})</span></span>
+            <span class="countdown-badge font-mono font-bold text-amber-300 shrink-0" data-time="${r.sale_time}"></span>
           </div>
         `).join('')}
       </div>
@@ -188,7 +283,7 @@ function renderTourCards() {
       <div class="p-4 rounded-2xl metal-card flex flex-col justify-between gap-3">
         <div class="flex gap-3.5">
           <div class="w-24 h-24 poster-square-box shrink-0">
-            ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeCity}" data-cap="${safeCity} · 海报" onclick="openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
+            ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeCity}" data-cap="${safeCity} · 演出海报" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
           </div>
           <div class="flex-1 min-w-0 space-y-1">
             <div class="flex items-center justify-between gap-2">
@@ -202,26 +297,46 @@ function renderTourCards() {
               </div>
             </div>
             <p class="text-xs text-slate-500">📍 ${item.venue} ｜ 🗓️ ${item.show_date}</p>
-            ${item.prices ? `<p class="text-[11px] text-slate-700">💰 票价：${item.prices}</p>` : ''}
+            <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
+              ${item.prices ? `<span class="text-[11px] px-2 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-700">💰 ${item.prices}</span>` : ''}
+              ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeCity)}
+            </div>
           </div>
         </div>
 
         ${roundsHtml}
 
+        <!-- 操作栏：参演指南 / 视野 live / 找搭子 / 日历 / 地图 -->
         <div class="flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-slate-200/80 text-xs">
           <div class="flex items-center gap-1.5 flex-wrap">
-            <button type="button" onclick="document.getElementById('guide-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🧭 参演指南 ▾</button>
-            <button type="button" onclick="requestExternalToolJump('${shijiaoLiveUrl}', '视角 Live', '${cleanVenue || safeCity}')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🔭 视角 Live ↗</button>
+            <button type="button" onclick="document.getElementById('guide-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🧭 指南 ▾</button>
+            <button type="button" onclick="requestExternalToolJump('${shiyeLiveUrl}', '视野 live（非官方座位视野工具站）', '${cleanVenue || safeCity}')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🔭 视野 live ↗</button>
+            <button type="button" onclick="document.getElementById('buddy-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🤝 找搭子 ▾</button>
           </div>
           <div class="flex items-center gap-1.5">
-            <button type="button" onclick="exportShowICS(${item.cloudId})" class="px-2 py-1 rounded-lg bg-white border border-slate-300 text-slate-700">📅 存日历</button>
+            <button type="button" onclick="exportShowICS(${item.cloudId})" class="px-2 py-1 rounded-lg bg-white border border-slate-300 text-slate-700">📅 日历</button>
             <a href="${amapUrl}" target="_blank" rel="noopener noreferrer" class="px-2 py-1 rounded-lg bg-white border border-slate-300 text-slate-700">地图 ↗</a>
           </div>
         </div>
 
+        <!-- 参演指南折叠抽屉 -->
         <div id="guide-drawer-${idx}" class="hidden p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-1.5 leading-relaxed">
           <div class="font-bold text-slate-900">🚇 交通与入场指南：</div>
           <div class="whitespace-pre-line">${item.transport || '• 建议提前 60–90 分钟到达场馆核验身份证入场\n• 禁止携带打火机、专业长焦相机及超尺寸灯牌'}</div>
+        </div>
+
+        <!-- 同场找搭子折叠抽屉 -->
+        <div id="buddy-drawer-${idx}" class="hidden p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-900">🤝 同场观演搭子登记（隐私优先 · 本地偏好过滤）</span>
+            <span class="text-[11px] text-slate-500">${AppState.currentUser ? `已登录：${AppState.currentUser.email}` : '访客本地模式'}</span>
+          </div>
+          <p class="text-[11px] text-slate-500">当前本机偏好：<strong>${AppState.fanPref.biasType === 'solo' ? '唯粉模式' : AppState.fanPref.biasType === 'cp' ? 'CP偏好' : '团粉模式'}</strong>（不公开联系方式，严禁出票/转票/定金）。</p>
+          ${myBuddy ? `<div class="p-2 rounded-lg bg-white border border-slate-300 text-slate-700">✅ 我的本机登记（${myBuddy.biasLabel}）：${myBuddy.note}</div>` : ''}
+          <div class="flex gap-1.5">
+            <input id="buddy-note-${item.cloudId}" type="text" value="${myBuddy?.note || ''}" placeholder="输入同行需求（如：散场拼车回高铁站/互拍打卡）..." class="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white" />
+            <button type="button" onclick="saveLocalBuddyIntent(${item.cloudId}, '${safeCity}')" class="px-3 py-1.5 rounded-lg obsidian-btn font-semibold shrink-0">保存意向</button>
+          </div>
         </div>
       </div>
     `;
@@ -264,6 +379,7 @@ function setArchiveTypeFilter(type) {
   renderArchiveTimeline();
 }
 
+// 7. 往日档案卡片（支持海报灯箱、音乐节时间表悬浮大图、管理员编辑）
 function renderArchiveTimeline() {
   const box = document.getElementById('archive-timeline-list');
   if (!box) return;
@@ -280,19 +396,21 @@ function renderArchiveTimeline() {
   }
 
   const showList = AppState.isArchiveExpanded ? filtered : filtered.slice(0, 3);
-  let html = showList.map(item => {
+  let html = showList.map((item, idx) => {
     const badge = (ARTIST_COLORS[item.artist] || ARTIST_COLORS['ONER']).bg;
     const safeTitle = String(item.title || '').replace(/['"<>]/g, '');
+    const slotPopoverId = `arc-slot-pop-${item.cloudId || idx}`;
     return `
       <div class="p-4 rounded-2xl metal-card flex items-center justify-between gap-3">
         <div class="flex items-center gap-3.5 min-w-0">
           <div class="w-16 h-16 poster-square-box shrink-0">
-            ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" data-cap="${safeTitle} · 往日海报" onclick="openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs text-slate-400">ONER</div>`}
+            ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" data-cap="${safeTitle} · 往日海报" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs text-slate-400">ONER</div>`}
           </div>
           <div class="min-w-0 space-y-1">
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="text-[10px] px-2 py-0.5 rounded text-white font-semibold" style="background:${badge}">${item.artist}</span>
               <span class="font-bold text-sm text-slate-900 truncate">${safeTitle}</span>
+              ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeTitle)}
             </div>
             <p class="text-xs text-slate-500">🗓️ ${item.showDate} ｜ 📍 ${item.venue}</p>
           </div>
