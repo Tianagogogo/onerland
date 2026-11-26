@@ -113,7 +113,7 @@ function buildSlotHoverBadgeHTML(slotText, scheduleImgs, popoverId, titleLabel) 
   `;
 }
 
-// 1. 提交本机私人评语（默认仅自己可见，绝不进入公共评分池）
+// ================= 1. 提交本机私人评语（默认仅自己可见） =================
 function submitPrivateNoteForm(showKey, formPrefix, rerenderScope) {
   const input = document.getElementById(`${formPrefix}-priv-note`);
   const text = (input?.value || '').trim();
@@ -130,7 +130,7 @@ function removePrivateNoteItem(showKey, noteId, rerenderScope) {
   else renderTourCards();
 }
 
-// 2. 脱敏票根核验（验证后解锁本场次公开发布客观评分）
+// ================= 2. 脱敏票根核验（解锁公开发布客观评分） =================
 function handleTicketProofVerify(showKey, formPrefix, rerenderScope) {
   const fileInput = document.getElementById(`${formPrefix}-proof-file`);
   const areaInput = document.getElementById(`${formPrefix}-proof-area`);
@@ -146,7 +146,7 @@ function handleTicketProofVerify(showKey, formPrefix, rerenderScope) {
   alert('✅ 本场脱敏票根已核验（系统未保存敏感原图），现已解锁公开发布客观体验评分！');
 }
 
-// 3. 公开发布客观体验评分（仅提交结构化选项，不包含任何文字评语）
+// ================= 3. 公开发布客观体验评分（不含评语） =================
 function submitVenueExperienceForm(venueName, showKey, formPrefix, rerenderScope) {
   if (!isShowTicketVerified(showKey)) {
     return alert('🔒 需先完成本场次「脱敏票根核验」，才能公开发布客观体验评分！');
@@ -189,7 +189,6 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
   const stats = computeVenueExperienceStats(cleanVenue);
   const privateNotes = getPrivateShowNotes(showKey);
 
-  // 公共聚合统计区（仅含客观评分分布，绝无他人评语）
   const publicStatsHtml = stats.unlocked
     ? `
       <div class="p-3 rounded-xl bg-white border border-slate-300 space-y-3">
@@ -248,7 +247,6 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
       </div>
     `;
 
-  // 票根核验门槛区
   const verifyGateHtml = verified
     ? `
       <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-2.5">
@@ -344,7 +342,6 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
       </div>
     `;
 
-  // 私人评语区（默认仅自己本机可见，无需票根即可自己记手账，也绝不外传）
   const privateNotesHtml = `
     <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
       <div class="flex items-center justify-between flex-wrap gap-1">
@@ -380,7 +377,6 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
     </div>
   `;
 }
-
 
 function renderThemeQuickBar() {
   const bar = document.getElementById('tour-themes-bar');
