@@ -1,4 +1,4 @@
-const SUPABASE_URL = '/sb';
+const SUPABASE_URL = 'https://xtgkepaqikpzvmpkoxsa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0Z2tlcGFxaWtwenZtcGtveHNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU2NzU1MDgsImV4cCI6MjExMTI1MTUwOH0.dsY0P3S-alER-Dg9U_sdAvGR5aw90lrShn2vSLpm_4g';
 const ADMIN_PIN = '1208';
 const GEMINI_KEY_STORAGE = 'onerland_gemini_api_key';
