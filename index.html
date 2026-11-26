@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" class="dark">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,44 +8,47 @@
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body {
-      background-color: #070912;
+      background-color: #f3f5f9;
       background-image:
-        radial-gradient(circle at 15% 10%, rgba(244, 114, 182, 0.08), transparent 35%),
-        radial-gradient(circle at 85% 15%, rgba(96, 165, 250, 0.08), transparent 35%),
-        radial-gradient(circle at 50% 80%, rgba(168, 85, 247, 0.07), transparent 40%),
-        linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
-      background-size: 100% 100%, 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+        radial-gradient(circle at 12% 8%, rgba(244, 114, 182, 0.08), transparent 38%),
+        radial-gradient(circle at 88% 12%, rgba(96, 165, 250, 0.09), transparent 38%),
+        radial-gradient(circle at 50% 85%, rgba(168, 85, 247, 0.06), transparent 42%),
+        linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
       background-attachment: fixed;
     }
-    .glass-card {
-      background: rgba(15, 23, 42, 0.62);
+    .frost-card {
+      background: rgba(255, 255, 255, 0.86);
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
-      border: 1px solid rgba(203, 213, 225, 0.16);
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
     }
-    .glass-card-silver {
-      background: linear-gradient(135deg, rgba(30, 41, 59, 0.72), rgba(15, 23, 42, 0.78));
+    .frost-card-silver {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(241, 245, 249, 0.9));
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(226, 232, 240, 0.24);
-      box-shadow: 0 4px 24px rgba(192, 132, 252, 0.1);
+      border: 1px solid #94a3b8;
+      box-shadow: 0 6px 24px rgba(100, 116, 139, 0.09);
     }
     .pearl-gradient {
-      background: linear-gradient(135deg, #F472B6 0%, #60A5FA 50%, #A855F7 100%);
+      background: linear-gradient(135deg, #ec4899 0%, #3b82f6 52%, #8b5cf6 100%);
+    }
+    .pearl-soft {
+      background: linear-gradient(135deg, rgba(244, 114, 182, 0.12) 0%, rgba(96, 165, 250, 0.12) 50%, rgba(168, 85, 247, 0.12) 100%);
     }
     .pearl-text {
-      background: linear-gradient(90deg, #F9A8D4 0%, #93C5FD 50%, #D8B4FE 100%);
+      background: linear-gradient(90deg, #db2777 0%, #2563eb 52%, #7c3aed 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
     .silver-btn {
-      background: linear-gradient(135deg, rgba(226, 232, 240, 0.16), rgba(148, 163, 184, 0.08));
-      border: 1px solid rgba(226, 232, 240, 0.28);
+      background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
+      border: 1px solid #cbd5e1;
+      color: #334155;
     }
     .silver-btn:hover {
-      background: linear-gradient(135deg, rgba(226, 232, 240, 0.26), rgba(148, 163, 184, 0.14));
+      background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
+      color: #0f172a;
     }
     .line-clamp-1-clean {
       display: -webkit-box;
@@ -54,40 +57,40 @@
       overflow: hidden;
     }
     .no-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
-    .no-scrollbar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.4); border-radius: 999px; }
-    .no-scrollbar::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.35); border-radius: 999px; }
-    .no-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(192, 132, 252, 0.55); }
+    .no-scrollbar::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 999px; }
+    .no-scrollbar::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 999px; }
   </style>
 </head>
-<body class="text-slate-100 min-h-screen antialiased selection:bg-purple-500/30 selection:text-white">
+<body class="text-slate-800 min-h-screen antialiased selection:bg-purple-200 selection:text-slate-900">
 
-  <header class="sticky top-0 z-30 bg-[#070912]/80 backdrop-blur-xl border-b border-slate-300/15">
+  <!-- ================= 顶部冷白银导航栏 ================= -->
+  <header class="sticky top-0 z-30 bg-white/85 backdrop-blur-xl border-b border-slate-200/90 shadow-xs">
     <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2 flex-wrap">
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-2">
-          <span id="sync-dot" class="w-2 h-2 rounded-full bg-gradient-to-r from-pink-400 to-sky-400 animate-pulse"></span>
-          <h1 class="font-bold text-base sm:text-lg tracking-tight text-slate-100">ONER & 坤音</h1>
+          <span id="sync-dot" class="w-2.5 h-2.5 rounded-full pearl-gradient animate-pulse"></span>
+          <h1 class="font-bold text-base sm:text-lg tracking-tight text-slate-900">ONER & 坤音</h1>
         </div>
 
         <div class="relative" id="artist-dropdown-wrap">
           <button type="button" onclick="toggleArtistMenu(event)" id="artist-menu-btn"
-            class="px-3 py-1.5 rounded-full text-xs font-semibold text-white pearl-gradient shadow-sm flex items-center gap-1.5 transition hover:opacity-90">
+            class="px-3 py-1.5 rounded-full text-xs font-semibold text-white pearl-gradient shadow-xs flex items-center gap-1.5 transition hover:opacity-90">
             <span>🎤 艺人：<span id="current-artist-label">全部艺人</span></span>
             <span class="text-[10px]">▾</span>
           </button>
-          <div id="artist-dropdown-menu" class="hidden absolute left-0 mt-2 w-44 rounded-xl bg-slate-900/95 backdrop-blur-xl border border-slate-300/20 shadow-2xl py-1.5 z-40"></div>
+          <div id="artist-dropdown-menu" class="hidden absolute left-0 mt-2 w-44 rounded-xl bg-white/95 backdrop-blur-xl border border-slate-200 shadow-xl py-1.5 z-40"></div>
         </div>
       </div>
 
       <div class="flex items-center gap-2 text-xs">
         <span id="last-sync" class="text-slate-400 hidden lg:inline">准备就绪</span>
-        <button id="admin-unlock-btn" onclick="toggleAdminMode()" class="px-3 py-1.5 rounded-lg silver-btn text-slate-200 transition font-medium">
+        <button id="admin-unlock-btn" onclick="toggleAdminMode()" class="px-3 py-1.5 rounded-lg silver-btn transition font-medium">
           🔒 管理
         </button>
-        <button onclick="openManageModal()" class="px-3 py-1.5 rounded-lg silver-btn text-slate-200 transition font-medium hidden sm:inline-block">
+        <button onclick="openManageModal()" class="px-3 py-1.5 rounded-lg silver-btn transition font-medium hidden sm:inline-block">
           ⚙️ 订阅源
         </button>
-        <button onclick="loadAllFeeds(true)" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-slate-200 via-slate-100 to-slate-300 text-slate-900 hover:opacity-90 transition font-semibold shadow-sm">
+        <button onclick="loadAllFeeds(true)" class="px-3 py-1.5 rounded-lg bg-slate-800 text-white hover:bg-slate-700 transition font-semibold shadow-xs">
           刷新同步
         </button>
       </div>
@@ -96,58 +99,60 @@
 
   <main class="max-w-5xl mx-auto px-4 py-6 space-y-8">
 
-    <section id="admin-publisher-panel" class="hidden p-4 sm:p-5 rounded-2xl glass-card-silver space-y-3">
+    <!-- ================= 管理员专属：快捷投喂与编辑台 ================= -->
+    <section id="admin-publisher-panel" class="hidden p-4 sm:p-5 rounded-2xl frost-card-silver space-y-3">
       <div class="flex items-center justify-between flex-wrap gap-2">
         <span class="text-sm font-bold pearl-text">✨ 管理员云端投喂台（多设备实时同步）</span>
         <div class="flex items-center gap-3 text-xs">
-          <button type="button" onclick="configGeminiKey()" class="text-sky-300 hover:underline font-medium">
+          <button type="button" onclick="configGeminiKey()" class="text-blue-600 hover:underline font-medium">
             🔑 配置 AI 识图密钥 (<span id="ai-key-status">未配置</span>)
           </button>
-          <button onclick="lockAdminMode()" class="text-slate-400 hover:text-rose-400">退出管理</button>
+          <button onclick="lockAdminMode()" class="text-slate-400 hover:text-rose-600">退出管理</button>
         </div>
       </div>
 
       <textarea id="raw-post-input" rows="2" placeholder="粘贴微博 / 小红书 / 抖音分享口令或官宣文案（支持识别优先购、预售、正式开票、连演两天及开场时间）..."
-        class="w-full text-xs sm:text-sm p-3 rounded-xl border border-slate-400/25 bg-slate-950/70 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-400/60"></textarea>
+        class="w-full text-xs sm:text-sm p-3 rounded-xl border border-slate-300 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-400"></textarea>
 
       <div class="flex items-center gap-2 flex-wrap">
-        <button id="smart-parse-btn" onclick="smartParsePost()" class="px-3.5 py-2 rounded-lg pearl-gradient hover:opacity-90 text-white text-xs font-semibold transition shadow-sm">
+        <button id="smart-parse-btn" onclick="smartParsePost()" class="px-3.5 py-2 rounded-lg pearl-gradient hover:opacity-90 text-white text-xs font-semibold transition shadow-xs">
           🪄 智能识别文案
         </button>
-        <button type="button" onclick="openTicketFormDirectly()" class="px-3.5 py-2 rounded-lg silver-btn text-pink-200 text-xs font-semibold transition">
+        <button type="button" onclick="openTicketFormDirectly()" class="px-3.5 py-2 rounded-lg silver-btn text-pink-700 text-xs font-semibold transition">
           🎫 手动新增演出 / 倒计时
         </button>
-        <button type="button" onclick="openArchiveFormDirectly()" class="px-3.5 py-2 rounded-lg silver-btn text-purple-200 text-xs font-semibold transition">
+        <button type="button" onclick="openArchiveFormDirectly()" class="px-3.5 py-2 rounded-lg silver-btn text-purple-700 text-xs font-semibold transition">
           🏛️ 录入往日演出 / 识别排期表海报
         </button>
-        <button onclick="resetConfirmForm()" class="px-3 py-2 rounded-lg bg-slate-800/80 text-slate-300 hover:text-white text-xs">
+        <button onclick="resetConfirmForm()" class="px-3 py-2 rounded-lg bg-slate-200/80 text-slate-600 hover:text-slate-900 text-xs">
           清空收起
         </button>
       </div>
 
-      <div id="parse-confirm-box" class="hidden pt-3 border-t border-dashed border-slate-400/20 space-y-3">
-        <div id="editing-banner" class="hidden px-3 py-2 rounded-lg bg-purple-500/15 border border-purple-400/30 text-xs text-purple-200 flex items-center justify-between">
+      <!-- 识别后确认 / 编辑微调表单 -->
+      <div id="parse-confirm-box" class="hidden pt-3 border-t border-dashed border-slate-300 space-y-3">
+        <div id="editing-banner" class="hidden px-3 py-2 rounded-lg bg-purple-50 border border-purple-200 text-xs text-purple-800 flex items-center justify-between">
           <span>✏️ 正在编辑已有演出场次：<strong id="editing-target-name"></strong></span>
-          <button type="button" onclick="cancelEditMode()" class="text-pink-300 underline font-medium">取消编辑</button>
+          <button type="button" onclick="cancelEditMode()" class="text-rose-600 underline font-medium">取消编辑</button>
         </div>
 
         <div id="entry-type-selector" class="flex items-center gap-4 text-xs flex-wrap">
-          <span class="text-slate-400">同步至板块：</span>
-          <label class="flex items-center gap-1 cursor-pointer font-medium text-slate-200">
+          <span class="text-slate-500">同步至板块：</span>
+          <label class="flex items-center gap-1 cursor-pointer font-medium text-slate-700">
             <input type="radio" name="cloudEntryType" value="feed" checked onchange="toggleCloudFields()" /> 📱 全平台动态时间线
           </label>
-          <label class="flex items-center gap-1 cursor-pointer font-medium text-sky-300">
+          <label class="flex items-center gap-1 cursor-pointer font-medium text-blue-700">
             <input type="radio" name="cloudEntryType" value="ticket" onchange="toggleCloudFields()" /> 🎫 近期演出（含开票倒计时 & 待开演场次）
           </label>
-          <label class="flex items-center gap-1 cursor-pointer font-medium text-purple-300">
+          <label class="flex items-center gap-1 cursor-pointer font-medium text-purple-700">
             <input type="radio" name="cloudEntryType" value="archive" onchange="toggleCloudFields()" /> 🏛️ 往日演出档案（支持多场表格图批量识别）
           </label>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
           <div>
-            <label class="text-slate-400 block mb-1">关联艺人</label>
-            <select id="cp-artist" class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80 text-slate-100">
+            <label class="text-slate-500 block mb-1">关联艺人</label>
+            <select id="cp-artist" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-800">
               <option value="ONER">ONER</option>
               <option value="坤音娱乐">坤音娱乐</option>
               <option value="岳岳">岳岳</option>
@@ -156,18 +161,19 @@
             </select>
           </div>
           <div id="cp-feed-platform-wrap">
-            <label class="text-slate-400 block mb-1">来源平台（如：微博 / 小红书 / 抖音）</label>
-            <input id="cp-platform" type="text" placeholder="微博" class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80 text-slate-100" />
+            <label class="text-slate-500 block mb-1">来源平台（如：微博 / 小红书 / 抖音）</label>
+            <input id="cp-platform" type="text" placeholder="微博" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-800" />
           </div>
           <div id="cp-ticket-url-top" class="hidden">
-            <label class="text-slate-400 block mb-1">官宣原帖 / 购票链接</label>
-            <input id="cp-url-ticket" type="text" placeholder="https://..." class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80 text-slate-100" />
+            <label class="text-slate-500 block mb-1">官宣原帖 / 购票链接</label>
+            <input id="cp-url-ticket" type="text" placeholder="https://..." class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-800" />
           </div>
 
-          <div id="cp-archive-fields" class="hidden sm:col-span-2 space-y-3 p-3.5 rounded-xl bg-purple-500/5 border border-slate-300/20">
+          <!-- ================= 往日演出档案表单 ================= -->
+          <div id="cp-archive-fields" class="hidden sm:col-span-2 space-y-3 p-3.5 rounded-xl bg-white/80 border border-slate-300">
             <div class="flex items-center justify-between flex-wrap gap-2">
               <div class="flex items-center gap-3">
-                <span class="font-bold text-purple-300">演出类型：</span>
+                <span class="font-bold text-purple-700">演出类型：</span>
                 <label class="flex items-center gap-1 cursor-pointer font-medium">
                   <input type="radio" name="archiveSubType" value="tour" checked onchange="toggleArchiveSubFields()" /> 🏟️ 巡演 / Livehouse（含票价与座位图）
                 </label>
@@ -177,11 +183,11 @@
               </div>
             </div>
 
-            <div class="p-3 rounded-lg bg-slate-950/70 border border-slate-300/15 space-y-2.5">
+            <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-2.5">
               <div class="flex items-center justify-between flex-wrap gap-2">
-                <label class="font-semibold text-purple-300">🖼️ 上传官宣海报或「多场次排期表格图片」</label>
+                <label class="font-semibold text-purple-700">🖼️ 上传官宣海报或「多场次排期表格图片」</label>
                 <div class="flex items-center gap-2 flex-wrap">
-                  <label class="cursor-pointer px-3 py-1 rounded-lg silver-btn text-slate-100 font-medium transition">
+                  <label class="cursor-pointer px-3 py-1 rounded-lg silver-btn font-medium transition">
                     选择本地图片
                     <input type="file" id="arc-poster-file" accept="image/*" class="hidden" onchange="handlePosterUpload(event)" />
                   </label>
@@ -190,15 +196,15 @@
                   </button>
                 </div>
               </div>
-              <input id="arc-poster-url" type="text" placeholder="或粘贴海报图片链接 https://..." class="w-full px-2.5 py-1.5 rounded border border-slate-400/25 bg-transparent text-xs" />
-              <div id="arc-ocr-status" class="hidden text-[11px] text-sky-300"></div>
-              <img id="arc-poster-preview" class="hidden max-h-40 rounded-lg border border-slate-400/20 object-contain" />
+              <input id="arc-poster-url" type="text" placeholder="或粘贴海报图片链接 https://..." class="w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white text-xs" />
+              <div id="arc-ocr-status" class="hidden text-[11px] text-blue-600"></div>
+              <img id="arc-poster-preview" class="hidden max-h-40 rounded-lg border border-slate-300 object-contain" />
 
-              <div id="multi-show-batch-box" class="hidden pt-2 border-t border-slate-400/20 space-y-2">
+              <div id="multi-show-batch-box" class="hidden pt-2 border-t border-slate-200 space-y-2">
                 <div class="flex items-center justify-between flex-wrap gap-2">
-                  <span class="font-bold text-sky-300">📋 识别到图片中的多场演出排期（可勾选微调后一键批量导入）：</span>
+                  <span class="font-bold text-blue-700">📋 识别到图片中的多场演出排期（可勾选微调后一键批量导入）：</span>
                   <div class="flex items-center gap-2">
-                    <select id="batch-target-section" class="px-2 py-1 rounded border border-slate-400/30 bg-slate-900 text-[11px]">
+                    <select id="batch-target-section" class="px-2 py-1 rounded border border-slate-300 bg-white text-[11px]">
                       <option value="archive">导入至：🏛️ 往日演出档案</option>
                       <option value="ticket">导入至：🎫 近期演出列表</option>
                     </select>
@@ -213,32 +219,32 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label class="text-slate-400 block mb-1">巡演/音乐节主题名称（用于横版专题聚合）</label>
-                <input id="arc-theme" type="text" placeholder="如：「极尽声色」巡回演唱会" class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
+                <label class="text-slate-500 block mb-1">巡演/音乐节主题名称（用于专题聚合）</label>
+                <input id="arc-theme" type="text" placeholder="如：「极尽声色」巡回演唱会" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" />
               </div>
               <div>
-                <label class="text-slate-400 block mb-1">具体站次 / 场次标题（必填）</label>
-                <input id="arc-title" type="text" placeholder="如：合肥站 / 北京站 / XX音乐节" class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
+                <label class="text-slate-500 block mb-1">具体站次 / 场次标题（必填）</label>
+                <input id="arc-title" type="text" placeholder="如：合肥站 / 北京站 / XX音乐节" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" />
               </div>
               <div>
-                <label class="text-slate-400 block mb-1">演出日期（必填，用于时间线排序）</label>
-                <input id="arc-date" type="date" class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
+                <label class="text-slate-500 block mb-1">演出日期（必填，用于时间线排序）</label>
+                <input id="arc-date" type="date" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" />
               </div>
               <div>
-                <label class="text-slate-400 block mb-1">城市与场馆 / Livehouse / 场地</label>
-                <input id="arc-venue" type="text" placeholder="如：北京 · 疆进酒·OMNI SPACE" class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
+                <label class="text-slate-500 block mb-1">城市与场馆 / Livehouse / 场地</label>
+                <input id="arc-venue" type="text" placeholder="如：北京 · 疆进酒·OMNI SPACE" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" />
               </div>
 
               <div id="arc-tour-only" class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label class="text-pink-300 font-medium block mb-1">💰 票价档位</label>
-                  <input id="arc-prices" type="text" placeholder="如：预售 280 / 全价 380 / VIP 580" class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
+                  <label class="text-pink-700 font-medium block mb-1">💰 票价档位</label>
+                  <input id="arc-prices" type="text" placeholder="如：预售 280 / 全价 380 / VIP 580" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" />
                 </div>
                 <div>
-                  <label class="text-sky-300 font-medium block mb-1">💺 场馆座位图（Livehouse 无座位可留空）</label>
+                  <label class="text-blue-700 font-medium block mb-1">💺 场馆座位图（Livehouse 无座位可留空）</label>
                   <div class="flex gap-1.5">
-                    <input id="arc-seat-url" type="text" placeholder="https://... 或点右侧上传" class="flex-1 px-2.5 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
-                    <label class="cursor-pointer px-2.5 py-2 rounded-lg silver-btn text-sky-200 shrink-0 font-medium">
+                    <input id="arc-seat-url" type="text" placeholder="https://... 或点右侧上传" class="flex-1 px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
+                    <label class="cursor-pointer px-2.5 py-2 rounded-lg silver-btn text-blue-700 shrink-0 font-medium">
                       上传图
                       <input type="file" accept="image/*" class="hidden" onchange="handleSeatMapUpload(event)" />
                     </label>
@@ -248,104 +254,105 @@
 
               <div id="arc-fest-only" class="hidden sm:col-span-2 space-y-3">
                 <div>
-                  <label class="text-purple-300 font-medium block mb-1">⏰ 演出时间段（鼠标悬停卡片该标签可预览下方时间表多图）</label>
-                  <input id="arc-slot" type="text" placeholder="如：16:20 - 17:00（主舞台）" class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
+                  <label class="text-purple-700 font-medium block mb-1">⏰ 演出时间段（鼠标悬停卡片该标签可预览下方时间表多图）</label>
+                  <input id="arc-slot" type="text" placeholder="如：16:20 - 17:00（主舞台）" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" />
                 </div>
 
-                <div class="p-3 rounded-lg bg-slate-950/70 border border-purple-400/25 space-y-2">
+                <div class="p-3 rounded-lg bg-slate-50 border border-purple-200 space-y-2">
                   <div class="flex items-center justify-between flex-wrap gap-2">
-                    <label class="text-purple-300 font-medium">🗓️ 音乐节时间表图片（可一次多选上传多张，支持添加图片链接）</label>
-                    <label class="cursor-pointer px-2.5 py-1 rounded-lg silver-btn text-purple-200 font-medium transition">
+                    <label class="text-purple-700 font-medium">🗓️ 音乐节时间表图片（可多选上传多张，建议单次不超过 3 张以保证同步速度）</label>
+                    <label class="cursor-pointer px-2.5 py-1 rounded-lg silver-btn text-purple-700 font-medium transition">
                       + 多选上传时间表图片
                       <input type="file" id="arc-schedule-files" accept="image/*" multiple class="hidden" onchange="handleMultiScheduleUpload(event, 'arc')" />
                     </label>
                   </div>
                   <div class="flex gap-1.5">
-                    <input id="arc-schedule-url-input" type="text" placeholder="输入单张时间表图片网址 https://... 后点添加" class="flex-1 px-2.5 py-1.5 rounded border border-slate-400/25 bg-transparent text-xs" />
-                    <button type="button" onclick="addScheduleImageByUrl('arc')" class="px-2.5 py-1.5 rounded-lg silver-btn text-sky-200 font-medium">添加链接图</button>
+                    <input id="arc-schedule-url-input" type="text" placeholder="输入单张时间表图片网址 https://... 后点添加" class="flex-1 px-2.5 py-1.5 rounded border border-slate-300 bg-white text-xs" />
+                    <button type="button" onclick="addScheduleImageByUrl('arc')" class="px-2.5 py-1.5 rounded-lg silver-btn text-blue-700 font-medium">添加链接图</button>
                   </div>
                   <div id="arc-schedule-thumbs" class="flex gap-2 flex-wrap pt-1"></div>
                 </div>
 
                 <div>
-                  <label class="text-emerald-300 font-medium block mb-1">🎤 现场演唱歌单 Setlist（每行一首）</label>
-                  <textarea id="arc-setlist" rows="4" placeholder="1. 过敏&#10;2. 镜中人&#10;3. 凶手" class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80 leading-relaxed"></textarea>
+                  <label class="text-emerald-700 font-medium block mb-1">🎤 现场演唱歌单 Setlist（每行一首）</label>
+                  <textarea id="arc-setlist" rows="4" placeholder="1. 过敏&#10;2. 镜中人&#10;3. 凶手" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white leading-relaxed"></textarea>
                 </div>
               </div>
 
               <div class="sm:col-span-2">
-                <label class="text-slate-400 block mb-1">官宣原帖 / 回顾链接（选填）</label>
-                <input id="arc-url" type="text" placeholder="https://..." class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
+                <label class="text-slate-500 block mb-1">官宣原帖 / 回顾链接（选填）</label>
+                <input id="arc-url" type="text" placeholder="https://..." class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" />
               </div>
             </div>
           </div>
 
-          <div id="cp-tour-fields" class="hidden sm:col-span-2 space-y-3 p-3.5 rounded-xl bg-sky-500/5 border border-slate-300/20">
+          <!-- ================= 近期演出表单 ================= -->
+          <div id="cp-tour-fields" class="hidden sm:col-span-2 space-y-3 p-3.5 rounded-xl bg-white/80 border border-slate-300">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label class="text-sky-300 font-medium block mb-1">巡演/音乐节主题名称（同主题可聚合专题页）</label>
-                <input id="cp-tour-theme" type="text" placeholder="如：「极尽声色」巡回演唱会" class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
+                <label class="text-blue-700 font-medium block mb-1">巡演/音乐节主题名称（同主题可聚合专题页）</label>
+                <input id="cp-tour-theme" type="text" placeholder="如：「极尽声色」巡回演唱会" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" />
               </div>
               <div>
-                <label class="text-sky-300 font-medium block mb-1">城市站次 / 场次名（必填）</label>
-                <input id="cp-tour-title" type="text" placeholder="如：合肥站 / 上海站 / XX音乐节" class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
+                <label class="text-blue-700 font-medium block mb-1">城市站次 / 场次名（必填）</label>
+                <input id="cp-tour-title" type="text" placeholder="如：合肥站 / 上海站 / XX音乐节" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" />
               </div>
               <div>
-                <label class="text-slate-400 block mb-1">演出场馆 / Livehouse / 场地</label>
+                <label class="text-slate-500 block mb-1">演出场馆 / Livehouse / 场地</label>
                 <div class="flex gap-1.5">
-                  <input id="cp-tour-venue" type="text" placeholder="如：MAO Livehouse / 合肥少荃体育馆" class="flex-1 px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
-                  <button type="button" onclick="autoFillVenueTransport()" class="px-2.5 py-1.5 rounded-lg silver-btn text-sky-200 shrink-0 font-medium">
+                  <input id="cp-tour-venue" type="text" placeholder="如：MAO Livehouse / 合肥少荃体育馆" class="flex-1 px-3 py-2 rounded-lg border border-slate-300 bg-white" />
+                  <button type="button" onclick="autoFillVenueTransport()" class="px-2.5 py-1.5 rounded-lg silver-btn text-blue-700 shrink-0 font-medium">
                     🚇 匹配路线
                   </button>
                 </div>
               </div>
               <div>
-                <label class="text-slate-400 block mb-1">演出日期（支持连演两天，如 2026-12-26 ~ 12-27）</label>
-                <input id="cp-tour-showdate" type="text" placeholder="如：2026-12-26 ~ 12-27 (连演2天)" class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
+                <label class="text-slate-500 block mb-1">演出日期（支持连演两天，如 2026-12-26 ~ 12-27）</label>
+                <input id="cp-tour-showdate" type="text" placeholder="如：2026-12-26 ~ 12-27 (连演2天)" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" />
               </div>
               <div>
-                <label class="text-purple-300 font-medium block mb-1">⏰ 开场时间（如 19:30 开场）</label>
-                <input id="cp-tour-starttime" type="text" placeholder="如：19:30 开场（提前60分钟检票）" class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
+                <label class="text-purple-700 font-medium block mb-1">⏰ 开场时间（如 19:30 开场）</label>
+                <input id="cp-tour-starttime" type="text" placeholder="如：19:30 开场（提前60分钟检票）" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" />
               </div>
               <div>
-                <label class="text-pink-300 font-medium block mb-1">💰 巡演票价档位</label>
-                <input id="cp-tour-prices" type="text" placeholder="如：380 / 580 / 780 / 1080" class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
+                <label class="text-pink-700 font-medium block mb-1">💰 巡演票价档位</label>
+                <input id="cp-tour-prices" type="text" placeholder="如：380 / 580 / 780 / 1080" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" />
               </div>
               <div class="sm:col-span-2">
-                <label class="text-purple-300 font-medium block mb-1">🎤 预计演出时段备注（音乐节适用，鼠标悬停卡片该标签可看时间表多图）</label>
-                <input id="cp-tour-slot" type="text" placeholder="如：16:20-17:00 预计登台" class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
+                <label class="text-purple-700 font-medium block mb-1">🎤 预计演出时段备注（音乐节适用，鼠标悬停卡片该标签可看时间表多图）</label>
+                <input id="cp-tour-slot" type="text" placeholder="如：16:20-17:00 预计登台" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" />
               </div>
 
-              <div class="sm:col-span-2 p-3 rounded-lg bg-slate-950/70 border border-purple-400/25 space-y-2">
+              <div class="sm:col-span-2 p-3 rounded-lg bg-slate-50 border border-purple-200 space-y-2">
                 <div class="flex items-center justify-between flex-wrap gap-2">
-                  <label class="text-purple-300 font-medium">🗓️ 音乐节时间表多图（支持一次多选上传多张图片，悬停演出时段时弹出预览）</label>
-                  <label class="cursor-pointer px-2.5 py-1 rounded-lg silver-btn text-purple-200 font-medium transition">
+                  <label class="text-purple-700 font-medium">🗓️ 音乐节时间表多图（支持多选上传多张，悬停演出时段时弹出预览）</label>
+                  <label class="cursor-pointer px-2.5 py-1 rounded-lg silver-btn text-purple-700 font-medium transition">
                     + 多选上传时间表图片
                     <input type="file" id="cp-schedule-files" accept="image/*" multiple class="hidden" onchange="handleMultiScheduleUpload(event, 'cp')" />
                   </label>
                 </div>
                 <div class="flex gap-1.5">
-                  <input id="cp-schedule-url-input" type="text" placeholder="输入单张时间表图片网址 https://... 后点添加" class="flex-1 px-2.5 py-1.5 rounded border border-slate-400/25 bg-transparent text-xs" />
-                  <button type="button" onclick="addScheduleImageByUrl('cp')" class="px-2.5 py-1.5 rounded-lg silver-btn text-sky-200 font-medium">添加链接图</button>
+                  <input id="cp-schedule-url-input" type="text" placeholder="输入单张时间表图片网址 https://... 后点添加" class="flex-1 px-2.5 py-1.5 rounded border border-slate-300 bg-white text-xs" />
+                  <button type="button" onclick="addScheduleImageByUrl('cp')" class="px-2.5 py-1.5 rounded-lg silver-btn text-blue-700 font-medium">添加链接图</button>
                 </div>
                 <div id="cp-schedule-thumbs" class="flex gap-2 flex-wrap pt-1"></div>
               </div>
 
               <div>
-                <label class="text-purple-300 font-medium block mb-1">🖼️ 演出海报（链接或上传本地图）</label>
+                <label class="text-purple-700 font-medium block mb-1">🖼️ 演出海报（链接或上传本地图）</label>
                 <div class="flex gap-1.5">
-                  <input id="cp-tour-poster" type="text" placeholder="https://... 或点右侧上传" class="flex-1 px-2.5 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
-                  <label class="cursor-pointer px-2.5 py-2 rounded-lg silver-btn text-purple-200 shrink-0 font-medium">
+                  <input id="cp-tour-poster" type="text" placeholder="https://... 或点右侧上传" class="flex-1 px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
+                  <label class="cursor-pointer px-2.5 py-2 rounded-lg silver-btn text-purple-700 shrink-0 font-medium">
                     上传图
                     <input type="file" accept="image/*" class="hidden" onchange="handleUpcomingPosterUpload(event)" />
                   </label>
                 </div>
               </div>
               <div>
-                <label class="text-sky-300 font-medium block mb-1">💺 场馆座位图（链接或上传本地图）</label>
+                <label class="text-blue-700 font-medium block mb-1">💺 场馆座位图（链接或上传本地图）</label>
                 <div class="flex gap-1.5">
-                  <input id="cp-tour-seat" type="text" placeholder="https://... 或点右侧上传" class="flex-1 px-2.5 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
-                  <label class="cursor-pointer px-2.5 py-2 rounded-lg silver-btn text-sky-200 shrink-0 font-medium">
+                  <input id="cp-tour-seat" type="text" placeholder="https://... 或点右侧上传" class="flex-1 px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
+                  <label class="cursor-pointer px-2.5 py-2 rounded-lg silver-btn text-blue-700 shrink-0 font-medium">
                     上传图
                     <input type="file" accept="image/*" class="hidden" onchange="handleUpcomingSeatUpload(event)" />
                   </label>
@@ -353,76 +360,78 @@
               </div>
             </div>
 
-            <div class="pt-2 border-t border-slate-400/15 space-y-2">
+            <div class="pt-2 border-t border-slate-200 space-y-2">
               <div class="flex items-center justify-between flex-wrap gap-2">
-                <span class="text-sky-300 font-semibold">🎫 开票轮次设置（支持优先购、预售、正式开票；已结束可留空）</span>
-                <button type="button" onclick="addTicketRoundRow('预售', '', '大麦')" class="px-2.5 py-1 rounded-lg silver-btn text-sky-200 font-medium transition">
+                <span class="text-blue-700 font-semibold">🎫 开票轮次设置（支持优先购、预售、正式开票；已结束可留空）</span>
+                <button type="button" onclick="addTicketRoundRow('预售', '', '大麦')" class="px-2.5 py-1 rounded-lg silver-btn text-blue-700 font-medium transition">
                   + 添加一轮开票
                 </button>
               </div>
               <div id="ticket-rounds-container" class="space-y-2"></div>
             </div>
 
-            <div class="pt-2 border-t border-slate-400/15 space-y-1.5">
+            <div class="pt-2 border-t border-slate-200 space-y-1.5">
               <div class="flex items-center justify-between">
-                <label class="text-sky-300 font-semibold">🚇 交通枢纽到场馆具体时间与路线</label>
+                <label class="text-blue-700 font-semibold">🚇 交通枢纽到场馆具体时间与路线</label>
                 <span class="text-[11px] text-slate-400">可自由修改</span>
               </div>
               <textarea id="cp-tour-transport" rows="3" placeholder="系统将自动匹配常用场馆与Livehouse路线，也可手动补充..."
-                class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80 leading-relaxed"></textarea>
+                class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white leading-relaxed"></textarea>
             </div>
           </div>
 
           <div id="cp-feed-fields" class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div class="sm:col-span-2">
-              <label class="text-slate-400 block mb-1">完整博文正文（支持多行）</label>
-              <textarea id="cp-content" rows="4" class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80 leading-relaxed"></textarea>
+              <label class="text-slate-500 block mb-1">完整博文正文（支持多行）</label>
+              <textarea id="cp-content" rows="4" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white leading-relaxed"></textarea>
             </div>
             <div>
-              <label class="text-sky-300 font-semibold block mb-1">原帖实际发布时间（可修改）</label>
-              <input id="cp-time" type="datetime-local" class="w-full px-3 py-1.5 rounded-lg border border-slate-400/25 bg-slate-950/80" />
+              <label class="text-blue-700 font-semibold block mb-1">原帖实际发布时间（可修改）</label>
+              <input id="cp-time" type="datetime-local" class="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white" />
             </div>
             <div>
-              <label class="text-slate-400 block mb-1">直达原帖链接</label>
-              <input id="cp-url" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
+              <label class="text-slate-500 block mb-1">直达原帖链接</label>
+              <input id="cp-url" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" />
             </div>
             <div class="sm:col-span-2">
-              <label class="text-slate-400 block mb-1">配图链接（可留空或手动粘贴图片网址）</label>
-              <input id="cp-img" type="text" placeholder="https://..." class="w-full px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-950/80" />
+              <label class="text-slate-500 block mb-1">配图链接（可留空或手动粘贴图片网址）</label>
+              <input id="cp-img" type="text" placeholder="https://..." class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" />
             </div>
           </div>
         </div>
 
-        <button id="cp-submit-btn" onclick="submitCloudEntry()" class="px-4 py-2 rounded-lg pearl-gradient hover:opacity-90 text-white text-xs font-semibold transition shadow-sm">
+        <button id="cp-submit-btn" onclick="submitCloudEntry()" class="px-4 py-2 rounded-lg pearl-gradient hover:opacity-90 text-white text-xs font-semibold transition shadow-xs">
           ☁️ 确认发布并同步至所有设备
         </button>
       </div>
     </section>
 
+    <!-- ================= 板块一：近期演出 ================= -->
     <section>
       <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h2 class="text-base font-bold flex items-center gap-2">
-          <span class="text-slate-100">🎫 近期演出（正在开票 & 待开演场次）</span>
-          <span class="text-[11px] font-normal px-2.5 py-0.5 rounded-full bg-slate-800/80 text-slate-300 border border-slate-400/25">支持在线编辑 · 结束后可一键归档</span>
+          <span class="text-slate-900">🎫 近期演出（正在开票 & 待开演场次）</span>
+          <span class="text-[11px] font-normal px-2.5 py-0.5 rounded-full bg-white text-slate-600 border border-slate-300">支持在线编辑 · 结束后可一键归档</span>
         </h2>
         <div id="tour-themes-bar" class="flex items-center gap-1.5 flex-wrap"></div>
       </div>
       <div id="tour-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
     </section>
 
+    <!-- ================= 板块二：往日演出回顾档案（竖行列表 + 单站精选折叠） ================= -->
     <section class="space-y-4">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 class="text-base font-bold flex items-center gap-2">
-          <span class="text-slate-100">🏛️ 往日演出回顾档案</span>
-          <span class="text-[11px] font-normal px-2.5 py-0.5 rounded-full bg-purple-500/15 text-purple-200 border border-purple-400/25">主页精选 1 站 · 其余折叠横滑</span>
+          <span class="text-slate-900">🏛️ 往日演出回顾档案</span>
+          <span class="text-[11px] font-normal px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">主页展示最新 1 站 · 其余竖行折叠</span>
         </h2>
         <div class="flex items-center gap-2 flex-wrap">
-          <div class="flex items-center gap-1 bg-slate-900/80 p-1 rounded-lg border border-slate-400/20 text-xs">
+          <div class="flex items-center gap-1 bg-white/90 p-1 rounded-lg border border-slate-300 text-xs">
             <button onclick="setArchiveTypeFilter('ALL')" id="arc-filter-ALL" class="px-2.5 py-1 rounded-md pearl-gradient text-white font-medium transition">全部</button>
-            <button onclick="setArchiveTypeFilter('tour')" id="arc-filter-tour" class="px-2.5 py-1 rounded-md text-slate-300 hover:bg-slate-800 transition">🏟️ 巡演/Livehouse</button>
-            <button onclick="setArchiveTypeFilter('festival')" id="arc-filter-festival" class="px-2.5 py-1 rounded-md text-slate-300 hover:bg-slate-800 transition">🎪 音乐节</button>
+            <button onclick="setArchiveTypeFilter('tour')" id="arc-filter-tour" class="px-2.5 py-1 rounded-md text-slate-600 hover:bg-slate-100 transition">🏟️ 巡演/Livehouse</button>
+            <button onclick="setArchiveTypeFilter('festival')" id="arc-filter-festival" class="px-2.5 py-1 rounded-md text-slate-600 hover:bg-slate-100 transition">🎪 音乐节</button>
           </div>
-          <select id="archive-year-filter" onchange="renderArchiveTimeline()" class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-400/25 bg-slate-900/80 text-slate-200">
+          <select id="archive-year-filter" onchange="renderArchiveTimeline()" class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700">
             <option value="ALL">全部年份</option>
           </select>
         </div>
@@ -431,37 +440,39 @@
       <div id="archive-timeline-list" class="space-y-3"></div>
     </section>
 
+    <!-- ================= 板块三：置顶最新动态（冷白银珠光） ================= -->
     <section id="latest-spotlight" class="hidden">
-      <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-pink-400/10 via-sky-400/10 to-purple-400/10 border border-slate-300/25 shadow-[0_0_24px_rgba(192,132,252,0.12)] backdrop-blur-md">
+      <div class="p-4 sm:p-5 rounded-2xl pearl-soft border border-slate-300 shadow-xs backdrop-blur-md">
         <div class="flex items-center justify-between gap-2 mb-2">
-          <div class="flex items-center gap-2 text-xs font-semibold text-slate-200">
+          <div class="flex items-center gap-2 text-xs font-semibold text-slate-700">
             <span class="px-2 py-0.5 rounded pearl-gradient text-white">最新更新</span>
-            <span id="spotlight-artist" class="font-bold text-white"></span>
+            <span id="spotlight-artist" class="font-bold text-slate-900"></span>
             <span class="text-slate-400">·</span>
-            <span id="spotlight-platform" class="text-sky-300"></span>
+            <span id="spotlight-platform" class="text-blue-700"></span>
             <span class="text-slate-400">·</span>
-            <span id="spotlight-time" class="text-slate-400"></span>
+            <span id="spotlight-time" class="text-slate-500"></span>
           </div>
-          <a id="spotlight-link" href="#" target="_blank" class="text-xs font-medium text-purple-300 hover:text-pink-300 hover:underline">
+          <a id="spotlight-link" href="#" target="_blank" class="text-xs font-medium text-purple-700 hover:text-pink-600 hover:underline">
             直达原帖 ↗
           </a>
         </div>
-        <p id="spotlight-text" class="text-sm sm:text-base font-medium leading-relaxed text-slate-100 line-clamp-1-clean"></p>
+        <p id="spotlight-text" class="text-sm sm:text-base font-medium leading-relaxed text-slate-800 line-clamp-1-clean"></p>
       </div>
     </section>
 
+    <!-- ================= 板块四：平台/日期范围筛选 + 全局社交媒体时间线 ================= -->
     <section class="space-y-4">
-      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 glass-card p-3.5 rounded-xl">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 frost-card p-3.5 rounded-xl">
         <div id="platform-tabs" class="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 no-scrollbar"></div>
         <div class="flex items-center gap-2 flex-wrap">
           <div class="flex items-center gap-1 text-xs">
-            <span class="text-slate-400">日期范围：</span>
-            <input type="date" id="date-start-filter" onchange="renderTimeline()" class="px-2 py-1 rounded-lg border border-slate-400/25 bg-slate-950/60 text-slate-200" />
+            <span class="text-slate-500">日期范围：</span>
+            <input type="date" id="date-start-filter" onchange="renderTimeline()" class="px-2 py-1 rounded-lg border border-slate-300 bg-white text-slate-700" />
             <span class="text-slate-400">至</span>
-            <input type="date" id="date-end-filter" onchange="renderTimeline()" class="px-2 py-1 rounded-lg border border-slate-400/25 bg-slate-950/60 text-slate-200" />
-            <button onclick="clearDate()" class="px-2 py-1 text-slate-400 hover:text-white">重置</button>
+            <input type="date" id="date-end-filter" onchange="renderTimeline()" class="px-2 py-1 rounded-lg border border-slate-300 bg-white text-slate-700" />
+            <button onclick="clearDate()" class="px-2 py-1 text-slate-500 hover:text-slate-900">重置</button>
           </div>
-          <input type="text" id="keyword-filter" oninput="renderTimeline()" placeholder="搜索动态..." class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-400/25 bg-slate-950/60 text-slate-200 w-32 sm:w-36" />
+          <input type="text" id="keyword-filter" oninput="renderTimeline()" placeholder="搜索动态..." class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 w-32 sm:w-36" />
         </div>
       </div>
 
@@ -470,49 +481,52 @@
 
   </main>
 
-  <div id="theme-detail-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5">
-    <div class="glass-card-silver rounded-2xl max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden">
-      <div class="p-4 sm:p-5 border-b border-slate-300/15 flex items-center justify-between gap-4 bg-gradient-to-r from-pink-400/10 via-sky-400/10 to-purple-400/10">
+  <!-- ================= 同主题巡演一页式网格专题 Modal（含各站海报展示） ================= -->
+  <div id="theme-detail-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
+    <div class="frost-card-silver rounded-2xl max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden bg-white">
+      <div class="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between gap-4 pearl-soft">
         <div class="flex items-center gap-4 min-w-0">
-          <img id="theme-modal-poster" src="" onclick="openLightbox(this.src, document.getElementById('theme-modal-title').textContent)" class="hidden w-14 h-20 object-cover rounded-lg border border-slate-300/30 cursor-zoom-in shrink-0" />
+          <img id="theme-modal-poster" src="" onclick="openLightbox(this.src, document.getElementById('theme-modal-title').textContent)" class="hidden w-14 h-20 object-cover rounded-lg border border-slate-300 cursor-zoom-in shrink-0 shadow-xs" />
           <div class="min-w-0">
-            <span class="text-[11px] px-2.5 py-0.5 rounded-full pearl-gradient text-white font-semibold">🎪 巡演主题横版巡礼</span>
-            <h3 id="theme-modal-title" class="font-bold text-lg sm:text-xl mt-1 text-white truncate"></h3>
-            <p id="theme-modal-subtitle" class="text-xs text-slate-300 mt-0.5"></p>
+            <span class="text-[11px] px-2.5 py-0.5 rounded-full pearl-gradient text-white font-semibold">🎪 巡演主题全站巡礼</span>
+            <h3 id="theme-modal-title" class="font-bold text-lg sm:text-xl mt-1 text-slate-900 truncate"></h3>
+            <p id="theme-modal-subtitle" class="text-xs text-slate-600 mt-0.5"></p>
           </div>
         </div>
-        <button onclick="document.getElementById('theme-detail-modal').classList.add('hidden')" class="w-8 h-8 rounded-full silver-btn flex items-center justify-center text-slate-200 shrink-0">✕</button>
+        <button onclick="document.getElementById('theme-detail-modal').classList.add('hidden')" class="w-8 h-8 rounded-full silver-btn flex items-center justify-center text-slate-700 shrink-0">✕</button>
       </div>
-      <div id="theme-modal-body" class="p-4 sm:p-6 overflow-y-auto no-scrollbar flex-1"></div>
+      <div id="theme-modal-body" class="p-4 sm:p-6 overflow-y-auto no-scrollbar flex-1 bg-slate-50/70"></div>
     </div>
   </div>
 
-  <div id="image-lightbox" onclick="this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-black/85 backdrop-blur-md flex items-center justify-center p-4 cursor-zoom-out">
+  <!-- ================= 图片灯箱大图预览弹窗 ================= -->
+  <div id="image-lightbox" onclick="this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 cursor-zoom-out">
     <div class="max-w-3xl max-h-[90vh] flex flex-col items-center gap-2" onclick="event.stopPropagation()">
-      <img id="lightbox-img" src="" class="max-h-[82vh] max-w-full rounded-xl shadow-2xl object-contain bg-slate-900 border border-slate-300/20" />
-      <div class="flex items-center gap-4 text-xs text-slate-200">
+      <img id="lightbox-img" src="" class="max-h-[82vh] max-w-full rounded-xl shadow-2xl object-contain bg-white border border-slate-200" />
+      <div class="flex items-center gap-4 text-xs text-white">
         <span id="lightbox-caption"></span>
-        <button onclick="document.getElementById('image-lightbox').classList.add('hidden')" class="px-3 py-1 rounded silver-btn text-white">关闭预览</button>
+        <button onclick="document.getElementById('image-lightbox').classList.add('hidden')" class="px-3 py-1 rounded bg-white/20 hover:bg-white/30 text-white">关闭预览</button>
       </div>
     </div>
   </div>
 
-  <div id="manage-modal" class="fixed inset-0 z-50 hidden bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="glass-card-silver rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col">
-      <div class="p-4 border-b border-slate-300/15 flex items-center justify-between">
-        <h3 class="font-bold text-base text-white">管理关注的艺人 & 订阅源</h3>
-        <button onclick="closeManageModal()" class="text-slate-400 hover:text-white text-lg">✕</button>
+  <!-- ================= 弹窗：管理/添加艺人及账号 ================= -->
+  <div id="manage-modal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="frost-card-silver rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col bg-white">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between">
+        <h3 class="font-bold text-base text-slate-900">管理关注的艺人 & 订阅源</h3>
+        <button onclick="closeManageModal()" class="text-slate-400 hover:text-slate-800 text-lg">✕</button>
       </div>
 
       <div class="p-4 overflow-y-auto space-y-5 flex-1 no-scrollbar">
-        <div class="p-3.5 rounded-xl bg-slate-950/60 space-y-3 border border-slate-400/20">
+        <div class="p-3.5 rounded-xl bg-slate-50 space-y-3 border border-slate-200">
           <p class="text-xs font-bold pearl-text">+ 添加艺人或新平台账号</p>
           <div class="grid grid-cols-2 gap-2">
-            <input id="input-artist-name" type="text" placeholder="艺人名称 (如: 木子洋)" class="text-xs px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-900" />
-            <input id="input-platform-name" type="text" placeholder="账号标签 (如: 抖音直播)" class="text-xs px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-900" />
+            <input id="input-artist-name" type="text" placeholder="艺人名称 (如: 木子洋)" class="text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white" />
+            <input id="input-platform-name" type="text" placeholder="账号标签 (如: 抖音直播)" class="text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white" />
           </div>
           <div class="flex gap-2">
-            <input id="input-rss-url" type="url" placeholder="粘贴 RSS 链接 (https://rsshub.app/...)" class="flex-1 text-xs px-3 py-2 rounded-lg border border-slate-400/25 bg-slate-900" />
+            <input id="input-rss-url" type="url" placeholder="粘贴 RSS 链接 (https://rsshub.app/...)" class="flex-1 text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white" />
             <input id="input-color" type="color" value="#DD0514" title="选择标签颜色" class="w-9 h-8 rounded cursor-pointer border-0 bg-transparent" />
           </div>
           <button onclick="addArtistAccount()" class="w-full py-2 rounded-lg pearl-gradient text-white text-xs font-semibold transition">
@@ -522,8 +536,8 @@
 
         <div class="space-y-3">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-slate-400">当前已配置列表（保存在本机浏览器）</span>
-            <button onclick="resetToDefaultArtists()" class="text-xs text-rose-400 hover:underline">恢复默认配置</button>
+            <span class="text-xs font-bold text-slate-500">当前已配置列表（保存在本机浏览器）</span>
+            <button onclick="resetToDefaultArtists()" class="text-xs text-rose-600 hover:underline">恢复默认配置</button>
           </div>
           <div id="manage-artist-list" class="space-y-2.5"></div>
         </div>
@@ -560,13 +574,13 @@
       const box = document.getElementById(target === 'cp' ? 'cp-schedule-thumbs' : 'arc-schedule-thumbs');
       if (!box) return;
       if (!imgs.length) {
-        box.innerHTML = `<span class="text-[11px] text-slate-500">暂未添加时间表图片</span>`;
+        box.innerHTML = `<span class="text-[11px] text-slate-400">暂未添加时间表图片</span>`;
         return;
       }
       box.innerHTML = imgs.map((src, idx) => `
-        <div class="relative w-16 h-20 rounded-lg overflow-hidden border border-purple-400/30 bg-slate-900">
+        <div class="relative w-16 h-20 rounded-lg overflow-hidden border border-purple-300 bg-white shadow-xs">
           <img src="${src}" data-caption="时间表图片 #${idx + 1}" onclick="openLightbox(this.src, this.dataset.caption)" class="w-full h-full object-cover cursor-zoom-in" />
-          <button type="button" onclick="removeScheduleImg('${target}', ${idx})" class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/75 text-white text-[10px] leading-none flex items-center justify-center hover:bg-rose-500">✕</button>
+          <button type="button" onclick="removeScheduleImg('${target}', ${idx})" class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-slate-900/75 text-white text-[10px] leading-none flex items-center justify-center hover:bg-rose-500">✕</button>
         </div>
       `).join('');
     }
@@ -582,7 +596,8 @@
       if (!files.length) return;
       for (const file of files) {
         try {
-          const dataUrl = await compressImageToDataURL(file, 840, 0.74);
+          // 适度压缩单图体积，避免多张图片拼接后超出数据库单字段承载阈值
+          const dataUrl = await compressImageToDataURL(file, 720, 0.68);
           if (target === 'cp') cpScheduleImgs.push(dataUrl);
           else arcScheduleImgs.push(dataUrl);
         } catch (e) {}
@@ -621,7 +636,7 @@
       const el = document.getElementById('ai-key-status');
       if (el) {
         el.textContent = hasKey ? '已启用 AI 多模态识图' : '未配置(点此配置)';
-        el.className = hasKey ? 'text-emerald-400 font-bold' : '';
+        el.className = hasKey ? 'text-emerald-600 font-bold' : '';
       }
     }
 
@@ -784,10 +799,10 @@
 
     const COLOR_ONER = 'linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)';
     const COLOR_QINS = '#1E293B';
-    const COLOR_YY   = '#9C73EF';
-    const COLOR_MZY  = '#F90092';
-    const COLOR_LC   = '#32B5E1';
-    const COLOR_PEARL = 'linear-gradient(135deg, #F472B6 0%, #60A5FA 50%, #A855F7 100%)';
+    const COLOR_YY   = '#8B5CF6';
+    const COLOR_MZY  = '#EC4899';
+    const COLOR_LC   = '#0EA5E9';
+    const COLOR_PEARL = 'linear-gradient(135deg, #EC4899 0%, #3B82F6 52%, #8B5CF6 100%)';
 
     const ARTIST_META_MAP = {
       'ONER':     { artistId: 'oner',    color: COLOR_ONER },
@@ -963,7 +978,7 @@
       return '';
     }
 
-    function compressImageToDataURL(file, maxWidth = 960, quality = 0.78) {
+    function compressImageToDataURL(file, maxWidth = 760, quality = 0.72) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = e => {
@@ -1016,7 +1031,7 @@
       statusEl.classList.remove('hidden');
       statusEl.textContent = '⏳ 正在加载高清海报图...';
       try {
-        const dataUrl = await compressImageToDataURL(file, 960, 0.78);
+        const dataUrl = await compressImageToDataURL(file, 760, 0.72);
         document.getElementById('arc-poster-url').value = dataUrl;
         const preview = document.getElementById('arc-poster-preview');
         preview.src = dataUrl;
@@ -1031,7 +1046,7 @@
       const file = event.target.files?.[0];
       if (!file) return;
       try {
-        const dataUrl = await compressImageToDataURL(file, 840, 0.76);
+        const dataUrl = await compressImageToDataURL(file, 760, 0.72);
         document.getElementById('arc-seat-url').value = dataUrl;
         alert('座位图已上传成功！');
       } catch (e) {
@@ -1043,7 +1058,7 @@
       const file = event.target.files?.[0];
       if (!file) return;
       try {
-        const dataUrl = await compressImageToDataURL(file, 900, 0.76);
+        const dataUrl = await compressImageToDataURL(file, 760, 0.72);
         document.getElementById('cp-tour-poster').value = dataUrl;
         alert('近期演出海报已上传成功！');
       } catch (e) {
@@ -1055,7 +1070,7 @@
       const file = event.target.files?.[0];
       if (!file) return;
       try {
-        const dataUrl = await compressImageToDataURL(file, 840, 0.76);
+        const dataUrl = await compressImageToDataURL(file, 760, 0.72);
         document.getElementById('cp-tour-seat').value = dataUrl;
         alert('座位图已上传成功！');
       } catch (e) {
@@ -1101,22 +1116,22 @@
         }));
 
         listEl.innerHTML = batchParsedItems.map((item, idx) => `
-          <div class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 items-center p-2 rounded-lg bg-slate-900/90 border border-slate-400/20 text-[11px]">
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-1.5 items-center p-2 rounded-lg bg-white border border-slate-200 text-[11px]">
             <div class="sm:col-span-1 flex items-center gap-1">
               <input type="checkbox" checked onchange="batchParsedItems[${idx}].checked = this.checked" />
               <span class="text-slate-400">#${idx + 1}</span>
             </div>
             <div class="sm:col-span-2">
-              <input type="text" value="${item.title}" onchange="batchParsedItems[${idx}].title = this.value" placeholder="站次" class="w-full px-1.5 py-1 rounded border border-slate-400/25 bg-transparent font-semibold" />
+              <input type="text" value="${item.title}" onchange="batchParsedItems[${idx}].title = this.value" placeholder="站次" class="w-full px-1.5 py-1 rounded border border-slate-300 bg-transparent font-semibold" />
             </div>
             <div class="sm:col-span-2">
-              <input type="date" value="${item.date}" onchange="batchParsedItems[${idx}].date = this.value" class="w-full px-1.5 py-1 rounded border border-slate-400/25 bg-transparent" />
+              <input type="date" value="${item.date}" onchange="batchParsedItems[${idx}].date = this.value" class="w-full px-1.5 py-1 rounded border border-slate-300 bg-transparent" />
             </div>
             <div class="sm:col-span-4">
-              <input type="text" value="${item.venue}" onchange="batchParsedItems[${idx}].venue = this.value" placeholder="场馆/Livehouse" class="w-full px-1.5 py-1 rounded border border-slate-400/25 bg-transparent" />
+              <input type="text" value="${item.venue}" onchange="batchParsedItems[${idx}].venue = this.value" placeholder="场馆/Livehouse" class="w-full px-1.5 py-1 rounded border border-slate-300 bg-transparent" />
             </div>
             <div class="sm:col-span-3">
-              <input type="text" value="${item.prices || item.slot}" onchange="batchParsedItems[${idx}].prices = this.value" placeholder="票价/时段" class="w-full px-1.5 py-1 rounded border border-slate-400/25 bg-transparent" />
+              <input type="text" value="${item.prices || item.slot}" onchange="batchParsedItems[${idx}].prices = this.value" placeholder="票价/时段" class="w-full px-1.5 py-1 rounded border border-slate-300 bg-transparent" />
             </div>
           </div>
         `).join('');
@@ -1461,19 +1476,19 @@
     function addTicketRoundRow(roundName = '正式开票', saleTime = '', platform = '大麦') {
       const container = document.getElementById('ticket-rounds-container');
       const row = document.createElement('div');
-      row.className = 'ticket-round-row grid grid-cols-1 sm:grid-cols-12 gap-2 items-center p-2 rounded-lg bg-slate-950/70 border border-slate-400/20';
+      row.className = 'ticket-round-row grid grid-cols-1 sm:grid-cols-12 gap-2 items-center p-2 rounded-lg bg-slate-50 border border-slate-200';
       row.innerHTML = `
         <div class="sm:col-span-3">
-          <input type="text" value="${roundName}" placeholder="轮次(优先购/预售/正式开票)" class="tr-name w-full px-2.5 py-1.5 rounded border border-slate-400/25 bg-transparent text-xs font-medium" />
+          <input type="text" value="${roundName}" placeholder="轮次(优先购/预售/正式开票)" class="tr-name w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white text-xs font-medium" />
         </div>
         <div class="sm:col-span-4">
-          <input type="datetime-local" value="${saleTime}" class="tr-time w-full px-2.5 py-1.5 rounded border border-slate-400/25 bg-transparent text-xs" />
+          <input type="datetime-local" value="${saleTime}" class="tr-time w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white text-xs" />
         </div>
         <div class="sm:col-span-4">
-          <input type="text" value="${platform}" placeholder="购票平台(如:大麦|猫眼)" class="tr-plat w-full px-2.5 py-1.5 rounded border border-slate-400/25 bg-transparent text-xs" />
+          <input type="text" value="${platform}" placeholder="购票平台(如:大麦|猫眼)" class="tr-plat w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white text-xs" />
         </div>
         <div class="sm:col-span-1 text-right">
-          <button type="button" onclick="removeTicketRoundRow(this)" class="text-xs text-slate-400 hover:text-rose-400 px-1.5 py-1" title="删除此轮">✕</button>
+          <button type="button" onclick="removeTicketRoundRow(this)" class="text-xs text-slate-400 hover:text-rose-600 px-1.5 py-1" title="删除此轮">✕</button>
         </div>
       `;
       container.appendChild(row);
@@ -1893,23 +1908,23 @@
         return;
       }
       box.innerHTML = artistsConfig.map((artist, aIdx) => `
-        <div class="p-3 rounded-xl border border-slate-400/20 bg-slate-950/50 space-y-2">
+        <div class="p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
-              <span class="w-3 h-3 rounded-full border border-white/20" style="background:${artist.badgeStyle || artist.accounts[0]?.color || '#6366f1'}"></span>
-              <span class="font-bold text-sm text-white">${artist.artistName}</span>
+              <span class="w-3 h-3 rounded-full border border-white" style="background:${artist.badgeStyle || artist.accounts[0]?.color || '#6366f1'}"></span>
+              <span class="font-bold text-sm text-slate-800">${artist.artistName}</span>
             </div>
-            <button onclick="removeArtist(${aIdx})" class="text-xs text-rose-400 hover:underline">删除整组</button>
+            <button onclick="removeArtist(${aIdx})" class="text-xs text-rose-600 hover:underline">删除整组</button>
           </div>
           <div class="space-y-1.5">
             ${artist.accounts.map((acc, accIdx) => `
-              <div class="flex items-center justify-between text-xs bg-slate-900/70 px-2.5 py-1.5 rounded-lg">
+              <div class="flex items-center justify-between text-xs bg-white px-2.5 py-1.5 rounded-lg border border-slate-200">
                 <div class="flex items-center gap-2 truncate pr-2">
-                  <span class="w-2.5 h-2.5 rounded-full shrink-0 border border-white/20" style="background:${acc.color}"></span>
-                  <span class="font-medium shrink-0 text-slate-200">${acc.name}</span>
+                  <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${acc.color}"></span>
+                  <span class="font-medium shrink-0 text-slate-700">${acc.name}</span>
                   <span class="text-slate-400 truncate">${acc.url}</span>
                 </div>
-                <button onclick="removeAccount(${aIdx}, ${accIdx})" class="text-slate-400 hover:text-rose-400 shrink-0">移除</button>
+                <button onclick="removeAccount(${aIdx}, ${accIdx})" class="text-slate-400 hover:text-rose-600 shrink-0">移除</button>
               </div>
             `).join('')}
           </div>
@@ -1993,6 +2008,7 @@
       return m ? m[1].trim() : '';
     }
 
+    // 单条容错加载云端演出记录，确保任何单条异常数据都不会影响全部演出展示
     async function loadTourData() {
       cloudTickets = [];
       cloudArchives = [];
@@ -2001,102 +2017,112 @@
         if (sbRes.ok) {
           const rows = await sbRes.json();
           rows.forEach(r => {
-            if (r.title && r.title.startsWith('ARCHIVE|')) {
-              const parts = r.title.split('|');
-              const artist = parts[1] || 'ONER';
-              const showTitle = parts[2] || '演出回顾';
-              const showDate = parts[3] || r.ticket_time.slice(0, 10);
-              let arcData = { subType: 'tour', theme: '', venue: '', posterUrl: '', prices: '', seatUrl: '', slot: '', scheduleImgs: [], setlist: [] };
-              if (r.platform && r.platform.startsWith('ARCHIVE:')) {
+            try {
+              const rawTitle = r.title || '';
+              const rawTime = r.ticket_time || '';
+              const rawPlat = r.platform || '';
+
+              if (rawTitle.startsWith('ARCHIVE|')) {
+                const parts = rawTitle.split('|');
+                const artist = parts[1] || 'ONER';
+                const showTitle = parts[2] || '演出回顾';
+                const showDate = parts[3] || rawTime.slice(0, 10);
+                let arcData = { subType: 'tour', theme: '', venue: '', posterUrl: '', prices: '', seatUrl: '', slot: '', scheduleImgs: [], setlist: [] };
+                if (rawPlat.startsWith('ARCHIVE:')) {
+                  try {
+                    arcData = { ...arcData, ...JSON.parse(rawPlat.slice(8)) };
+                  } catch (e) {}
+                }
+                const resolvedTheme = extractThemeName(showTitle, arcData.theme);
+                cloudArchives.push({
+                  cloudId: r.id,
+                  artist,
+                  title: showTitle,
+                  theme: resolvedTheme,
+                  showDate,
+                  year: showDate.slice(0, 4),
+                  url: r.url || '',
+                  ...arcData
+                });
+                return;
+              }
+
+              const parts = rawTitle.split('|');
+              const artist = parts.length > 1 ? parts[0] : 'ONER';
+              const cityTitle = parts.length > 1 ? parts[1] : rawTitle;
+              const venue = parts.length > 2 ? parts[2] : '场馆待补充';
+              const showDate = parts.length > 3 ? parts[3] : rawTime.replace('T', ' ');
+              let slotNote = parts.length > 4 ? parts[4] : '';
+
+              let parsedRounds = [];
+              let savedTransport = '';
+              let savedTheme = '';
+              let savedPrices = '';
+              let savedStartTime = '';
+              let savedPosterUrl = '';
+              let savedSeatUrl = '';
+              let savedScheduleImgs = [];
+
+              if (rawPlat.startsWith('META:')) {
                 try {
-                  arcData = { ...arcData, ...JSON.parse(r.platform.slice(8)) };
+                  const meta = JSON.parse(rawPlat.slice(5));
+                  if (Array.isArray(meta.rounds)) parsedRounds = meta.rounds;
+                  if (meta.transport) savedTransport = meta.transport;
+                  if (meta.slot) slotNote = meta.slot;
+                  if (meta.theme) savedTheme = meta.theme;
+                  if (meta.prices) savedPrices = meta.prices;
+                  if (meta.startTime) savedStartTime = meta.startTime;
+                  if (meta.posterUrl) savedPosterUrl = meta.posterUrl;
+                  if (meta.seatUrl) savedSeatUrl = meta.seatUrl;
+                  if (Array.isArray(meta.scheduleImgs)) savedScheduleImgs = meta.scheduleImgs;
+                } catch (e) {}
+              } else if (rawPlat.startsWith('ROUNDS:')) {
+                try {
+                  parsedRounds = JSON.parse(rawPlat.slice(7));
                 } catch (e) {}
               }
-              const resolvedTheme = extractThemeName(showTitle, arcData.theme);
-              cloudArchives.push({
+
+              if (!Array.isArray(parsedRounds) || parsedRounds.length === 0) {
+                if (rawPlat && !rawPlat.startsWith('META:')) {
+                  parsedRounds = [{
+                    round_name: '正式开票',
+                    sale_time: rawTime.replace('T', ' '),
+                    platform: rawPlat || '大麦'
+                  }];
+                }
+              }
+
+              if (!savedTransport) {
+                savedTransport = findPresetTransport(`${cityTitle} ${venue}`);
+              }
+
+              const resolvedTheme = extractThemeName(cityTitle, savedTheme);
+
+              cloudTickets.push({
                 cloudId: r.id,
                 artist,
-                title: showTitle,
+                city: cityTitle,
                 theme: resolvedTheme,
-                showDate,
-                year: showDate.slice(0, 4),
-                url: r.url || '',
-                ...arcData
+                venue,
+                show_date: showDate,
+                startTime: savedStartTime,
+                slot: slotNote,
+                prices: savedPrices,
+                posterUrl: savedPosterUrl,
+                seatUrl: savedSeatUrl,
+                scheduleImgs: savedScheduleImgs,
+                source_url: r.url || '#',
+                rounds: parsedRounds,
+                transport: savedTransport
               });
-              return;
+            } catch (rowErr) {
+              console.warn('跳过异常行数据:', r, rowErr);
             }
-
-            const parts = r.title.split('|');
-            const artist = parts.length > 1 ? parts[0] : 'ONER';
-            const cityTitle = parts.length > 1 ? parts[1] : r.title;
-            const venue = parts.length > 2 ? parts[2] : '场馆待补充';
-            const showDate = parts.length > 3 ? parts[3] : r.ticket_time.replace('T', ' ');
-            let slotNote = parts.length > 4 ? parts[4] : '';
-
-            let parsedRounds = [];
-            let savedTransport = '';
-            let savedTheme = '';
-            let savedPrices = '';
-            let savedStartTime = '';
-            let savedPosterUrl = '';
-            let savedSeatUrl = '';
-            let savedScheduleImgs = [];
-
-            if (r.platform && r.platform.startsWith('META:')) {
-              try {
-                const meta = JSON.parse(r.platform.slice(5));
-                if (Array.isArray(meta.rounds)) parsedRounds = meta.rounds;
-                if (meta.transport) savedTransport = meta.transport;
-                if (meta.slot) slotNote = meta.slot;
-                if (meta.theme) savedTheme = meta.theme;
-                if (meta.prices) savedPrices = meta.prices;
-                if (meta.startTime) savedStartTime = meta.startTime;
-                if (meta.posterUrl) savedPosterUrl = meta.posterUrl;
-                if (meta.seatUrl) savedSeatUrl = meta.seatUrl;
-                if (Array.isArray(meta.scheduleImgs)) savedScheduleImgs = meta.scheduleImgs;
-              } catch (e) {}
-            } else if (r.platform && r.platform.startsWith('ROUNDS:')) {
-              try {
-                parsedRounds = JSON.parse(r.platform.slice(7));
-              } catch (e) {}
-            }
-
-            if (!Array.isArray(parsedRounds) || parsedRounds.length === 0) {
-              if (r.platform && !r.platform.startsWith('META:')) {
-                parsedRounds = [{
-                  round_name: '正式开票',
-                  sale_time: r.ticket_time.replace('T', ' '),
-                  platform: r.platform || '大麦'
-                }];
-              }
-            }
-
-            if (!savedTransport) {
-              savedTransport = findPresetTransport(`${cityTitle} ${venue}`);
-            }
-
-            const resolvedTheme = extractThemeName(cityTitle, savedTheme);
-
-            cloudTickets.push({
-              cloudId: r.id,
-              artist,
-              city: cityTitle,
-              theme: resolvedTheme,
-              venue,
-              show_date: showDate,
-              startTime: savedStartTime,
-              slot: slotNote,
-              prices: savedPrices,
-              posterUrl: savedPosterUrl,
-              seatUrl: savedSeatUrl,
-              scheduleImgs: savedScheduleImgs,
-              source_url: r.url || '#',
-              rounds: parsedRounds,
-              transport: savedTransport
-            });
           });
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error('加载演出数据异常:', e);
+      }
 
       cloudArchives.sort((a, b) => new Date(b.showDate) - new Date(a.showDate));
       updateArchiveYearOptions();
@@ -2121,13 +2147,14 @@
         const safeTheme = String(theme).replace(/['"<>]/g, '');
         return `
           <button type="button" data-theme="${safeTheme}" onclick="openThemeDetailModal(this.dataset.theme)"
-            class="text-xs px-2.5 py-1 rounded-full silver-btn text-purple-200 hover:text-white font-medium transition">
-            🎪 ${safeTheme} 横版专题 ↗
+            class="text-xs px-2.5 py-1 rounded-full silver-btn text-purple-700 font-medium transition shadow-2xs">
+            🎪 ${safeTheme} 巡礼专题 ↗
           </button>
         `;
       }).join('');
     }
 
+    // 同主题巡演一页式网格专题 Modal（含各站海报直接展示）
     function openThemeDetailModal(themeName) {
       const upcoming = tourSchedules.filter(t => t.theme === themeName).map(u => ({
         status: (u.rounds || []).some(r => new Date(r.sale_time.replace(/-/g, '/')).getTime() > Date.now()) ? 'selling' : 'upcoming',
@@ -2178,35 +2205,42 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
           ${allStops.map((stop, idx) => {
             const statusPill = stop.status === 'selling'
-              ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-200 border border-pink-400/30 font-semibold">🔥 售票中</span>`
+              ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-pink-50 text-pink-700 border border-pink-200 font-semibold">🔥 售票中</span>`
               : stop.status === 'upcoming'
-                ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-200 border border-sky-400/30 font-semibold">🎫 待开演</span>`
-                : `<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-700/70 text-slate-300 border border-slate-400/25 font-medium">🏛️ 已落幕</span>`;
+                ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold">🎫 待开演</span>`
+                : `<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-300 font-medium">🏛️ 已落幕</span>`;
 
             const shortName = stop.title.replace(themeName, '').replace(/^[·\s]+/, '') || stop.title;
+            const displayPoster = stop.posterUrl || mainPoster;
 
             return `
-              <div class="p-3.5 rounded-xl bg-slate-900/75 border border-slate-300/15 hover:border-purple-400/40 transition flex flex-col justify-between gap-2.5 text-xs">
-                <div class="space-y-1.5">
-                  <div class="flex items-start justify-between gap-2">
-                    <span class="font-bold text-sm text-white leading-snug">${shortName}</span>
-                    ${statusPill}
+              <div class="p-3.5 rounded-xl bg-white border border-slate-200 hover:border-purple-300 shadow-2xs transition flex flex-col justify-between gap-2.5 text-xs">
+                <div class="flex gap-3">
+                  ${displayPoster ? `
+                    <img src="${displayPoster}" data-cap="${shortName} · 演出海报" onclick="openLightbox(this.src, this.dataset.cap)"
+                      class="w-16 h-24 object-cover rounded-lg border border-slate-200 cursor-zoom-in shrink-0 hover:opacity-90 transition" />
+                  ` : ''}
+                  <div class="space-y-1.5 min-w-0 flex-1">
+                    <div class="flex items-start justify-between gap-1.5">
+                      <span class="font-bold text-sm text-slate-900 leading-snug">${shortName}</span>
+                      ${statusPill}
+                    </div>
+                    <div class="text-slate-500 space-y-0.5">
+                      <p>🗓️ ${stop.date} ${stop.startTime ? `· ⏰ ${stop.startTime}` : ''}</p>
+                      <p class="truncate" title="${stop.venue}">📍 ${stop.venue}</p>
+                    </div>
+                    ${stop.prices ? `<div class="text-[11px] text-pink-700 bg-pink-50 border border-pink-200 px-2 py-0.5 rounded inline-block">💰 ${stop.prices}</div>` : ''}
                   </div>
-                  <div class="text-slate-400 space-y-0.5">
-                    <p>🗓️ ${stop.date} ${stop.startTime ? `· ⏰ ${stop.startTime}` : ''}</p>
-                    <p class="truncate" title="${stop.venue}">📍 ${stop.venue}</p>
-                  </div>
-                  ${stop.prices ? `<div class="text-[11px] text-pink-200/90 bg-pink-500/10 border border-pink-400/20 px-2 py-0.5 rounded inline-block">💰 ${stop.prices}</div>` : ''}
                 </div>
 
-                <div class="pt-2 border-t border-slate-400/10 flex items-center justify-between gap-2 flex-wrap">
+                <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
                   <div class="flex items-center gap-1.5">
-                    ${stop.seatUrl ? `<button type="button" data-src="${stop.seatUrl}" data-cap="${shortName} · 座位图" onclick="openLightbox(this.dataset.src, this.dataset.cap)" class="px-2 py-0.5 rounded silver-btn text-sky-200 text-[11px]">💺 座位图</button>` : ''}
-                    ${stop.transport ? `<button type="button" onclick="document.getElementById('theme-tr-${idx}').classList.toggle('hidden')" class="px-2 py-0.5 rounded silver-btn text-purple-200 text-[11px]">🚇 交通</button>` : ''}
+                    ${stop.seatUrl ? `<button type="button" data-src="${stop.seatUrl}" data-cap="${shortName} · 座位图" onclick="openLightbox(this.dataset.src, this.dataset.cap)" class="px-2 py-0.5 rounded silver-btn text-blue-700 text-[11px]">💺 座位图</button>` : ''}
+                    ${stop.transport ? `<button type="button" onclick="document.getElementById('theme-tr-${idx}').classList.toggle('hidden')" class="px-2 py-0.5 rounded silver-btn text-purple-700 text-[11px]">🚇 交通</button>` : ''}
                   </div>
-                  ${stop.url ? `<a href="${stop.url}" target="_blank" class="text-[11px] text-slate-400 hover:text-sky-300">原帖 ↗</a>` : ''}
+                  ${stop.url ? `<a href="${stop.url}" target="_blank" class="text-[11px] text-slate-500 hover:text-blue-600">原帖 ↗</a>` : ''}
                 </div>
-                ${stop.transport ? `<div id="theme-tr-${idx}" class="hidden p-2 rounded bg-slate-950/90 border border-slate-400/20 text-[11px] text-slate-300 whitespace-pre-line leading-relaxed">${stop.transport}</div>` : ''}
+                ${stop.transport ? `<div id="theme-tr-${idx}" class="hidden p-2 rounded bg-slate-50 border border-slate-200 text-[11px] text-slate-600 whitespace-pre-line leading-relaxed">${stop.transport}</div>` : ''}
               </div>
             `;
           }).join('')}
@@ -2232,7 +2266,7 @@
         if (t === type) {
           btn.className = 'px-2.5 py-1 rounded-md pearl-gradient text-white font-medium transition';
         } else {
-          btn.className = 'px-2.5 py-1 rounded-md text-slate-300 hover:bg-slate-800 transition';
+          btn.className = 'px-2.5 py-1 rounded-md text-slate-600 hover:bg-slate-100 transition';
         }
       });
       renderArchiveTimeline();
@@ -2250,15 +2284,15 @@
       const safeTitle = String(titleLabel || '').replace(/['"<>]/g, '');
 
       const popoverHtml = hasImgs ? `
-        <div id="${popoverId}" class="hidden absolute left-0 bottom-full mb-2 z-50 w-72 sm:w-96 p-3 rounded-xl glass-card-silver border border-purple-400/40 shadow-2xl">
-          <div class="flex items-center justify-between text-[11px] text-purple-200 font-semibold mb-2">
+        <div id="${popoverId}" class="hidden absolute left-0 bottom-full mb-2 z-50 w-72 sm:w-96 p-3 rounded-xl bg-white border border-purple-300 shadow-2xl">
+          <div class="flex items-center justify-between text-[11px] text-purple-800 font-semibold mb-2">
             <span>🗓️ ${safeTitle} · 音乐节时间表（共 ${imgs.length} 张，点击放大）</span>
           </div>
           <div class="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto no-scrollbar">
             ${imgs.map((src, i) => `
               <img src="${src}" data-caption="${safeTitle} · 时间表 #${i + 1}"
                 onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.caption)"
-                class="w-full h-28 object-cover rounded-lg border border-slate-300/25 cursor-zoom-in hover:opacity-90 transition bg-slate-900" />
+                class="w-full h-28 object-cover rounded-lg border border-slate-200 cursor-zoom-in hover:opacity-90 transition bg-slate-50" />
             `).join('')}
           </div>
         </div>
@@ -2268,16 +2302,17 @@
         <div class="relative inline-block"
           ${hasImgs ? `onmouseenter="showSlotHoverPopover('${popoverId}')" onmouseleave="hideSlotHoverPopover('${popoverId}')"` : ''}>
           <span ${hasImgs ? `onclick="toggleSlotHoverPopover('${popoverId}')"` : ''}
-            class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-purple-500/15 border border-purple-400/25 text-purple-200 font-medium ${hasImgs ? 'cursor-pointer hover:bg-purple-500/25' : ''}">
+            class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-purple-50 border border-purple-200 text-purple-700 font-medium ${hasImgs ? 'cursor-pointer hover:bg-purple-100' : ''}">
             <span>🎤 ${slotText || '音乐节时间表'}</span>
-            ${hasImgs ? `<span class="text-[10px] px-1 rounded bg-white/10 text-sky-200">时间表×${imgs.length}</span>` : ''}
+            ${hasImgs ? `<span class="text-[10px] px-1 rounded bg-white text-blue-700 border border-purple-200">时间表×${imgs.length}</span>` : ''}
           </span>
           ${popoverHtml}
         </div>
       `;
     }
 
-    function buildArchiveCardHTML(item, isCompact = false) {
+    // 往日演出统一采用清晰直观的竖行卡片样式
+    function buildArchiveVerticalCardHTML(item) {
       const matchedArtist = artistsConfig.find(a => a.artistName.toLowerCase() === (item.artist || '').toLowerCase());
       const artistBadgeBg = matchedArtist?.badgeStyle || COLOR_PEARL;
       const isFest = item.subType === 'festival';
@@ -2285,50 +2320,21 @@
       const safeTitle = String(item.title || '').replace(/['"<>]/g, '');
       const safeTheme = String(item.theme || '').replace(/['"<>]/g, '');
 
-      const setlistHtml = (!isCompact && (item.setlist || []).length > 0)
-        ? `<div class="mt-2.5 p-3 rounded-xl bg-emerald-500/5 border border-emerald-400/20">
-            <div class="text-xs font-bold text-emerald-300 mb-1.5">🎤 现场演唱歌单（共 ${item.setlist.length} 首）：</div>
-            <ol class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-300 list-decimal list-inside">
+      const setlistHtml = (item.setlist || []).length > 0
+        ? `<div class="mt-2.5 p-3 rounded-xl bg-emerald-50/70 border border-emerald-200">
+            <div class="text-xs font-bold text-emerald-800 mb-1.5">🎤 现场演唱歌单（共 ${item.setlist.length} 首）：</div>
+            <ol class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-700 list-decimal list-inside">
               ${item.setlist.map(song => `<li class="truncate">${song}</li>`).join('')}
             </ol>
           </div>`
         : '';
 
-      if (isCompact) {
-        return `
-          <div class="w-72 sm:w-80 shrink-0 snap-start p-4 rounded-2xl glass-card flex flex-col justify-between gap-3">
-            <div class="flex gap-3">
-              ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" data-cap="${safeTitle} · 官宣海报" onclick="openLightbox(this.src, this.dataset.cap)" class="w-16 h-24 object-cover rounded-lg border border-slate-400/25 cursor-zoom-in shrink-0" />` : ''}
-              <div class="min-w-0 flex-1 space-y-1">
-                <div class="flex items-center gap-1.5 flex-wrap">
-                  <span class="text-[10px] px-1.5 py-0.5 rounded text-white font-semibold" style="background:${artistBadgeBg}">${item.artist}</span>
-                  <span class="text-[10px] px-1.5 py-0.5 rounded-full ${isFest ? 'bg-purple-500/20 text-purple-200' : 'bg-sky-500/20 text-sky-200'}">${isFest ? '🎪 音乐节' : '🏟️ 巡演'}</span>
-                </div>
-                <h4 class="font-bold text-sm text-white truncate" title="${safeTitle}">${safeTitle}</h4>
-                <p class="text-[11px] text-slate-400">🗓️ ${item.showDate}</p>
-                <p class="text-[11px] text-slate-400 truncate" title="${item.venue}">📍 ${item.venue}</p>
-              </div>
-            </div>
-            <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-400/15 text-[11px]">
-              <div class="flex items-center gap-1.5 truncate">
-                ${item.prices ? `<span class="text-pink-200 truncate">💰 ${item.prices}</span>` : (item.slot ? `<span class="text-purple-200 truncate">🎤 ${item.slot}</span>` : '')}
-              </div>
-              <div class="flex items-center gap-2 shrink-0">
-                ${item.seatUrl ? `<button type="button" data-src="${item.seatUrl}" data-cap="${safeTitle} · 座位图" onclick="openLightbox(this.dataset.src, this.dataset.cap)" class="text-sky-300 hover:underline">座位图</button>` : ''}
-                ${safeTheme ? `<button type="button" data-theme="${safeTheme}" onclick="openThemeDetailModal(this.dataset.theme)" class="text-purple-300 hover:underline">专题 ↗</button>` : ''}
-                ${isAdmin ? `<button type="button" onclick="deleteCloudRecord('tickets', ${item.cloudId})" class="text-rose-400 hover:underline">删</button>` : ''}
-              </div>
-            </div>
-          </div>
-        `;
-      }
-
       return `
-        <div class="p-4 sm:p-5 rounded-2xl glass-card-silver flex flex-col sm:flex-row gap-4">
+        <div class="p-4 sm:p-5 rounded-2xl frost-card flex flex-col sm:flex-row gap-4">
           ${item.posterUrl ? `
             <div class="sm:w-32 shrink-0">
               <img src="${item.posterUrl}" alt="${safeTitle}" data-cap="${safeTitle} · 官宣海报" onclick="openLightbox(this.src, this.dataset.cap)"
-                class="w-full h-44 object-cover rounded-xl border border-slate-300/25 cursor-zoom-in hover:opacity-90 transition" />
+                class="w-full h-44 object-cover rounded-xl border border-slate-200 cursor-zoom-in hover:opacity-90 transition shadow-2xs" />
             </div>
           ` : ''}
 
@@ -2337,24 +2343,24 @@
               <div class="flex items-start justify-between gap-2">
                 <div class="flex items-center gap-2 flex-wrap">
                   <span class="text-xs px-2 py-0.5 rounded text-white font-semibold" style="background:${artistBadgeBg}">${item.artist}</span>
-                  <span class="text-[11px] px-2 py-0.5 rounded-full font-medium ${isFest ? 'bg-purple-500/20 text-purple-200' : 'bg-sky-500/20 text-sky-200'}">
+                  <span class="text-[11px] px-2 py-0.5 rounded-full font-medium ${isFest ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}">
                     ${isFest ? '🎪 音乐节' : '🏟️ 巡演/Livehouse'}
                   </span>
-                  <h3 class="font-bold text-base text-white">${safeTitle}</h3>
+                  <h3 class="font-bold text-base text-slate-900">${safeTitle}</h3>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                  ${safeTheme ? `<button type="button" data-theme="${safeTheme}" onclick="openThemeDetailModal(this.dataset.theme)" class="text-xs text-purple-300 hover:underline font-medium">横版专题 ↗</button>` : ''}
-                  ${item.url ? `<a href="${item.url}" target="_blank" class="text-xs text-slate-400 hover:text-sky-300">原帖 ↗</a>` : ''}
-                  ${isAdmin ? `<button type="button" onclick="deleteCloudRecord('tickets', ${item.cloudId})" class="text-xs text-rose-400 hover:underline">删除</button>` : ''}
+                  ${safeTheme ? `<button type="button" data-theme="${safeTheme}" onclick="openThemeDetailModal(this.dataset.theme)" class="text-xs text-purple-700 hover:underline font-medium">巡礼专题 ↗</button>` : ''}
+                  ${item.url ? `<a href="${item.url}" target="_blank" class="text-xs text-slate-500 hover:text-blue-600">原帖 ↗</a>` : ''}
+                  ${isAdmin ? `<button type="button" onclick="deleteCloudRecord('tickets', ${item.cloudId})" class="text-xs text-rose-600 hover:underline">删除</button>` : ''}
                 </div>
               </div>
 
-              <p class="text-xs text-slate-400 mt-1.5">🗓️ ${item.showDate} ｜ 📍 ${item.venue}</p>
+              <p class="text-xs text-slate-500 mt-1.5">🗓️ ${item.showDate} ｜ 📍 ${item.venue}</p>
 
               ${!isFest ? `
                 <div class="flex items-center gap-2 flex-wrap mt-2.5">
-                  ${item.prices ? `<span class="text-xs px-2.5 py-1 rounded-lg bg-pink-500/10 border border-pink-400/20 text-pink-200 font-medium">💰 票价：${item.prices}</span>` : ''}
-                  ${item.seatUrl ? `<button type="button" data-src="${item.seatUrl}" data-cap="${safeTitle} · 场馆座位图" onclick="openLightbox(this.dataset.src, this.dataset.cap)" class="text-xs px-2.5 py-1 rounded-lg silver-btn text-sky-200 font-medium transition">💺 查看场馆座位图</button>` : ''}
+                  ${item.prices ? `<span class="text-xs px-2.5 py-1 rounded-lg bg-pink-50 border border-pink-200 text-pink-700 font-medium">💰 票价：${item.prices}</span>` : ''}
+                  ${item.seatUrl ? `<button type="button" data-src="${item.seatUrl}" data-cap="${safeTitle} · 场馆座位图" onclick="openLightbox(this.dataset.src, this.dataset.cap)" class="text-xs px-2.5 py-1 rounded-lg silver-btn text-blue-700 font-medium transition">💺 查看场馆座位图</button>` : ''}
                 </div>
               ` : `
                 <div class="mt-2.5">
@@ -2400,18 +2406,18 @@
       const featured = filtered[0];
       const rest = filtered.slice(1);
 
-      let html = buildArchiveCardHTML(featured, false);
+      let html = buildArchiveVerticalCardHTML(featured);
 
       if (rest.length > 0) {
         html += `
-          <div class="pt-1">
+          <div class="pt-1 space-y-3">
             <button type="button" onclick="toggleArchiveExpand()"
-              class="w-full py-2.5 px-4 rounded-xl silver-btn text-xs font-semibold text-slate-200 hover:text-white flex items-center justify-center gap-2 transition">
-              <span>${isArchiveExpanded ? `🔼 收起其余 ${rest.length} 场往日演出` : `📂 展开其余 ${rest.length} 场往日演出回顾（支持左右滑动查看）▾`}</span>
+              class="w-full py-2.5 px-4 rounded-xl silver-btn text-xs font-semibold text-slate-700 flex items-center justify-center gap-2 transition shadow-2xs">
+              <span>${isArchiveExpanded ? `🔼 收起其余 ${rest.length} 场往日演出` : `📂 展开其余 ${rest.length} 场往日演出回顾（竖行列表展示）▾`}</span>
             </button>
             ${isArchiveExpanded ? `
-              <div class="mt-3 flex gap-3.5 overflow-x-auto pb-3 snap-x no-scrollbar">
-                ${rest.map(item => buildArchiveCardHTML(item, true)).join('')}
+              <div class="space-y-3">
+                ${rest.map(item => buildArchiveVerticalCardHTML(item)).join('')}
               </div>
             ` : ''}
           </div>
@@ -2463,18 +2469,18 @@
 
         const hasActiveSale = activeRounds.length > 0;
         const statusBadgeHtml = hasActiveSale
-          ? `<span class="text-[11px] px-2 py-0.5 rounded-full bg-pink-500/15 text-pink-200 border border-pink-400/25 font-semibold">🔥 售票倒计时中</span>`
-          : `<span class="text-[11px] px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-200 border border-sky-400/25 font-semibold">🎫 开票已结束 · 待开演</span>`;
+          ? `<span class="text-[11px] px-2 py-0.5 rounded-full bg-pink-50 text-pink-700 border border-pink-200 font-semibold">🔥 售票倒计时中</span>`
+          : `<span class="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold">🎫 开票已结束 · 待开演</span>`;
 
         const roundsHtml = hasActiveSale
           ? activeRounds.map(r => {
               const isPrio = /优先|特权|会员/.test(r.round_name);
               const isPresale = /预售/.test(r.round_name);
               const badgeStyleClass = isPrio
-                ? 'bg-purple-500/15 text-purple-200 border border-purple-400/25 font-medium'
+                ? 'bg-purple-50 text-purple-800 border border-purple-200 font-medium'
                 : isPresale
-                  ? 'bg-sky-500/15 text-sky-200 border border-sky-400/25 font-medium'
-                  : 'bg-pink-500/15 text-pink-200 border border-pink-400/25 font-medium';
+                  ? 'bg-sky-50 text-sky-800 border border-sky-200 font-medium'
+                  : 'bg-pink-50 text-pink-800 border border-pink-200 font-medium';
 
               return `
                 <div class="flex items-center justify-between gap-2 text-xs py-1.5 px-2.5 rounded-lg ${badgeStyleClass}">
@@ -2482,8 +2488,8 @@
                     <strong>${r.round_name}</strong>：${r.sale_time} <span class="opacity-85">(${r.platform})</span>
                   </span>
                   <div class="flex items-center gap-2 shrink-0">
-                    <span class="countdown-badge font-mono text-white" data-time="${r.sale_time}"></span>
-                    <button type="button" onclick="downloadICS('${safeCity}-${String(r.round_name || '').replace(/['"<>]/g, '')}', '${r.sale_time}', '${String(r.platform || '').replace(/['"<>]/g, '')}', '${item.source_url || ''}')" class="text-[11px] px-1.5 py-0.5 rounded bg-white/10 text-slate-100 hover:bg-white/20" title="加入手机/电脑日历">📅</button>
+                    <span class="countdown-badge font-mono font-bold text-slate-900" data-time="${r.sale_time}"></span>
+                    <button type="button" onclick="downloadICS('${safeCity}-${String(r.round_name || '').replace(/['"<>]/g, '')}', '${r.sale_time}', '${String(r.platform || '').replace(/['"<>]/g, '')}', '${item.source_url || ''}')" class="text-[11px] px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700 hover:bg-slate-100" title="加入手机/电脑日历">📅</button>
                   </div>
                 </div>
               `;
@@ -2491,51 +2497,51 @@
           : '';
 
         return `
-          <div class="p-4 rounded-xl glass-card flex flex-col justify-between gap-3">
+          <div class="p-4 rounded-xl frost-card flex flex-col justify-between gap-3">
             <div class="flex gap-3.5">
               ${item.posterUrl ? `
                 <img src="${item.posterUrl}" alt="${safeCity}" data-cap="${safeCity} · 演出海报" onclick="openLightbox(this.src, this.dataset.cap)"
-                  class="w-20 h-28 object-cover rounded-lg border border-slate-300/25 cursor-zoom-in shrink-0 hover:opacity-90 transition" />
+                  class="w-20 h-28 object-cover rounded-lg border border-slate-200 cursor-zoom-in shrink-0 hover:opacity-90 transition shadow-2xs" />
               ` : ''}
 
               <div class="flex-1 min-w-0">
                 <div class="flex items-start justify-between gap-2">
                   <div class="flex items-center gap-2 flex-wrap">
-                    ${item.artist ? `<span class="text-xs px-2 py-0.5 rounded text-white font-semibold border border-white/15 shrink-0" style="background:${artistBadgeBg}">${item.artist}</span>` : ''}
-                    <span class="font-bold text-base text-white">${safeCity}</span>
+                    ${item.artist ? `<span class="text-xs px-2 py-0.5 rounded text-white font-semibold shrink-0" style="background:${artistBadgeBg}">${item.artist}</span>` : ''}
+                    <span class="font-bold text-base text-slate-900">${safeCity}</span>
                     ${statusBadgeHtml}
                   </div>
                   <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                    ${safeTheme ? `<button type="button" data-theme="${safeTheme}" onclick="openThemeDetailModal(this.dataset.theme)" class="text-xs text-purple-300 hover:underline font-medium">专题页 ↗</button>` : ''}
-                    ${item.source_url && item.source_url !== '#' ? `<a href="${item.source_url}" target="_blank" class="text-xs text-slate-400 hover:text-sky-300">原帖 ↗</a>` : ''}
-                    ${(isAdmin && item.cloudId) ? `<button type="button" onclick="editExistingTicket(${item.cloudId})" class="text-xs text-sky-300 hover:underline font-medium">✏️ 编辑</button>` : ''}
-                    ${(isAdmin && item.cloudId) ? `<button type="button" onclick="archiveExistingTicket(${item.cloudId})" class="text-xs text-purple-300 hover:underline" title="归档至往日演出">归档</button>` : ''}
-                    ${(isAdmin && item.cloudId) ? `<button type="button" onclick="deleteCloudRecord('tickets', ${item.cloudId})" class="text-xs text-rose-400 hover:underline">删除</button>` : ''}
+                    ${safeTheme ? `<button type="button" data-theme="${safeTheme}" onclick="openThemeDetailModal(this.dataset.theme)" class="text-xs text-purple-700 hover:underline font-medium">专题页 ↗</button>` : ''}
+                    ${item.source_url && item.source_url !== '#' ? `<a href="${item.source_url}" target="_blank" class="text-xs text-slate-500 hover:text-blue-600">原帖 ↗</a>` : ''}
+                    ${(isAdmin && item.cloudId) ? `<button type="button" onclick="editExistingTicket(${item.cloudId})" class="text-xs text-blue-600 hover:underline font-medium">✏️ 编辑</button>` : ''}
+                    ${(isAdmin && item.cloudId) ? `<button type="button" onclick="archiveExistingTicket(${item.cloudId})" class="text-xs text-purple-700 hover:underline" title="归档至往日演出">归档</button>` : ''}
+                    ${(isAdmin && item.cloudId) ? `<button type="button" onclick="deleteCloudRecord('tickets', ${item.cloudId})" class="text-xs text-rose-600 hover:underline">删除</button>` : ''}
                   </div>
                 </div>
 
-                <p class="text-xs text-slate-400 mt-1.5">
+                <p class="text-xs text-slate-500 mt-1.5">
                   📍 ${item.venue} ｜ 🗓️ ${item.show_date} ${item.startTime ? `｜ ⏰ ${item.startTime}` : ''}
                 </p>
 
                 <div class="flex items-center justify-between gap-2 mt-2 flex-wrap">
                   <div class="flex items-center gap-1.5 flex-wrap">
-                    ${item.prices ? `<span class="text-[11px] px-2 py-0.5 rounded-md bg-pink-500/10 border border-pink-400/20 text-pink-200 font-medium">💰 ${item.prices}</span>` : ''}
-                    ${item.seatUrl ? `<button type="button" data-src="${item.seatUrl}" data-cap="${safeCity} · 场馆座位图" onclick="openLightbox(this.dataset.src, this.dataset.cap)" class="text-[11px] px-2 py-0.5 rounded-md silver-btn text-sky-200 font-medium transition">💺 座位图</button>` : ''}
+                    ${item.prices ? `<span class="text-[11px] px-2 py-0.5 rounded-md bg-pink-50 border border-pink-200 text-pink-700 font-medium">💰 ${item.prices}</span>` : ''}
+                    ${item.seatUrl ? `<button type="button" data-src="${item.seatUrl}" data-cap="${safeCity} · 场馆座位图" onclick="openLightbox(this.dataset.src, this.dataset.cap)" class="text-[11px] px-2 py-0.5 rounded-md silver-btn text-blue-700 font-medium transition">💺 座位图</button>` : ''}
                     ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeCity)}
                   </div>
                   <div class="flex items-center gap-2">
-                    <button type="button" onclick="toggleTransportDrawer(${idx})" class="text-[11px] px-2 py-0.5 rounded-md silver-btn text-sky-200 font-medium transition">
+                    <button type="button" onclick="toggleTransportDrawer(${idx})" class="text-[11px] px-2 py-0.5 rounded-md silver-btn text-blue-700 font-medium transition">
                       🚇 交通攻略 ▾
                     </button>
-                    <a href="${amapSearchUrl}" target="_blank" class="text-[11px] px-2 py-0.5 rounded-md bg-slate-800/80 text-slate-300 hover:text-white transition">
+                    <a href="${amapSearchUrl}" target="_blank" class="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 transition">
                       导航 ↗
                     </a>
                   </div>
                 </div>
 
-                <div id="transport-box-${idx}" class="hidden mt-2.5 p-2.5 rounded-lg bg-slate-950/75 border border-slate-400/20 text-xs text-slate-300 space-y-1 leading-relaxed whitespace-pre-line">
-                  <div class="font-semibold text-sky-300 mb-1">🚇 交通枢纽 → ${item.venue}：</div>
+                <div id="transport-box-${idx}" class="hidden mt-2.5 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-1 leading-relaxed whitespace-pre-line">
+                  <div class="font-semibold text-blue-700 mb-1">🚇 交通枢纽 → ${item.venue}：</div>
                   ${item.transport || '该场地暂未录入预设路线，可点击右侧「导航 ↗」一键使用高德地图规划路线。'}
                 </div>
               </div>
@@ -2643,7 +2649,7 @@
         const isActive = activeArtistId === t.id;
         return `
           <button type="button" onclick="selectArtist('${t.id}')"
-            class="w-full px-3.5 py-2 text-left text-xs flex items-center justify-between hover:bg-slate-800/80 transition ${isActive ? 'font-bold text-purple-300' : 'text-slate-300'}">
+            class="w-full px-3.5 py-2 text-left text-xs flex items-center justify-between hover:bg-slate-100 transition ${isActive ? 'font-bold text-purple-700' : 'text-slate-700'}">
             <span class="flex items-center gap-2">
               <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${t.badgeStyle}"></span>
               <span>${t.name}</span>
@@ -2689,7 +2695,7 @@
         return `
           <button type="button" onclick="selectAccount('${t.id}')"
             style="${isActive ? `background:${t.color}` : ''}"
-            class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition border ${isActive ? 'text-white border-white/25 shadow-sm' : 'bg-slate-900/80 text-slate-300 border-slate-400/20 hover:border-slate-300/40'}">
+            class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition border ${isActive ? 'text-white border-transparent shadow-xs' : 'bg-white text-slate-600 border-slate-300 hover:border-slate-400'}">
             ${t.label}
           </button>
         `;
@@ -2748,20 +2754,20 @@
       listEl.innerHTML = filtered.map(p => {
         const dateStr = new Date(p.timestamp).toLocaleString('zh-CN', { hour12: false });
         return `
-          <article class="p-3.5 sm:p-4 rounded-xl glass-card space-y-2">
+          <article class="p-3.5 sm:p-4 rounded-xl frost-card space-y-2">
             <div class="flex items-center justify-between text-xs gap-2">
               <div class="flex items-center gap-2 flex-wrap">
-                <span class="px-2.5 py-0.5 rounded-full text-white font-semibold border border-white/15 shadow-xs" style="background:${p.platformColor}">
+                <span class="px-2.5 py-0.5 rounded-full text-white font-semibold shadow-2xs" style="background:${p.platformColor}">
                   ${p.artistName} · ${p.platformName}
                 </span>
                 <span class="text-slate-400">${formatTimeAgo(p.timestamp)} · ${dateStr}</span>
               </div>
               <div class="flex items-center gap-2.5 shrink-0">
-                ${p.link && p.link !== '#' ? `<a href="${p.link}" target="_blank" class="text-slate-400 hover:text-sky-300">原帖 ↗</a>` : ''}
-                ${(isAdmin && p.cloudId) ? `<button type="button" onclick="deleteCloudRecord('feeds', ${p.cloudId})" class="text-rose-400 hover:underline">删除</button>` : ''}
+                ${p.link && p.link !== '#' ? `<a href="${p.link}" target="_blank" class="text-slate-500 hover:text-blue-600">原帖 ↗</a>` : ''}
+                ${(isAdmin && p.cloudId) ? `<button type="button" onclick="deleteCloudRecord('feeds', ${p.cloudId})" class="text-rose-600 hover:underline">删除</button>` : ''}
               </div>
             </div>
-            <p class="text-sm leading-relaxed text-slate-200 line-clamp-1-clean cursor-pointer" title="点击展开/收起全文" onclick="this.classList.toggle('line-clamp-1-clean')">${p.text}</p>
+            <p class="text-sm leading-relaxed text-slate-700 line-clamp-1-clean cursor-pointer" title="点击展开/收起全文" onclick="this.classList.toggle('line-clamp-1-clean')">${p.text}</p>
           </article>
         `;
       }).join('');
