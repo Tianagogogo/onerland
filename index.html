@@ -20,16 +20,19 @@
   <header class="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-800">
     <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
       <div class="flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span id="sync-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
         <h1 class="font-bold text-base sm:text-lg tracking-tight">ONER & 坤音 动态与巡演中心</h1>
       </div>
       <div class="flex items-center gap-2 text-xs">
         <span id="last-sync" class="text-slate-400 hidden md:inline">准备就绪</span>
-        <button onclick="openManageModal()" class="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium">
-          ⚙️ 管理艺人
+        <button id="admin-unlock-btn" onclick="toggleAdminMode()" class="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium">
+          🔒 发布动态
+        </button>
+        <button onclick="openManageModal()" class="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition font-medium hidden sm:inline-block">
+          ⚙️ 艺人配置
         </button>
         <button onclick="loadAllFeeds(true)" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white dark:bg-indigo-600 hover:opacity-90 transition font-medium">
-          刷新动态
+          刷新同步
         </button>
       </div>
     </div>
@@ -43,12 +46,80 @@
 
   <main class="max-w-5xl mx-auto px-4 py-6 space-y-8">
 
+    <!-- ================= 管理员专属：智能粘贴投喂台（默认隐藏，输入暗码后解锁） ================= -->
+    <section id="admin-publisher-panel" class="hidden p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-indigo-500/40 shadow-lg space-y-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-bold text-indigo-600 dark:text-indigo-400">✨ 管理员云端投喂台（多设备实时同步）</span>
+        </div>
+        <button onclick="lockAdminMode()" class="text-xs text-slate-400 hover:text-rose-500">退出管理模式</button>
+      </div>
+
+      <textarea id="raw-post-input" rows="3" placeholder="直接粘贴微博 / 小红书 / 抖音 / B站分享口令或官宣全文（自动识别艺人、平台、原帖链接及开票时间）..."
+        class="w-full text-xs sm:text-sm p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:border-indigo-500"></textarea>
+
+      <div class="flex items-center gap-2 flex-wrap">
+        <button onclick="smartParsePost()" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition">
+          🪄 智能识别内容
+        </button>
+        <button onclick="document.getElementById('raw-post-input').value=''; document.getElementById('parse-confirm-box').classList.add('hidden');" class="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs">
+          清空
+        </button>
+      </div>
+
+      <!-- 识别后确认/微调表单 -->
+      <div id="parse-confirm-box" class="hidden pt-3 border-t border-dashed border-slate-200 dark:border-slate-800 space-y-3">
+        <div class="flex items-center gap-4 text-xs">
+          <span class="text-slate-400">同步至板块：</span>
+          <label class="flex items-center gap-1 cursor-pointer font-medium">
+            <input type="radio" name="cloudEntryType" value="feed" checked onchange="toggleCloudFields()" /> 📱 全平台动态时间线
+          </label>
+          <label class="flex items-center gap-1 cursor-pointer font-medium text-amber-600 dark:text-amber-400">
+            <input type="radio" name="cloudEntryType" value="ticket" onchange="toggleCloudFields()" /> 🎫 巡演行程与开票倒计时
+          </label>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div>
+            <label class="text-slate-400 block mb-1">关联艺人</label>
+            <select id="cp-artist" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950">
+              <option value="ONER">ONER</option>
+              <option value="坤音娱乐">坤音娱乐</option>
+              <option value="岳岳">岳岳</option>
+              <option value="木子洋">木子洋</option>
+              <option value="灵超">灵超</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-slate-400 block mb-1">来源平台 / 购票渠道</label>
+            <input id="cp-platform" type="text" placeholder="如：微博 / 小红书 / 大麦" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950" />
+          </div>
+          <div class="sm:col-span-2">
+            <label id="cp-content-label" class="text-slate-400 block mb-1">动态正文摘要 / 演出城市与名称</label>
+            <input id="cp-content" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950" />
+          </div>
+          <div id="cp-time-wrap" class="hidden">
+            <label class="text-amber-600 dark:text-amber-400 font-semibold block mb-1">开票准确时间（必填）</label>
+            <input id="cp-time" type="datetime-local" class="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950" />
+          </div>
+          <div id="cp-url-wrap" class="sm:col-span-2">
+            <label class="text-slate-400 block mb-1">直达原帖 / 购票链接</label>
+            <input id="cp-url" type="text" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950" />
+          </div>
+        </div>
+
+        <button id="cp-submit-btn" onclick="submitCloudEntry()" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition">
+          ☁️ 确认发布并同步至所有设备
+        </button>
+      </div>
+    </section>
+
     <!-- ================= 板块一：巡演日程 & 抢票倒计时 ================= -->
     <section>
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-base font-bold flex items-center gap-2">
           <span>🎫 巡演行程与开票倒计时</span>
-          <span class="text-xs font-normal px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">AI 自动追踪</span>
+          <span class="text-xs font-normal px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">多端实时同步</span>
         </h2>
       </div>
       <div id="tour-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
@@ -87,7 +158,7 @@
         </div>
       </div>
 
-      <!-- 节点抓取状态提示条 -->
+      <!-- 状态提示条 -->
       <div id="feed-status-bar" class="hidden text-xs px-3.5 py-2 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20"></div>
 
       <!-- 时间线列表 -->
@@ -134,6 +205,54 @@
   </div>
 
   <script>
+    // ================= 0. Supabase 云端同步与管理员暗码配置 =================
+    // 👇 请替换为你自己的 Supabase Project URL、anon public Key 和管理员暗码 👇
+    const SUPABASE_URL = 'https://xtgkepaqikpzvnmpkoxsa.supabase.co';
+    const SUPABASE_ANON_KEY =sb_publishable_hOjf_o2p6Fxw8vrAEl5vyQ_-SPy_WU5 '你的anon_public_key';
+    const ADMIN_PIN = '1208'; // 输入此密码才显示投喂框与删除按钮
+
+    const SB_HEADERS = {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    };
+
+    let isAdmin = localStorage.getItem('onerland_admin_pin') === ADMIN_PIN;
+    let cloudTickets = [];
+    let cloudFeeds = [];
+
+    function syncAdminUI() {
+      const panel = document.getElementById('admin-publisher-panel');
+      const btn = document.getElementById('admin-unlock-btn');
+      if (isAdmin) {
+        panel.classList.remove('hidden');
+        btn.classList.add('hidden');
+      } else {
+        panel.classList.add('hidden');
+        btn.classList.remove('hidden');
+      }
+      renderTourCards();
+      renderTimeline();
+    }
+
+    function toggleAdminMode() {
+      const pin = prompt('请输入管理员暗码以开启发布与编辑权限：');
+      if (pin === ADMIN_PIN) {
+        isAdmin = true;
+        localStorage.setItem('onerland_admin_pin', ADMIN_PIN);
+        syncAdminUI();
+      } else if (pin !== null) {
+        alert('暗码错误，当前保持访客只读模式。');
+      }
+    }
+
+    function lockAdminMode() {
+      isAdmin = false;
+      localStorage.removeItem('onerland_admin_pin');
+      syncAdminUI();
+    }
+
     // ================= 1. 专属应援色/品牌色定义 =================
     const COLOR_ONER = 'linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)';
     const COLOR_QINS = '#111827';
@@ -141,7 +260,14 @@
     const COLOR_MZY  = '#F90092';
     const COLOR_LC   = '#32B5E1';
 
-    // 备用公共 RSSHub 镜像列表（仅用于弹窗手动新增自定义源时的兜底抓取）
+    const ARTIST_META_MAP = {
+      'ONER':     { artistId: 'oner',    color: COLOR_ONER },
+      '坤音娱乐': { artistId: 'qins',    color: COLOR_QINS },
+      '岳岳':     { artistId: 'pinkray', color: COLOR_YY },
+      '木子洋':   { artistId: 'kwin',    color: COLOR_MZY },
+      '灵超':     { artistId: 'didi',    color: COLOR_LC }
+    };
+
     const RSSHUB_MIRRORS = [
       'https://rsshub.app',
       'https://rsshub.rssforever.com',
@@ -237,7 +363,140 @@
       localStorage.setItem(STORAGE_ARTISTS_KEY, JSON.stringify(artistsConfig));
     }
 
-    // ================= 3. 多镜像节点兜底抓取（用于弹窗自定义新增源） =================
+    // ================= 3. 智能解析粘贴内容并推送至 Supabase =================
+    function smartParsePost() {
+      const text = document.getElementById('raw-post-input').value.trim();
+      if (!text) return alert('请先粘贴分享链接或动态文案！');
+
+      const urlMatch = text.match(/https?:\/\/[^\s\u4e00-\u9fa5]+/);
+      const url = urlMatch ? urlMatch[0] : '';
+
+      let platform = '微博';
+      if (/xhslink\.com|xiaohongshu\.com|小红书/.test(text)) platform = '小红书';
+      else if (/douyin\.com|抖音/.test(text)) platform = '抖音';
+      else if (/b23\.tv|bilibili\.com|B站|哔哩哔哩/.test(text)) platform = 'B站';
+      else if (/youtu\.be|youtube\.com|YouTube/i.test(text)) platform = 'YouTube';
+      else if (/instagram\.com|ins/i.test(text)) platform = 'Instagram';
+      else if (/tiktok\.com|TikTok/i.test(text)) platform = 'TikTok';
+      else if (/大麦/.test(text)) platform = '大麦';
+      else if (/秀动/.test(text)) platform = '秀动';
+
+      let artist = 'ONER';
+      if (text.includes('岳岳') || text.includes('PINKRAY')) artist = '岳岳';
+      else if (text.includes('木子洋') || text.includes('KWIN')) artist = '木子洋';
+      else if (text.includes('灵超') || text.includes('DIDI')) artist = '灵超';
+      else if (text.includes('坤音')) artist = '坤音娱乐';
+
+      let cleanText = text.replace(/https?:\/\/\S+/g, '').replace(/复制打开抖音.*|小红书App.*|长按复制此条消息.*/g, '').trim();
+      if (!cleanText) cleanText = `${artist} 的 ${platform} 最新动态`;
+
+      const isTicket = /开票|预售|抢票|巡演|演唱会|大麦|秀动|售票/.test(text);
+      document.getElementsByName('cloudEntryType').forEach(r => r.checked = (r.value === (isTicket ? 'ticket' : 'feed')));
+
+      const currentYear = new Date().getFullYear();
+      const dateRegex = /(?:(\d{4})[年\.\-\/])?(\d{1,2})[月\.\-\/](\d{1,2})[日号]?\s*(?:周[一二三四五六日天]|星期[一二三四五六日天])?\s*(?:上午|中午|下午|晚上)?\s*(\d{1,2})[:：点时](\d{1,2})?/;
+      const m = text.match(dateRegex);
+      let targetDateStr = '';
+      if (m) {
+        const year = m[1] || currentYear;
+        const month = m[2].padStart(2, '0');
+        const day = m[3].padStart(2, '0');
+        let hour = parseInt(m[4], 10);
+        if ((text.includes('下午') || text.includes('晚上')) && hour < 12) hour += 12;
+        const minute = (m[5] || '00').padStart(2, '0');
+        targetDateStr = `${year}-${month}-${day}T${String(hour).padStart(2, '0')}:${minute}`;
+      }
+
+      document.getElementById('cp-artist').value = artist;
+      document.getElementById('cp-platform').value = platform;
+      document.getElementById('cp-content').value = cleanText.slice(0, 200);
+      document.getElementById('cp-time').value = targetDateStr;
+      document.getElementById('cp-url').value = url;
+
+      toggleCloudFields();
+      document.getElementById('parse-confirm-box').classList.remove('hidden');
+    }
+
+    function toggleCloudFields() {
+      const type = document.querySelector('input[name="cloudEntryType"]:checked').value;
+      const timeWrap = document.getElementById('cp-time-wrap');
+      const urlWrap = document.getElementById('cp-url-wrap');
+      if (type === 'ticket') {
+        timeWrap.classList.remove('hidden');
+        urlWrap.classList.remove('sm:col-span-2');
+      } else {
+        timeWrap.classList.add('hidden');
+        urlWrap.classList.add('sm:col-span-2');
+      }
+    }
+
+    async function submitCloudEntry() {
+      const type = document.querySelector('input[name="cloudEntryType"]:checked').value;
+      const artist = document.getElementById('cp-artist').value;
+      const platform = document.getElementById('cp-platform').value.trim() || '微博';
+      const content = document.getElementById('cp-content').value.trim();
+      const url = document.getElementById('cp-url').value.trim();
+      const ticket_time = document.getElementById('cp-time').value;
+
+      if (!content) return alert('请填写动态摘要或演出名称！');
+      if (type === 'ticket' && !ticket_time) return alert('开票倒计时必须填写准确开票时间！');
+
+      const btn = document.getElementById('cp-submit-btn');
+      btn.disabled = true;
+      btn.textContent = '☁️ 正在同步至云端...';
+
+      try {
+        const endpoint = type === 'ticket' ? 'tickets' : 'feeds';
+        const payload = type === 'ticket'
+          ? { title: `${artist}|${content}`, ticket_time, platform, url }
+          : { platform, artist, content, url };
+
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
+          method: 'POST', headers: SB_HEADERS, body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error();
+
+        document.getElementById('raw-post-input').value = '';
+        document.getElementById('parse-confirm-box').classList.add('hidden');
+        await loadTourData();
+        await loadAllFeeds(true);
+      } catch (e) {
+        alert('同步失败，请检查代码顶部的 SUPABASE_URL 和 SUPABASE_ANON_KEY 是否已正确填写！');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '☁️ 确认发布并同步至所有设备';
+      }
+    }
+
+    async function deleteCloudRecord(table, id) {
+      if (!isAdmin) return;
+      if (!confirm('确定从所有设备删除这条记录吗？')) return;
+      await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, { method: 'DELETE', headers: SB_HEADERS });
+      await loadTourData();
+      await loadAllFeeds(true);
+    }
+
+    function downloadICS(title, timeStr, platform, url) {
+      const start = new Date(timeStr.replace(/-/g, '/'));
+      if (isNaN(start)) return alert('时间格式暂不支持导出日历');
+      const end = new Date(start.getTime() + 30 * 60000);
+      const fmt = d => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      const ics = [
+        'BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT',
+        `SUMMARY:🎫 抢票提醒：${title} (${platform})`,
+        `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`,
+        `DESCRIPTION:售票平台：${platform}\\n直达链接：${url || ''}`,
+        'BEGIN:VALARM', 'TRIGGER:-PT15M', 'ACTION:DISPLAY', 'DESCRIPTION:还有15分钟开票！', 'END:VALARM',
+        'END:VEVENT', 'END:VCALENDAR'
+      ].join('\r\n');
+      const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${title}-开票提醒.ics`;
+      a.click();
+    }
+
+    // ================= 4. 多镜像节点兜底抓取（弹窗自定义源用） =================
     async function fetchXmlWithFallback(rawUrl) {
       const candidateUrls = [rawUrl];
       if (rawUrl.includes('rsshub.app')) {
@@ -269,7 +528,7 @@
       return [];
     }
 
-    // ================= 4. 弹窗增删管理逻辑 =================
+    // ================= 5. 弹窗增删管理逻辑 =================
     function openManageModal() {
       renderManageList();
       document.getElementById('manage-modal').classList.remove('hidden');
@@ -380,16 +639,44 @@
       loadAllFeeds(true);
     }
 
-    // ================= 5. 巡演日程加载 =================
+    // ================= 6. 巡演日程加载（融合本地 JSON + Supabase 云端实时开票） =================
     async function loadTourData() {
+      let localTours = [];
       try {
         const res = await fetch('./tour_data.json?t=' + Date.now());
-        tourSchedules = await res.json();
-        renderTourCards();
-        setInterval(updateCountdowns, 1000);
-      } catch (e) {
-        document.getElementById('tour-grid').innerHTML = `<div class="text-sm text-slate-400">暂无巡演日程数据</div>`;
+        if (res.ok) localTours = await res.json();
+      } catch (e) {}
+
+      cloudTickets = [];
+      if (SUPABASE_URL.startsWith('https://') && !SUPABASE_URL.includes('你的项目ID')) {
+        try {
+          const sbRes = await fetch(`${SUPABASE_URL}/rest/v1/tickets?select=*&order=ticket_time.asc`, { headers: SB_HEADERS });
+          if (sbRes.ok) {
+            const rows = await sbRes.json();
+            cloudTickets = rows.map(r => {
+              const parts = r.title.split('|');
+              const artist = parts.length > 1 ? parts[0] : 'ONER';
+              const cityTitle = parts.length > 1 ? parts.slice(1).join('|') : r.title;
+              return {
+                cloudId: r.id,
+                artist,
+                city: cityTitle,
+                venue: '云端实时同步场次',
+                show_date: r.ticket_time.replace('T', ' '),
+                source_url: r.url || '#',
+                rounds: [{
+                  round_name: '正式开票',
+                  sale_time: r.ticket_time.replace('T', ' '),
+                  platform: r.platform || '大麦'
+                }]
+              };
+            });
+          }
+        } catch (e) {}
       }
+
+      tourSchedules = [...cloudTickets, ...localTours];
+      renderTourCards();
     }
 
     function renderTourCards() {
@@ -416,7 +703,10 @@
           return `
             <div class="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-lg ${isPast ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-400 line-through' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 font-medium'}">
               <span>${r.round_name}：${r.sale_time} (${r.platform})</span>
-              <span class="countdown-badge font-mono" data-time="${r.sale_time}"></span>
+              <div class="flex items-center gap-2">
+                <span class="countdown-badge font-mono" data-time="${r.sale_time}"></span>
+                ${!isPast ? `<button onclick="downloadICS('${item.city.replace(/'/g, '')}', '${r.sale_time}', '${r.platform}', '${item.source_url || ''}')" class="text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:opacity-80" title="加入手机/电脑日历">📅</button>` : ''}
+              </div>
             </div>
           `;
         }).join('');
@@ -424,12 +714,15 @@
         return `
           <div class="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between gap-3">
             <div>
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2">
-                  ${item.artist ? `<span class="text-xs px-2 py-0.5 rounded text-white font-semibold border border-white/15" style="background:${artistBadgeBg}">${item.artist}</span>` : ''}
+                  ${item.artist ? `<span class="text-xs px-2 py-0.5 rounded text-white font-semibold border border-white/15 shrink-0" style="background:${artistBadgeBg}">${item.artist}</span>` : ''}
                   <span class="font-bold text-base">${item.city}</span>
                 </div>
-                <a href="${item.source_url || '#'}" target="_blank" class="text-xs text-slate-400 hover:text-indigo-500">官宣原帖 ↗</a>
+                <div class="flex items-center gap-2 shrink-0">
+                  ${item.source_url && item.source_url !== '#' ? `<a href="${item.source_url}" target="_blank" class="text-xs text-slate-400 hover:text-indigo-500">官宣原帖 ↗</a>` : ''}
+                  ${(isAdmin && item.cloudId) ? `<button onclick="deleteCloudRecord('tickets', ${item.cloudId})" class="text-xs text-rose-500 hover:underline">删除</button>` : ''}
+                </div>
               </div>
               <p class="text-xs text-slate-500 mt-1">📍 ${item.venue} ｜ 🗓️ ${item.show_date}</p>
             </div>
@@ -461,90 +754,56 @@
       });
     }
 
-    // ================= 6. 核心加载函数：优先秒读后台生成的 feeds_data.json =================
+    // ================= 7. 核心加载函数：融合 Supabase 云端动态 + 本地 feeds_data.json =================
     async function loadAllFeeds(force = false) {
-      document.getElementById('timeline-list').innerHTML = `<div class="text-center py-10 text-sm text-slate-400">正在加载最新聚合动态...</div>`;
+      document.getElementById('timeline-list').innerHTML = `<div class="text-center py-10 text-sm text-slate-400">正在同步最新聚合动态...</div>`;
       let serverPosts = [];
       let failedSources = [];
 
-      // 1. 优先秒读 GitHub Actions 后台抓取并生成的 feeds_data.json
+      // 1. 拉取 Supabase 云端手动投喂的多设备同步动态
+      cloudFeeds = [];
+      if (SUPABASE_URL.startsWith('https://') && !SUPABASE_URL.includes('你的项目ID')) {
+        try {
+          const sbRes = await fetch(`${SUPABASE_URL}/rest/v1/feeds?select=*&order=created_at.desc&limit=80`, { headers: SB_HEADERS });
+          if (sbRes.ok) {
+            const rows = await sbRes.json();
+            cloudFeeds = rows.map(r => {
+              const meta = ARTIST_META_MAP[r.artist] || { artistId: 'oner', color: COLOR_ONER };
+              const matchedArtistObj = artistsConfig.find(a => a.artistName === r.artist);
+              const matchedAcc = matchedArtistObj?.accounts.find(acc => acc.name === r.platform);
+              return {
+                cloudId: r.id,
+                artistId: matchedArtistObj?.artistId || meta.artistId,
+                artistName: r.artist,
+                accountId: matchedAcc?.id || `${meta.artistId}_cloud`,
+                platformName: r.platform,
+                platformColor: matchedArtistObj?.badgeStyle || meta.color,
+                text: r.content,
+                imgs: [],
+                link: r.url || '#',
+                timestamp: new Date(r.created_at).getTime()
+              };
+            });
+            serverPosts.push(...cloudFeeds);
+            document.getElementById('last-sync').textContent = '云端已同步 · ' + new Date().toLocaleTimeString();
+          }
+        } catch (e) {}
+      }
+
+      // 2. 补充读取本地 feeds_data.json（如果仓库里有的话）
       try {
         const res = await fetch('./feeds_data.json?t=' + Date.now());
         if (res.ok) {
           const payload = await res.json();
-          serverPosts = payload.posts || [];
-          failedSources = payload.failedSources || [];
-          if (payload.updatedAt) {
-            document.getElementById('last-sync').textContent = '后台同步于 · ' + new Date(payload.updatedAt).toLocaleTimeString();
+          if (Array.isArray(payload.posts)) {
+            serverPosts.push(...payload.posts);
           }
         }
-      } catch (e) {
-        console.warn('读取 feeds_data.json 失败，尝试前端直连抓取');
-      }
+      } catch (e) {}
 
-      // 2. 找出用户在弹窗里额外新增的自定义账号（不在默认配置里的）
-      const defaultIds = new Set();
-      DEFAULT_ARTISTS.forEach(a => a.accounts.forEach(acc => defaultIds.add(acc.id)));
-
-      const customTasks = [];
-      artistsConfig.forEach(artist => {
-        artist.accounts.forEach(acc => {
-          if (!defaultIds.has(acc.id) || serverPosts.length === 0) {
-            customTasks.push(
-              (async () => {
-                const nodes = await fetchXmlWithFallback(acc.url);
-                if (nodes.length === 0) {
-                  if (!failedSources.includes(`${artist.artistName}-${acc.name}`)) {
-                    failedSources.push(`${artist.artistName}-${acc.name}`);
-                  }
-                  return;
-                }
-                nodes.forEach(node => {
-                  const title = node.querySelector('title')?.textContent || '';
-                  const desc = node.querySelector('description')?.textContent || node.querySelector('content')?.textContent || '';
-                  const pubDate = node.querySelector('pubDate')?.textContent || node.querySelector('published')?.textContent || node.querySelector('updated')?.textContent || '';
-                  const link = node.querySelector('link')?.textContent || node.querySelector('link')?.getAttribute('href') || '#';
-                  const tmpDiv = document.createElement('div');
-                  tmpDiv.innerHTML = desc;
-                  const imgs = [...tmpDiv.querySelectorAll('img')].map(img => img.src).filter(Boolean);
-                  const plainText = (tmpDiv.textContent || title).trim();
-                  const timestamp = pubDate ? new Date(pubDate).getTime() : Date.now();
-
-                  serverPosts.push({
-                    artistId: artist.artistId,
-                    artistName: artist.artistName,
-                    accountId: acc.id,
-                    platformName: acc.name,
-                    platformColor: acc.color,
-                    text: plainText,
-                    imgs,
-                    link,
-                    timestamp: isNaN(timestamp) ? 0 : timestamp
-                  });
-                });
-              })()
-            );
-          }
-        });
-      });
-
-      if (customTasks.length > 0) {
-        await Promise.all(customTasks);
-      }
-
-      // 过滤掉用户在弹窗里已删除的艺人/账号
-      const activeAccountIds = new Set();
-      artistsConfig.forEach(a => a.accounts.forEach(acc => activeAccountIds.add(acc.id)));
-      allPosts = serverPosts.filter(p => activeAccountIds.has(p.accountId));
+      // 3. 过滤与排序
+      allPosts = serverPosts;
       allPosts.sort((a, b) => b.timestamp - a.timestamp);
-
-      const statusBar = document.getElementById('feed-status-bar');
-      if (failedSources.length > 0) {
-        statusBar.classList.remove('hidden');
-        statusBar.textContent = `⚠️ 部分源因平台反爬限制暂未返回数据（${failedSources.length} 个）：${failedSources.join('、')}。`;
-      } else {
-        statusBar.classList.add('hidden');
-      }
 
       initUI();
     }
@@ -582,18 +841,21 @@
         spotlightEl.classList.add('hidden');
       }
 
-      let visibleAccounts = [];
-      if (activeArtistId === 'ALL') {
-        artistsConfig.forEach(a => a.accounts.forEach(acc => visibleAccounts.push({ id: acc.id, label: `${a.artistName}·${acc.name}`, color: acc.color })));
-      } else {
-        const currentA = artistsConfig.find(a => a.artistId === activeArtistId);
-        if (currentA) visibleAccounts = currentA.accounts.map(acc => ({ id: acc.id, label: acc.name, color: acc.color }));
-      }
+      // 动态提取当前艺人拥有的平台胶囊（兼容预设平台与云端同步的任意平台名）
+      const platformMap = new Map();
+      artistPosts.forEach(p => {
+        const key = `${p.artistName}·${p.platformName}`;
+        const label = activeArtistId === 'ALL' ? key : p.platformName;
+        if (!platformMap.has(label)) {
+          platformMap.set(label, { label, color: p.platformColor, count: 0 });
+        }
+        platformMap.get(label).count++;
+      });
 
-      const platformTabs = [{ id: 'ALL', label: `全部 (${artistPosts.length})`, color: '#1e293b' }, ...visibleAccounts.map(acc => ({
-        id: acc.id,
-        label: `${acc.label} (${artistPosts.filter(p => p.accountId === acc.id).length})`,
-        color: acc.color
+      const platformTabs = [{ id: 'ALL', label: `全部 (${artistPosts.length})`, color: '#1e293b' }, ...[...platformMap.values()].map(item => ({
+        id: item.label,
+        label: `${item.label} (${item.count})`,
+        color: item.color
       }))];
 
       document.getElementById('platform-tabs').innerHTML = platformTabs.map(t => {
@@ -633,7 +895,10 @@
 
       const filtered = allPosts.filter(p => {
         if (activeArtistId !== 'ALL' && p.artistId !== activeArtistId) return false;
-        if (activeAccountId !== 'ALL' && p.accountId !== activeAccountId) return false;
+        if (activeAccountId !== 'ALL') {
+          const pLabel = activeArtistId === 'ALL' ? `${p.artistName}·${p.platformName}` : p.platformName;
+          if (pLabel !== activeAccountId) return false;
+        }
         if (dateVal) {
           const d = new Date(p.timestamp);
           const localDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -645,13 +910,13 @@
 
       const listEl = document.getElementById('timeline-list');
       if (!filtered.length) {
-        listEl.innerHTML = `<div class="text-center py-10 text-sm text-slate-400">没有符合筛选条件的动态</div>`;
+        listEl.innerHTML = `<div class="text-center py-10 text-sm text-slate-400">暂无动态记录（管理员可点击右上角「🔒 发布动态」粘贴各平台分享链接同步）</div>`;
         return;
       }
 
       listEl.innerHTML = filtered.map(p => {
         const dateStr = new Date(p.timestamp).toLocaleString('zh-CN', { hour12: false });
-        const imgsHtml = p.imgs.slice(0, 4).map(src => `
+        const imgsHtml = (p.imgs || []).slice(0, 4).map(src => `
           <a href="${src}" target="_blank">
             <img src="${src}" loading="lazy" class="w-full h-36 object-cover rounded-lg border border-slate-200 dark:border-slate-800" />
           </a>
@@ -659,14 +924,17 @@
 
         return `
           <article class="p-4 sm:p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-            <div class="flex items-center justify-between text-xs">
+            <div class="flex items-center justify-between text-xs gap-2">
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="px-2.5 py-0.5 rounded-full text-white font-semibold border border-white/15 shadow-xs" style="background:${p.platformColor}">
                   ${p.artistName} · ${p.platformName}
                 </span>
                 <span class="text-slate-500">${formatTimeAgo(p.timestamp)} · ${dateStr}</span>
               </div>
-              <a href="${p.link}" target="_blank" class="text-slate-400 hover:text-indigo-500 shrink-0">原帖 ↗</a>
+              <div class="flex items-center gap-2.5 shrink-0">
+                ${p.link && p.link !== '#' ? `<a href="${p.link}" target="_blank" class="text-slate-400 hover:text-indigo-500">原帖 ↗</a>` : ''}
+                ${(isAdmin && p.cloudId) ? `<button onclick="deleteCloudRecord('feeds', ${p.cloudId})" class="text-rose-500 hover:underline">删除</button>` : ''}
+              </div>
             </div>
             <p class="text-sm leading-relaxed whitespace-pre-line line-clamp-4 cursor-pointer" onclick="this.classList.toggle('line-clamp-4')">${p.text}</p>
             ${imgsHtml ? `<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">${imgsHtml}</div>` : ''}
@@ -683,8 +951,11 @@
       return Math.floor(diff / 86400) + ' 天前';
     }
 
+    syncAdminUI();
     loadTourData();
     loadAllFeeds();
+    setInterval(updateCountdowns, 1000);
+    setInterval(() => { loadTourData(); loadAllFeeds(); }, 60000);
   </script>
 </body>
 </html>
