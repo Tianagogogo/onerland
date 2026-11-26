@@ -1,10 +1,12 @@
 {
-  "updatedAt": 1795717620280,
+  "updatedAt": 1795721686844,
   "failedSources": [
+    "ONER-微博",
     "ONER-小红书",
     "ONER-抖音",
     "ONER-Instagram",
     "ONER-B站",
+    "坤音娱乐-微博",
     "坤音娱乐-抖音",
     "坤音娱乐-Instagram",
     "坤音娱乐-B站",
@@ -68,86 +70,6 @@
       "timestamp": 1795687859000
     },
     {
-      "artistId": "oner",
-      "artistName": "ONER",
-      "accountId": "oner_wb",
-      "platformName": "微博",
-      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
-      "text": "oner ❤️🔥#ONER极尽声色演唱会##来ONER巡演吃顿好的#ONER「极尽声色」巡回演唱会——来合肥吃顿好的📢「合肥站」预售开票24H倒计时逃离喧嚣，尽兴狂欢！把...\n oner ❤️🔥 #ONER极尽声色演唱会# #来ONER巡演吃顿好的# ONER「极尽声色」巡回演唱会——来合肥吃顿好的 📢「合肥站」预售开票24H倒计时 逃离喧嚣，尽兴狂欢！ 把好吃的都端上桌，把好听的都唱给你 ⏰预售时间：11月27日13:14 🎫购票平台：大麦｜坤音商城小程序｜猫眼｜携程 📝演出时间：12月26日（周六） 📍演出地点：合肥少荃体育中心体育馆 ❗️请大家仔细阅读「票务须知」，现场见！ #ONER极尽声色合肥站开票# @岳岳PINKRAY @木子洋KWIN @灵超DIDI &nbsp; 岳岳pinkray 木子洋 灵超",
-      "imgs": [
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png"
-      ],
-      "link": "https://weibo.com/6524267181/Rt9NK4nxD",
-      "timestamp": 1795670097000
-    },
-    {
-      "artistId": "oner",
-      "artistName": "ONER",
-      "accountId": "oner_wb",
-      "platformName": "微博",
-      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
-      "text": "oner ❤️🔥 #ONER极尽声色演唱会##来ONER巡演吃顿好的#ONER「极尽声色」巡回演唱会——来北京吃顿好的💥「北京站」12月6日（周日）全票售罄💥📝 演出时...\n oner &nbsp;❤️🔥&nbsp; #ONER极尽声色演唱会# #来ONER巡演吃顿好的# ONER「极尽声色」巡回演唱会——来北京吃顿好的 💥「北京站」12月6日（周日）全票售罄💥 📝&nbsp;演出时间：12月6日（周日） 📍&nbsp;演出地点：北京市华熙生物・润百颜 ECM 中心 #ONER极尽声色北京站售罄# @岳岳PINKRAY @木子洋KWIN @灵超DIDI &nbsp; 岳岳pinkray 木子洋 灵超",
-      "imgs": [
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png"
-      ],
-      "link": "https://weibo.com/6524267181/RsJhqEcPk",
-      "timestamp": 1795427036000
-    },
-    {
-      "artistId": "oner",
-      "artistName": "ONER",
-      "accountId": "oner_wb",
-      "platformName": "微博",
-      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
-      "text": "oner ❤️🔥 #ONER极尽声色演唱会##来ONER巡演吃顿好的#ONER「极尽声色」巡回演唱会——来北京吃顿好的💥「北京站」12月5日（周六）全票售罄💥📝 演出时...\n oner ❤️🔥&nbsp; #ONER极尽声色演唱会# #来ONER巡演吃顿好的# ONER「极尽声色」巡回演唱会——来北京吃顿好的 💥「北京站」12月5日（周六）全票售罄💥 📝&nbsp;演出时间：12月5日（周六） 📍&nbsp;演出地点：北京市华熙生物・润百颜 ECM 中心 #ONER极尽声色北京站售罄# @岳岳PINKRAY @木子洋KWIN @灵超DIDI &nbsp; 岳岳pinkray 木子洋 灵超",
-      "imgs": [
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png"
-      ],
-      "link": "https://weibo.com/6524267181/RsHBidEOp",
-      "timestamp": 1795411642000
-    },
-    {
-      "artistId": "oner",
-      "artistName": "ONER",
-      "accountId": "oner_wb",
-      "platformName": "微博",
-      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
-      "text": "oner ❤️🔥 #ONER极尽声色演唱会##来ONER巡演吃顿好的#ONER「极尽声色」巡回演唱会——吃顿好的🔥「北京站」二开今日开启🔥⏰ 开票时间：12月5日（周六）...\n oner &nbsp;❤️🔥&nbsp; #ONER极尽声色演唱会# #来ONER巡演吃顿好的# ONER「极尽声色」巡回演唱会——吃顿好的 🔥「北京站」二开今日开启🔥 ⏰&nbsp;开票时间： 12月5日（周六）场——11月23日13:14开票 12月6日（周日）场——11月23日17:20开票 🎫购票平台：大麦｜坤音商城小程序｜猫眼｜携程 「大 麦」： 网页链接 「坤音商城」：微信🔍坤音商城小程序&nbsp; 「猫 眼」： 网页链接 「携 程」： 网页链接 📝&nbsp;演出时间：12月5日（周六）、12月6日（周日） 📍&nbsp;演出地点：北京市华熙生物・润百颜 ECM 中心 #ONER极尽声色北京站开票# @岳岳PINKRAY @木子洋KWIN @灵超DIDI &nbsp; 岳岳pinkray 木子洋 灵超",
-      "imgs": [
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://h5.sinaimg.cn/upload/2015/09/25/3/timeline_card_small_web_default.png",
-        "https://h5.sinaimg.cn/upload/2015/09/25/3/timeline_card_small_web_default.png",
-        "https://h5.sinaimg.cn/upload/2015/09/25/3/timeline_card_small_web_default.png"
-      ],
-      "link": "https://weibo.com/6524267181/RsGGvmZ6m",
-      "timestamp": 1795403248000
-    },
-    {
-      "artistId": "oner",
-      "artistName": "ONER",
-      "accountId": "oner_wb",
-      "platformName": "微博",
-      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
-      "text": "oner ❤️🔥 #ONER极尽声色演唱会##来ONER巡演吃顿好的#ONER「极尽声色」巡回演唱会——来北京吃顿好的📢「北京站」二开24H倒计时⏰ 开票时间：12月5日（周...\n oner &nbsp;❤️🔥&nbsp; #ONER极尽声色演唱会# #来ONER巡演吃顿好的# ONER「极尽声色」巡回演唱会——来北京吃顿好的 📢「北京站」二开24H倒计时 ⏰&nbsp;开票时间： 12月5日（周六）场——11月23日13:14开票 12月6日（周日）场——11月23日17:20开票 🎫购票平台：大麦｜坤音商城小程序｜猫眼｜携程 📝&nbsp;演出时间：12月5日（周六）、12月6日（周日） 📍&nbsp;演出地点：北京市华熙生物・润百颜 ECM 中心 #ONER极尽声色北京站开票# @岳岳PINKRAY @木子洋KWIN @灵超DIDI &nbsp; 岳岳pinkray 木子洋 灵超",
-      "imgs": [
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png"
-      ],
-      "link": "https://weibo.com/6524267181/Rsy5JaFn2",
-      "timestamp": 1795324493000
-    },
-    {
       "artistId": "qins",
       "artistName": "坤音娱乐",
       "accountId": "qins_yt",
@@ -157,22 +79,6 @@
       "imgs": [],
       "link": "https://www.youtube.com/watch?v=7TzBOM4SMUw",
       "timestamp": 1795320018000
-    },
-    {
-      "artistId": "oner",
-      "artistName": "ONER",
-      "accountId": "oner_wb",
-      "platformName": "微博",
-      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
-      "text": "oner 提前拿下gapday佛山站落地签，11月29日，一起来现场解锁@岳岳PINKRAY @木子洋KWIN @灵超DIDI 的同款吧！ #2026gapday音乐节# #2026gapday音乐节佛山站# 岳...\n oner 提前拿下gapday佛山站落地签，11月29日，一起来现场解锁 @岳岳PINKRAY &nbsp; @木子洋KWIN &nbsp; @灵超DIDI &nbsp;的同款吧！ #2026gapday音乐节# &nbsp; #2026gapday音乐节佛山站# &nbsp; 岳岳pinkray 木子洋 灵超 - 转发 @gapday音乐节 : 滑动选择软托邦的奇遇图鉴，点击解锁属于 @ONER &nbsp;（ @岳岳PINKRAY &nbsp; @木子洋KWIN &nbsp; @灵超DIDI &nbsp;）&nbsp;的沙漠秘境落地签📸 #2026gapday音乐节# &nbsp; #2026gapday音乐节佛山站# &nbsp; #微博演出季# gapday音乐节的微博视频 视频无法显示，请前往 微博视频 观看。",
-      "imgs": [
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png"
-      ],
-      "link": "https://weibo.com/6524267181/Rsp3455d8",
-      "timestamp": 1795241616000
     },
     {
       "artistId": "didi",
@@ -252,22 +158,6 @@
       "timestamp": 1795194614000
     },
     {
-      "artistId": "oner",
-      "artistName": "ONER",
-      "accountId": "oner_wb",
-      "platformName": "微博",
-      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
-      "text": "oner ❤️🔥 #ONER极尽声色演唱会##来ONER巡演吃顿好的#ONER「极尽声色」巡回演唱会——来西安吃顿好的💥「西安站」12月12日（周六）预售售罄💥📝 演出...\n oner ❤️🔥&nbsp; #ONER极尽声色演唱会# #来ONER巡演吃顿好的# ONER「极尽声色」巡回演唱会——来西安吃顿好的 💥「西安站」12月12日（周六）预售售罄💥 📝&nbsp;演出时间：12月12日（周六） 📍&nbsp;演出地点：西安奥体中心体育馆 #ONER极尽声色西安站开票# @岳岳PINKRAY @木子洋KWIN @灵超DIDI &nbsp; 岳岳pinkray 木子洋 灵超",
-      "imgs": [
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png"
-      ],
-      "link": "https://weibo.com/6524267181/Rsfo6bEZu",
-      "timestamp": 1795153077000
-    },
-    {
       "artistId": "qins",
       "artistName": "坤音娱乐",
       "accountId": "qins_yt",
@@ -277,22 +167,6 @@
       "imgs": [],
       "link": "https://www.youtube.com/watch?v=Uzp98gKPwRs",
       "timestamp": 1795152880000
-    },
-    {
-      "artistId": "oner",
-      "artistName": "ONER",
-      "accountId": "oner_wb",
-      "platformName": "微博",
-      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
-      "text": "oner ❤️🔥 #ONER极尽声色演唱会##来ONER巡演吃顿好的#ONER「极尽声色」巡回演唱会——吃顿好的🔥第二站「西安」预售今日开启🔥⏰ 预售时间：11月20日13:...\n oner &nbsp;❤️🔥&nbsp; #ONER极尽声色演唱会# #来ONER巡演吃顿好的# ONER「极尽声色」巡回演唱会——吃顿好的 🔥第二站「西安」预售今日开启🔥 ⏰&nbsp;预售时间：11月20日13:14 🎫购票平台：大麦｜坤音商城小程序｜猫眼｜携程 「大 麦」： 网页链接 「坤音商城」：微信🔍坤音商城小程序&nbsp; 「猫 眼」： 网页链接 「携 程」： 网页链接 📝&nbsp;演出时间：12月12日（周六） 📍&nbsp;演出地点：西安奥体中心体育馆 #ONER极尽声色西安站开票# @岳岳PINKRAY @木子洋KWIN @灵超DIDI &nbsp; 岳岳pinkray 木子洋 灵超",
-      "imgs": [
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://h5.sinaimg.cn/upload/2015/09/25/3/timeline_card_small_web_default.png",
-        "https://h5.sinaimg.cn/upload/2015/09/25/3/timeline_card_small_web_default.png",
-        "https://h5.sinaimg.cn/upload/2015/09/25/3/timeline_card_small_web_default.png"
-      ],
-      "link": "https://weibo.com/6524267181/Rsep5h8Zc",
-      "timestamp": 1795144058000
     },
     {
       "artistId": "oner",
@@ -387,22 +261,6 @@
       "timestamp": 1795066053000
     },
     {
-      "artistId": "oner",
-      "artistName": "ONER",
-      "accountId": "oner_wb",
-      "platformName": "微博",
-      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
-      "text": "oner ❤️🔥#ONER极尽声色演唱会##来ONER巡演吃顿好的#ONER「极尽声色」巡回演唱会——来西安吃顿好的第二站「西安」📢预售开票24H倒计时一城烟火，放开吃，...\n oner ❤️🔥 #ONER极尽声色演唱会# #来ONER巡演吃顿好的# ONER「极尽声色」巡回演唱会——来西安吃顿好的 第二站「西安」📢预售开票24H倒计时 一城烟火，放开吃，放开玩 声色开席，来西安吃顿好的！ ⏰预售时间：11月20日13:14 🎫购票平台：大麦｜坤音商城小程序｜猫眼｜携程 📝演出时间：12月12日（周六） 📍演出地点：西安奥体中心体育馆 ❗️请大家仔细阅读「票务须知」，现场见！ #ONER极尽声色西安站开票# @岳岳PINKRAY @木子洋KWIN @灵超DIDI &nbsp; 岳岳pinkray 木子洋 灵超",
-      "imgs": [
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png"
-      ],
-      "link": "https://weibo.com/6524267181/Rs5Oh1QK2",
-      "timestamp": 1795065298000
-    },
-    {
       "artistId": "qins",
       "artistName": "坤音娱乐",
       "accountId": "qins_yt",
@@ -456,22 +314,6 @@
       "imgs": [],
       "link": "https://www.tiktok.com/@oner0830official/video/7709522070186577165",
       "timestamp": 1795012985000
-    },
-    {
-      "artistId": "oner",
-      "artistName": "ONER",
-      "accountId": "oner_wb",
-      "platformName": "微博",
-      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
-      "text": "oner ❤️🔥 #ONER极尽声色演唱会##来ONER巡演吃顿好的#ONER「极尽声色」巡回演唱会——来北京吃顿好的💥「北京站」12月6日（周日）预售售罄💥📝 演出时...\n oner ❤️🔥 #ONER极尽声色演唱会# #来ONER巡演吃顿好的# ONER「极尽声色」巡回演唱会——来北京吃顿好的 💥「北京站」12月6日（周日）预售售罄💥 📝 演出时间：12月6日（周日） 📍 演出地点：北京市华熙生物・润百颜 ECM 中心 #ONER极尽声色北京站开票# @岳岳PINKRAY @木子洋KWIN @灵超DIDI 岳岳pinkray 木子洋 灵超",
-      "imgs": [
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png"
-      ],
-      "link": "https://weibo.com/6524267181/RrFdemlxO",
-      "timestamp": 1794821538000
     },
     {
       "artistId": "oner",
@@ -784,19 +626,6 @@
     {
       "artistId": "qins",
       "artistName": "坤音娱乐",
-      "accountId": "qins_wb",
-      "platformName": "微博",
-      "platformColor": "#111827",
-      "text": "针对相关私生行为，公司将持续加大公开曝光力度，同时进行证据留存并移交律师团队，依法严肃追责。曝光与维权并行推进，绝不姑息！ 网页链接\n针对相关私生行为，公司将持续加大公开曝光力度，同时进行证据留存并移交律师团队，依法严肃追责。 曝光与维权并行推进，绝不姑息！ 网页链接",
-      "imgs": [
-        "https://h5.sinaimg.cn/upload/2015/09/25/3/timeline_card_small_video_default.png"
-      ],
-      "link": "https://weibo.com/6062604272/RmdVporsf",
-      "timestamp": 1791730362000
-    },
-    {
-      "artistId": "qins",
-      "artistName": "坤音娱乐",
       "accountId": "qins_yt",
       "platformName": "YouTube",
       "platformColor": "#111827",
@@ -804,65 +633,6 @@
       "imgs": [],
       "link": "https://www.youtube.com/watch?v=OIjZnJP0vpE",
       "timestamp": 1791515174000
-    },
-    {
-      "artistId": "qins",
-      "artistName": "坤音娱乐",
-      "accountId": "qins_wb",
-      "platformName": "微博",
-      "platformColor": "#111827",
-      "text": "坤音娱乐 初心历久弥坚，信念从未徘徊。行止从容不迫，远途终将抵达。@ONER、@HIGH5官博、@BC221 #ONER##HIGH5##BC221三代#onerHIGH5BC221 [图片]\n 坤音娱乐 初心历久弥坚，信念从未徘徊。 行止从容不迫，远途终将抵达。 @ONER 、 @HIGH5官博 、 @BC221 #ONER# #HIGH5# #BC221三代# oner HIGH5 BC221",
-      "imgs": [
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png"
-      ],
-      "link": "https://weibo.com/6062604272/RlAuT5WGr",
-      "timestamp": 1791369014000
-    },
-    {
-      "artistId": "qins",
-      "artistName": "坤音娱乐",
-      "accountId": "qins_wb",
-      "platformName": "微博",
-      "platformColor": "#111827",
-      "text": "严肃声明 [图片][图片][图片][图片]\n严肃声明",
-      "imgs": [
-        "https://tvax3.sinaimg.cn/mw2000/006Ci4jSly1iht6yutmeij32g63gqnpd.jpg",
-        "https://tvax1.sinaimg.cn/mw2000/006Ci4jSly1iht6ytwinaj32g63gqx6p.jpg",
-        "https://tvax1.sinaimg.cn/mw2000/006Ci4jSly1iht6yvqp91j32g63gqnpd.jpg",
-        "https://tvax1.sinaimg.cn/mw2000/006Ci4jSly1iht6ywbtjqj30z31dnwkj.jpg"
-      ],
-      "link": "https://weibo.com/6062604272/RlvAonbWc",
-      "timestamp": 1791324004000
-    },
-    {
-      "artistId": "qins",
-      "artistName": "坤音娱乐",
-      "accountId": "qins_wb",
-      "platformName": "微博",
-      "platformColor": "#111827",
-      "text": "坤音娱乐 坤音娱乐家族团歌《BOW DOWN》已在多个平台同时上线，点击下方链接收听～@ONER、@HIGH5官博、@BC221 全员集结，以家族之名开启新纪元。从最初的梦想出...\n 坤音娱乐 坤音娱乐家族团歌《BOW DOWN》已在多个平台同时上线，点击下方链接收听～ @ONER 、 @HIGH5官博 、 @BC221 全员集结，以家族之名开启新纪元。从最初的梦想出发，撕碎高墙、摘下旧冠，把不肯被定义的姿态写进同一份宣言——这一章，署名QINs。 当流量与浮华轮番登场，他们选择埋头打磨每一个作品、每一场舞台；他们敢于追求正确的事，敢于挣脱规则的束缚，也敢于不放弃。这不是坤音家族的单向输出，更是这个热血团队以战士的姿态，带领每一个不甘被定义的人，一起撕开属于自己的旷野。 旧页翻过，新纪元已至。即刻聆听，见证一群纯粹追梦的人如何让世界为之震动。 QQ音乐： BOW DOWN 网易云音乐： 网页链接 酷狗音乐： 网页链接 酷我音乐： 网页链接 汽水音乐： 网页链接 #ONER# #HIGH5# #BC221三代# #坤音家族团歌BOWDOWN# oner HIGH5 BC221",
-      "imgs": [
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://h5.sinaimg.cn/upload/2015/09/25/3/timeline_card_small_web_default.png",
-        "https://h5.sinaimg.cn/upload/2015/09/25/3/timeline_card_small_web_default.png",
-        "https://h5.sinaimg.cn/upload/2015/09/25/3/timeline_card_small_web_default.png"
-      ],
-      "link": "https://weibo.com/6062604272/RkXpX9Ogj",
-      "timestamp": 1791010857000
-    },
-    {
-      "artistId": "qins",
-      "artistName": "坤音娱乐",
-      "accountId": "qins_wb",
-      "platformName": "微博",
-      "platformColor": "#111827",
-      "text": "致所有喜爱坤音娱乐旗下艺人的朋友们：首先，非常感谢大家一直以来对艺人们的喜爱和陪伴。每年艺人生日时，公司门口那一束束盛放的鲜花，见证了大家一次次的奔赴...\n致所有喜爱坤音娱乐旗下艺人的朋友们： 首先，非常感谢大家一直以来对艺人们的喜爱和陪伴。每年艺人生日时，公司门口那一束束盛放的鲜花，见证了大家一次次的奔赴与守候，也承载了我们之间无数温暖而真实的瞬间。这些美好回忆，会一直留在公司和每位艺人的心里，成为我们共同珍藏的片段。 但随着鲜花越送越多，安全通道被花束占满，不仅造成了资源浪费，也给公司周边区域的日常秩序维护带来了困扰。为了不给公共环境增添负担，也不让这份心意变成不必要的消耗，我们决定：从今往后，艺人生日及各类节日期间，公司不再接收任何鲜花及其他实物应援。 我们明白，花是大家最直接、最热烈的情感表达，但真心的祝福从来不只有一种形式。你们在线上线下留下的每一句真诚留言、每一次安静守候、每一份长久陪伴，艺人们都真真切切地感受到，并铭记于心。 希望大家能理解我们的决定，也请大家一起守护这份默契，用更理性、更舒适的方式继续支持我们。爱不必拥挤，也不必铺张。 最后，坤音娱乐再次感谢每一位曾为爱奔波的你们。爱从不因形式而减分，花会凋零，但你们给过的光不会褪色。愿我们继续相互陪伴，稳步前行。",
-      "imgs": [],
-      "link": "https://weibo.com/6062604272/Rkw3cadBD",
-      "timestamp": 1790760043000
     },
     {
       "artistId": "qins",
@@ -1284,84 +1054,6 @@
       "imgs": [],
       "link": "https://www.youtube.com/watch?v=bhUqpDJGA08",
       "timestamp": 1777435206000
-    },
-    {
-      "artistId": "qins",
-      "artistName": "坤音娱乐",
-      "accountId": "qins_wb",
-      "platformName": "微博",
-      "platformColor": "#111827",
-      "text": "❗️严正声明❗️请各界人士注意，谨防上当受骗！！！！ 坤音娱乐 [图片]\n❗️严正声明❗️ 请各界人士注意，谨防上当受骗！！！！ 坤音娱乐",
-      "imgs": [
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://tvax1.sinaimg.cn/mw2000/006Ci4jSly1ib4co1funaj31ww2pf4ae.jpg"
-      ],
-      "link": "https://weibo.com/6062604272/QvLHT26UC",
-      "timestamp": 1773312073000
-    },
-    {
-      "artistId": "qins",
-      "artistName": "坤音娱乐",
-      "accountId": "qins_wb",
-      "platformName": "微博",
-      "platformColor": "#111827",
-      "text": "坤音娱乐 🐎 #坤音2026家族演唱会##坤音2026万马奔腾迎春晚会# 灯光收束，留下我们共同绘织的专属记忆，感谢每一个你对这场宴会的奔赴，新年快乐！@ONER @岳岳...\n 坤音娱乐 🐎 #坤音2026家族演唱会# #坤音2026万马奔腾迎春晚会# 灯光收束，留下我们共同绘织的专属记忆，感谢每一个你对这场宴会的奔赴，新年快乐！ @ONER @岳岳PINKRAY @木子洋KWIN @灵超DIDI @HIGH5官博 @BC221 oner 岳岳pinkray 木子洋 灵超 HIGH5 BC221",
-      "imgs": [
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png"
-      ],
-      "link": "https://weibo.com/6062604272/Qr4aO2OMT",
-      "timestamp": 1770640223000
-    },
-    {
-      "artistId": "qins",
-      "artistName": "坤音娱乐",
-      "accountId": "qins_wb",
-      "platformName": "微博",
-      "platformColor": "#111827",
-      "text": "坤音娱乐 🐎 #坤音2026家族演唱会#𝟐𝟎𝟐𝟔坤音Q跨万马奔腾迎春晚会🔥即将开演🔥「观演指南」敬请仔细阅读📅演出时间：2026年2月7日（六）18:00...\n 坤音娱乐 🐎 #坤音2026家族演唱会# 𝟐𝟎𝟐𝟔坤音Q跨万马奔腾迎春晚会 🔥即将开演🔥 「观演指南」敬请仔细阅读 📅演出时间：2026年2月7日（六）18:00 📍演出地点：上海·浦发银行东方体育中心 📝演出阵容： @ONER @岳岳PINKRAY @木子洋KWIN @灵超DIDI @HIGH5官博 @马思涵SAI @麟壹铭LIN @杨淘TAOO @冯陈思楠Merman @刘欣LilStar @BC221 #坤音2026Q跨万马奔腾迎春晚会# oner 岳岳pinkray 木子洋 灵超 HIGH5 BC221",
-      "imgs": [
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png"
-      ],
-      "link": "https://weibo.com/6062604272/QqrunxUJu",
-      "timestamp": 1770285689000
-    },
-    {
-      "artistId": "qins",
-      "artistName": "坤音娱乐",
-      "accountId": "qins_wb",
-      "platformName": "微博",
-      "platformColor": "#111827",
-      "text": "坤音娱乐 🐎 #坤音2026家族演唱会#𝟐𝟎𝟐𝟔坤音Q跨万马奔腾迎春晚会🔥演出倒计时 𝟯 天🔥……𝐒𝐓𝐀𝐘 𝐓𝐔𝐍𝐄𝐃……📅演...\n 坤音娱乐 🐎 #坤音2026家族演唱会# 𝟐𝟎𝟐𝟔坤音Q跨万马奔腾迎春晚会 🔥演出倒计时 𝟯 天🔥 ……𝐒𝐓𝐀𝐘 𝐓𝐔𝐍𝐄𝐃…… 📅演出时间：2026年2月7日（六）18:00 📍演出地点：上海·浦发银行东方体育中心 📝演出阵容： @ONER @岳岳PINKRAY @木子洋KWIN @灵超DIDI @HIGH5官博 @马思涵SAI @麟壹铭LIN @杨淘TAOO @冯陈思楠Merman @刘欣LilStar @BC221 #坤音2026Q跨万马奔腾迎春晚会# oner 岳岳pinkray 木子洋 灵超 HIGH5 BC221",
-      "imgs": [
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png"
-      ],
-      "link": "https://weibo.com/6062604272/QqiCVEfKA",
-      "timestamp": 1770204470000
-    },
-    {
-      "artistId": "qins",
-      "artistName": "坤音娱乐",
-      "accountId": "qins_wb",
-      "platformName": "微博",
-      "platformColor": "#111827",
-      "text": "坤音娱乐 「𝟐𝟎𝟐𝟔坤音Q跨万马奔腾迎春晚会」三次开票倒计时！ 三开时间：2月5日13:14📣#坤音2026家族演唱会# #坤音2026Q跨万马奔腾迎春晚会# @ONER...\n 坤音娱乐 「𝟐𝟎𝟐𝟔坤音Q跨万马奔腾迎春晚会」三次开票倒计时！ 三开时间：2月5日13:14📣 #坤音2026家族演唱会# #坤音2026Q跨万马奔腾迎春晚会# @ONER @HIGH5官博 @BC221 oner HIGH5 BC221 - 转发 @坤音娱乐 :  坤音娱乐 🐎 #坤音2026家族演唱会# 「𝟐𝟎𝟐𝟔坤音Q跨万马奔腾迎春晚会」正式官宣🔥 马踏祥云至，欢歌辞旧岁。 蹄声敲福运，新岁盼君来。 📅演出时间：2026年2月7日（六）18:00 📍演出地点：上海·浦发银行东方体育中心 📝演出阵容： @ONER @岳岳PINKRAY @木子洋KWIN @灵超DIDI @HIGH5官博 @马思涵SAI @麟壹铭LIN @杨淘TAOO @冯陈思楠Merman @刘欣LilStar @BC221 ⏰预售时间：2026年1月14日（三）17:27 🎫购票平台：大麦｜猫眼｜票星球 「大 麦」 网页链接 「猫 眼」 网页链接 「票 星 球」 网页链接 #坤音2026Q跨万马奔腾迎春晚会# #坤音娱乐# oner 岳岳pinkray 木子洋 灵超 HIGH5 BC221",
-      "imgs": [
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png",
-        "https://n.sinaimg.cn/photo/5213b46e/20180926/timeline_card_small_super_default.png"
-      ],
-      "link": "https://weibo.com/6062604272/Qq8puDe6w",
-      "timestamp": 1770110836000
     },
     {
       "artistId": "oner",
