@@ -1,0 +1,33 @@
+name: Auto Extract Tour Schedule
+
+on:
+  schedule:
+    - cron: '*/15 * * * *' # 每 15 分钟自动运行一次
+  workflow_dispatch:        # 支持在 GitHub 网页上手动点按钮立刻运行测试
+
+permissions:
+  contents: write
+
+jobs:
+  extract-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run tour extraction script
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: python scripts/fetch_and_extract.py
+
+      - name: Commit updated tour_data.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add tour_data.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: 自动更新巡演开票信息" && git push)
