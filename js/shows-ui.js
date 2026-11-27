@@ -756,7 +756,7 @@ function renderSecurityVoteBlock(host, stats) {
       <div class="space-y-1.5">${levelRows}</div>
       <div>
         <div class="text-[11px] text-slate-500 mb-1">🚫 合规提醒标签（可多选，实时统计）：</div>
-        <div class="flex flex-wrap gap-1.5">${tagChips}</div>
+        <div class="flex flex-wrap gap-1.5 security-tag-row">${tagChips}</div>
       </div>
       <div class="text-[10px] text-slate-400">仅统计票数，不上传任何自由文本、账号或截图；同一浏览器可随时修改自己的一票。</div>
       ${degradedHtml}
@@ -896,7 +896,7 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
     `;
 
   const securityPanelHtml = `
-    <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-2.5">
+    <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-2.5 security-panel">
       <div class="flex items-center justify-between flex-wrap gap-1">
         <span class="font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
           🛡️ 演出期间安检体验
@@ -923,7 +923,7 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
   `;
 
   const securityArchiveHtml = `
-    <div class="p-3 rounded-xl bg-white border border-slate-300 space-y-1.5">
+    <div class="p-3 rounded-xl bg-white border border-slate-300 space-y-1.5 security-panel">
       <div class="flex items-center justify-between flex-wrap gap-1">
         <span class="font-bold text-slate-900">🛡️ 演出期间安检体验归档</span>
         <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300 font-semibold">本机笔记 + 云端统计</span>
@@ -1056,9 +1056,9 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
         <span class="font-bold text-slate-900">🔒 我的私人观演评语（默认仅自己本机可见）</span>
         <span class="text-[11px] text-slate-400">仅存当前浏览器 · 绝不公开发布</span>
       </div>
-      <div class="flex gap-1.5">
-        <input id="${formPrefix}-priv-note" type="text" placeholder="记录仅自己看的观演感受、座位号细节、舞台回忆..." class="flex-1 min-w-0 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white" />
-        <button type="button" onclick="submitPrivateNoteForm('${safeShowKey}', '${formPrefix}', '${rerenderScope}', '${safeCtxVenue}', '${safeCtxTitle}', '${safeCtxDate}', '${safeCtxArtist}')" class="tour-action-btn shrink-0">仅自己保存</button>
+      <div class="flex gap-1.5 security-note-row">
+        <input id="${formPrefix}-priv-note" type="text" placeholder="记录仅自己看的观演感受、座位号细节、舞台回忆..." class="flex-1 min-w-0 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white security-note-input" />
+        <button type="button" onclick="submitPrivateNoteForm('${safeShowKey}', '${formPrefix}', '${rerenderScope}', '${safeCtxVenue}', '${safeCtxTitle}', '${safeCtxDate}', '${safeCtxArtist}')" class="tour-action-btn shrink-0 security-note-submit">仅自己保存</button>
       </div>
       ${privateNotes.length
         ? `<div class="space-y-1.5 pt-1">

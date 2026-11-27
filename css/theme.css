@@ -614,3 +614,101 @@ select::-moz-focus-inner { border: 0; }
   .buddy-platform-select { width: 100%; min-width: 0; }
   .buddy-contact-input { flex: 1 1 100%; width: 100%; }
 }
+
+
+/* ===== 移动端：演出卡片底部操作按钮栏换行布局 ===== */
+@media (max-width: 640px) {
+  .tour-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .tour-actions-row .tour-action-btn {
+    width: auto;
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 30px;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .tour-actions-row .tour-action-btn--mini {
+    height: auto;
+    min-height: 28px;
+    padding: 5px 9px;
+    font-size: 12px;
+  }
+  .tour-actions-row > div {
+    flex: 0 0 auto;
+  }
+  /* 窄屏隐藏竖线分隔符，改由 gap 自然排列 */
+  .tour-actions-divider {
+    display: none;
+  }
+}
+
+/* ===== 移动端：安检体验展开面板内部呼吸感 ===== */
+.security-panel {
+  padding: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.security-panel .security-tag-row,
+.security-panel .security-level-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.security-panel textarea,
+.security-panel input[type="text"] {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* 安检等级/标签在窄屏内可换行，绝不顶出面板 */
+.security-panel [data-vote-inner] {
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: normal;
+  word-break: break-word;
+}
+
+@media (max-width: 480px) {
+  .security-panel {
+    padding: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .security-panel .security-note-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .security-panel .security-note-input {
+    width: 100%;
+    flex: 1 1 auto;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 8px 10px;
+  }
+  .security-panel .security-note-submit {
+    width: 100%;
+    justify-content: center;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 8px 10px;
+  }
+  .security-panel textarea {
+    width: 100%;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 8px 10px;
+  }
+}
