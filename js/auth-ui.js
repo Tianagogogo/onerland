@@ -84,29 +84,21 @@ function syncAuthState() {
   AppState.accessToken = session ? session.access_token : '';
   syncAdminUnlockState();
 
-  // 顶部按钮：邮箱登录态优先展示，密码解锁态在没有邮箱时单独显示。
+  // 顶部按钮：仅展示本机昵称与解锁态，不再暴露邮箱信息。
   const nickname = typeof getGuestNickname === 'function' ? getGuestNickname() : '';
   const topBtn = document.getElementById('user-auth-btn');
   if (topBtn) {
-    topBtn.textContent = email
-      ? (AppState.isAdmin ? '👤 管理员' : `👤 ${email.split('@')[0]}`)
-      : (nickname ? `👤 ${nickname}` : (AppState.isAdminPasswordVerified ? '🔓 已解锁' : '👤 我的身份'));
+    topBtn.textContent = nickname
+      ? `👤 ${nickname}`
+      : (AppState.isAdminPasswordVerified ? '🔓 已解锁' : '👤 我的身份');
   }
 
   // 弹窗内状态文案
   const statusEl = document.getElementById('auth-current-status');
   if (statusEl) {
-    if (!email) {
-      statusEl.textContent = AppState.isAdminPasswordVerified
-        ? '管理员密码已解锁：当前可编辑内容。前台搭子等功能无需登录即可使用。'
-        : '免注册即可浏览与发布搭子。这里的昵称只保存在本机，用于搭子卡片署名。';
-    } else if (AppState.isAdmin) {
-      statusEl.textContent = `已登录：${email}（授权邮箱，可编辑演出与档案）`;
-    } else if (AppState.isAdminPasswordVerified) {
-      statusEl.textContent = `已登录：${email}（普通用户）；管理员密码已解锁，可编辑演出与档案。`;
-    } else {
-      statusEl.textContent = `已登录：${email}（普通用户，可浏览；也可用管理员密码解锁编辑权限）。`;
-    }
+    statusEl.textContent = AppState.isAdminPasswordVerified
+      ? '管理员密码已解锁：当前可编辑演出与档案。前台搭子等功能无需登录即可使用。'
+      : '免注册即可浏览与发布搭子。这里的昵称只保存在本机，用于搭子卡片署名。';
   }
 
   // 本机昵称与设备标识（不依赖邮箱，不阻塞任何前台功能）
@@ -117,15 +109,8 @@ function syncAuthState() {
   const deviceHint = document.getElementById('guest-device-hint');
   if (deviceHint) {
     const deviceId = typeof getDeviceId === 'function' ? getDeviceId() : '';
-    deviceHint.textContent = `本机设备标识：${deviceId.slice(0, 8)}…（仅用于允许你撤销自己发布的搭子，不会公开展示）`
-      + (email ? ` · 当前已登录邮箱：${email}` : '');
+    deviceHint.textContent = `本机设备标识：${deviceId.slice(0, 8)}…（仅用于允许你撤销自己发布的搭子，不会公开展示）`;
   }
-
-  // 登录态下禁用邮箱与密码输入，避免误操作
-  const emailInput = document.getElementById('auth-email-input');
-  if (emailInput) emailInput.disabled = Boolean(email);
-  const passwordInput = document.getElementById('auth-password-input');
-  if (passwordInput) passwordInput.disabled = Boolean(email);
 
   if (typeof renderTourCards === 'function') renderTourCards();
   if (typeof renderArchiveTimeline === 'function') renderArchiveTimeline();
@@ -383,24 +368,6 @@ async function sendEmailOTP() {
 }
 async function verifyEmailOTP() {
   return signInWithPassword();
-}
-
-function logoutEmailUser() {
-  if (!confirm('确认退出当前邮箱？')) return;
-  saveSession(null);
-  AppState.pendingAuthEmail = '';
-  AppState.authEmail = '';
-  AppState.accessToken = '';
-  AppState.isAdmin = false;
-  // 退出邮箱不影响已独立验证的管理员密码解锁态。
-  const emailInput = document.getElementById('auth-email-input');
-  if (emailInput) { emailInput.disabled = false; emailInput.value = ''; }
-  const passwordInput = document.getElementById('auth-password-input');
-  if (passwordInput) { passwordInput.value = ''; passwordInput.disabled = false; }
-  syncAuthState();
-  alert(AppState.isAdminPasswordVerified
-    ? '已退出邮箱登录；管理员密码解锁态仍然有效'
-    : '已退出登录');
 }
 
 // 读取登录态用的请求头（写操作请走服务端校验，见 functions/rpc）
