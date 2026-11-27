@@ -338,7 +338,10 @@ function buildHomeTimelineList() {
     });
   };
 
-  (Array.isArray(AppState.cloudTickets) ? AppState.cloudTickets : []).forEach(item => push({
+  const visibleTickets = typeof filterVisibleShowRecords === 'function'
+    ? filterVisibleShowRecords(AppState.cloudTickets)
+    : (Array.isArray(AppState.cloudTickets) ? AppState.cloudTickets : []).filter(item => String(item && item.artist || '').toUpperCase() !== 'HIDDEN');
+  visibleTickets.forEach(item => push({
     artist: item.artist || 'ONER',
     city: item.city || item.title || '待定场次',
     venue: item.venue || '',
@@ -362,6 +365,7 @@ function buildHomeTimelineList() {
       ts: typeof parseLocalTime === 'function' ? parseLocalTime(rec.date) : new Date(rec.date).getTime()
     }))
     .filter(rec => !isNaN(rec.ts))
+    .filter(rec => String(rec.artist || '').toUpperCase() !== 'HIDDEN' && !String(rec.city || '').includes('HIDDEN|'))
     .sort((a, b) => b.ts - a.ts);
 }
 

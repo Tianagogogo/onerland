@@ -47,10 +47,10 @@ function resolveShowSeriesKey(item, isArchive) {
 
 function listAllShowRecords() {
   const records = [];
-  (Array.isArray(AppState.cloudTickets) ? AppState.cloudTickets : [])
-    .forEach(item => records.push({ item, isArchive: false }));
-  (Array.isArray(AppState.cloudArchives) ? AppState.cloudArchives : [])
-    .forEach(item => records.push({ item, isArchive: true }));
+  const visibleTickets = typeof filterVisibleShowRecords === 'function' ? filterVisibleShowRecords(AppState.cloudTickets) : (AppState.cloudTickets || []);
+  const visibleArchives = typeof filterVisibleShowRecords === 'function' ? filterVisibleShowRecords(AppState.cloudArchives) : (AppState.cloudArchives || []);
+  visibleTickets.forEach(item => records.push({ item, isArchive: false }));
+  visibleArchives.forEach(item => records.push({ item, isArchive: true }));
   return records;
 }
 
@@ -1811,7 +1811,7 @@ function renderTourCards() {
   const pref = getFanPrefState();
   const { autoFilterShows, biasType, biasMembers } = pref;
 
-  const list = AppState.cloudTickets
+  const list = filterVisibleShowRecords(AppState.cloudTickets)
     .filter(t => {
       if (AppState.activeArtistId !== 'ALL') {
         const meta = ARTIST_COLORS[t.artist];
@@ -2198,7 +2198,7 @@ function renderArchiveTimeline() {
     : AppState.activeArchiveType;
 
   // 往日演出统一按演出日期时间正序排列，同日多场按开场时间、记录 ID 次级排序。
-  const filtered = AppState.cloudArchives
+  const filtered = filterVisibleShowRecords(AppState.cloudArchives)
     .filter(a => {
       if (archiveType !== 'ALL' && a.subType !== archiveType) return false;
       if (year !== 'ALL' && getArchiveYear(a) !== year) return false;

@@ -584,6 +584,23 @@ function mergeShowRecords(localRecords, cloudRecords, isArchive) {
   return kept;
 }
 
+// ================= 隐藏标记行过滤（历史 HIDDEN| 墓碑数据不再当真实演出） =================
+function isHiddenMarkerItem(item) {
+  if (!item) return true;
+  const artist = String(item.artist || '').trim().toUpperCase();
+  if (artist === 'HIDDEN') return true;
+  const title = String(item.title || '');
+  const city = String(item.city || '');
+  const venue = String(item.venue || '');
+  return title.startsWith('HIDDEN|') || title.includes('HIDDEN|')
+    || city.startsWith('HIDDEN|') || city.includes('HIDDEN|')
+    || venue.startsWith('HIDDEN|');
+}
+
+function filterVisibleShowRecords(list) {
+  return (Array.isArray(list) ? list : []).filter(item => !isHiddenMarkerItem(item));
+}
+
 function renderLoadedTourData() {
   if (typeof renderThemeQuickBar === 'function') renderThemeQuickBar();
   if (typeof renderTourCards === 'function') renderTourCards();
@@ -618,6 +635,9 @@ async function loadTourData() {
     for (const row of list) {
       const rawTitle = row.title || '';
       const rawPlat = row.platform || '';
+
+      // 历史隐藏标记行（HIDDEN|...）绝不当成真实演出解析
+      if (rawTitle.startsWith('HIDDEN|') || rawTitle.includes('HIDDEN|')) continue;
 
       // 单条脏数据不能让整页演出消失：逐行隔离解析异常。
       try {
@@ -712,8 +732,8 @@ async function loadTourData() {
       }
     }
 
-    AppState.cloudTickets = mergeShowRecords([], tickets, false);
-    AppState.cloudArchives = mergeShowRecords([], archives, true);
+    AppState.cloudTickets = filterVisibleShowRecords(mergeShowRecords([], tickets, false));
+    AppState.cloudArchives = filterVisibleShowRecords(mergeShowRecords([], archives, true));
     AppState.showLoadError = '';
   } catch (err) {
     AppState.cloudTickets = [];
