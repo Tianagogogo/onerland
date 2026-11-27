@@ -11,6 +11,37 @@ function normalizeSeriesKey(rawTitle = '', savedTheme = '') {
   return '';
 }
 
+// ================= 全局标签切换 =================
+function switchMainTab(tabId) {
+  const sections = {
+    home: 'view-home-page',
+    shows: 'view-shows-page',
+    footprint: 'view-footprint-page',
+    feeds: 'view-feeds-page'
+  };
+  Object.entries(sections).forEach(([id, sel]) => {
+    const el = document.getElementById(sel);
+    if (el) el.classList.add('hidden');
+    const btn = document.getElementById(`top-tab-${id}`) || document.getElementById(`bottom-tab-${id}`);
+    if (btn) {
+      if (id === tabId) {
+        btn.classList.add('obsidian-btn', 'text-white', 'font-semibold');
+        btn.classList.remove('text-slate-600');
+      } else {
+        btn.classList.remove('obsidian-btn', 'text-white', 'font-semibold');
+        btn.classList.add('text-slate-600');
+      }
+    }
+  });
+  const target = document.getElementById(sections[tabId]);
+  if (target) target.classList.remove('hidden');
+  if (tabId === 'home' && typeof renderHomeDashboard === 'function') renderHomeDashboard();
+  if (tabId === 'shows' && typeof renderTourCards === 'function') renderTourCards();
+  if (tabId === 'footprint' && typeof renderFootprintPage === 'function') renderFootprintPage();
+  if (tabId === 'feeds' && typeof renderFeedsSectionOnly === 'function') renderFeedsSectionOnly();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 function requestExternalToolJump(url, siteName, venueName = '') {
   AppState.pendingExternalUrl = url;
   document.getElementById('ext-confirm-site').textContent = siteName;

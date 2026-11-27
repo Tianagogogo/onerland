@@ -1,6 +1,7 @@
 // ================= 全局状态与常量 =================
 const AppState = {
   activeArtistId: 'ALL',
+  activeAccountId: 'ALL',
   activeArchiveType: 'ALL',
   isArchiveExpanded: false,
   editingTicketId: null,
@@ -10,6 +11,13 @@ const AppState = {
   cloudTickets: [],
   cloudArchives: [],
   cloudFeeds: [],
+  allPosts: [],
+  footprints: [],
+  anniversary: {
+    firstMeetDate: '',
+    fanNickname: '',
+    customEvents: []
+  },
   fanPref: {
     biasType: 'group',
     biasMembers: [],
@@ -36,14 +44,7 @@ if (typeof window.updateAuthButtonUI !== 'function') {
   };
 }
 
-const SB_HEADERS = typeof SUPABASE_ANON_KEY !== 'undefined'
-  ? {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation'
-    }
-  : { 'Content-Type': 'application/json' };
+// SB_HEADERS 统一由 js/config.js 提供（config.js 先于 store.js 加载），此处不再重复声明
 
 // ================= 图片压缩工具 =================
 function compressImageToDataURL(file, maxWidth = 800, quality = 0.72) {
@@ -82,7 +83,21 @@ function openLightbox(src, caption = '') {
   box.classList.remove('hidden');
 }
 
-// ================= 云端演出与往日档案加载 =================
+// ================= 动态/足迹加载占位（暂无云端数据时作为兜底） =================
+async function loadAllFeeds() {
+  // 当前版本动态模块为纯本地/静态展示，云端动态接口未启用
+  // 如有本地 feeds_data.json 数据，可在此解析并写入 AppState.allPosts
+  if (typeof renderTimeline === 'function') renderTimeline();
+  if (typeof renderFeedBriefCard === 'function') renderFeedBriefCard();
+}
+
+// ================= AI Key 状态（暂无对应 UI，先提供空实现避免启动报错） =================
+function updateAiKeyStatusUI() {
+  const badge = document.getElementById('ai-key-status');
+  if (!badge) return;
+  const key = localStorage.getItem(GEMINI_KEY_STORAGE);
+  badge.textContent = key ? 'AI 已配置' : '未配置';
+}
 async function loadTourData() {
   if (typeof window.updateAuthButtonUI === 'function') {
     window.updateAuthButtonUI();
@@ -93,7 +108,8 @@ async function loadTourData() {
     if (typeof renderTourCards === 'function') renderTourCards();
     if (typeof updateArchiveYearOptions === 'function') updateArchiveYearOptions();
     if (typeof renderArchiveTimeline === 'function') renderArchiveTimeline();
-    if (typeof renderHomeUpcomingTimeline === 'function') renderHomeUpcomingTimeline();
+    if (typeof renderUpcomingMiniTimeline === 'function') renderUpcomingMiniTimeline();
+    if (typeof renderHomeDashboard === 'function') renderHomeDashboard();
     return;
   }
 
@@ -192,7 +208,8 @@ async function loadTourData() {
   if (typeof renderTourCards === 'function') renderTourCards();
   if (typeof updateArchiveYearOptions === 'function') updateArchiveYearOptions();
   if (typeof renderArchiveTimeline === 'function') renderArchiveTimeline();
-  if (typeof renderHomeUpcomingTimeline === 'function') renderHomeUpcomingTimeline();
+  if (typeof renderUpcomingMiniTimeline === 'function') renderUpcomingMiniTimeline();
+  if (typeof renderHomeDashboard === 'function') renderHomeDashboard();
   if (typeof renderAdminTodoQueue === 'function') renderAdminTodoQueue();
 }
 

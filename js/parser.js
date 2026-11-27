@@ -1,23 +1,4 @@
-function compressImageToDataURL(file, maxWidth = 760, quality = 0.72) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let w = img.width, h = img.height;
-        if (w > maxWidth) { h = Math.round((h * maxWidth) / w); w = maxWidth; }
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.onerror = reject;
-      img.src = e.target.result;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
+// compressImageToDataURL 统一由 js/store.js 提供（store.js 先于 parser.js 加载），此处不再重复声明
 
 function preprocessImageForLocalOCR(dataUrl) {
   return new Promise((resolve, reject) => {
