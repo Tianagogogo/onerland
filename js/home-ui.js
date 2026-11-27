@@ -350,6 +350,21 @@ function buildHomeTimelineList() {
     cloudId: item.cloudId
   }));
 
+  // 往日档案（Supabase tickets 中的 ARCHIVE 记录）同样参与时间轴排序，
+  // 否则 2022 年的足迹会顶到最前，而 2023–2025 的已落幕巡演完全不出现。
+  const visibleArchives = typeof filterVisibleShowRecords === 'function'
+    ? filterVisibleShowRecords(AppState.cloudArchives)
+    : (Array.isArray(AppState.cloudArchives) ? AppState.cloudArchives : []);
+  visibleArchives.forEach(item => push({
+    artist: item.artist || 'ONER',
+    city: item.title || item.city || '往日场次',
+    venue: item.venue || '',
+    date: String(item.showDate || '').slice(0, 10),
+    posterUrl: item.posterUrl || item.poster_url || item.poster || item.cover || item.cover_url || item.image || '',
+    cloudId: item.cloudId,
+    isArchive: true
+  }));
+
   (Array.isArray(AppState.footprints) ? AppState.footprints : []).forEach(f => push({
     artist: f.artist || 'ONER',
     city: f.title || f.city || '我的场次',
@@ -408,7 +423,7 @@ function renderUpcomingMiniTimeline() {
         </div>
         <div class="flex items-center gap-1.5 shrink-0">
           <span class="text-[10px] px-1.5 py-0.5 rounded ${isFuture ? 'bg-white border border-slate-300 text-slate-600' : 'bg-slate-100 text-slate-500'}">${isFuture ? '待开演' : '已落幕'}</span>
-          ${typeof item.cloudId === 'number' ? `<button type="button" onclick="exportShowICS(${item.cloudId})" class="tour-action-btn tour-action-btn--mini" title="导出日历提醒">📅 日历</button>` : ''}
+          ${(typeof item.cloudId === 'number' && !item.isArchive) ? `<button type="button" onclick="exportShowICS(${item.cloudId})" class="tour-action-btn tour-action-btn--mini" title="导出日历提醒">📅 日历</button>` : ''}
           <button type="button" onclick="switchMainTab('shows')" class="tour-action-btn tour-action-btn--mini">详情</button>
         </div>
       </div>
