@@ -11,11 +11,15 @@
         "platform": "大麦｜坤音商城小程序｜猫眼｜携程"
       }
     ],
-    "source_url": "https://weibo.com/6400910760/RtbKdeznG",
+    "source_url": "https://weibo.com/6524267181/Rt9NK4nxD",
     "related_urls": [
-      "https://weibo.com/6400910760/RtbKdeznG"
+      "https://weibo.com/6400910760/RtbKdeznG",
+      "https://weibo.com/6524267181/Rtjq3cnIv",
+      "https://weibo.com/6524267181/Rtiov3F1g",
+      "https://weibo.com/6524267181/Rt9NK4nxD",
+      "https://weibo.com/6392771552/RtbJU3luk"
     ],
-    "_priority": 3
+    "_priority": 1
   },
   {
     "artist": "ONER",
@@ -29,12 +33,15 @@
         "platform": "大麦 / 坤音商城小程序 / 猫眼 / 携程"
       }
     ],
-    "source_url": "https://weibo.com/6400910962/Rs5U8agNf",
+    "source_url": "https://weibo.com/6524267181/Rsep5h8Zc",
     "related_urls": [
       "https://weibo.com/6400910760/Rs5TNeLks",
-      "https://weibo.com/6400910962/Rs5U8agNf"
+      "https://weibo.com/6400910962/Rs5U8agNf",
+      "https://weibo.com/6524267181/Rsfo6bEZu",
+      "https://weibo.com/6524267181/Rsep5h8Zc",
+      "https://weibo.com/6392771552/Rs5Tnwav6"
     ],
-    "_priority": 3
+    "_priority": 1
   },
   {
     "artist": "ONER",
@@ -51,6 +58,99 @@
     "source_url": "https://weibo.com/6400910962/RtbKO8AVN",
     "related_urls": [
       "https://weibo.com/6400910962/RtbKO8AVN"
+    ],
+    "_priority": 3
+  },
+  {
+    "artist": "ONER",
+    "city": "北京站",
+    "venue": "北京市华熙生物·润百颜ECM中心",
+    "show_date": "12月6日（周日）",
+    "rounds": [],
+    "source_url": "https://weibo.com/6524267181/RsJhqEcPk",
+    "related_urls": [
+      "https://weibo.com/6524267181/RsJhqEcPk"
+    ],
+    "_priority": 1
+  },
+  {
+    "artist": "ONER",
+    "city": "北京站",
+    "venue": "北京市华熙生物·润百颜ECM中心",
+    "show_date": "2020-12-05",
+    "rounds": [
+      {
+        "round_name": "二开",
+        "sale_time": "2020-11-23 13:14",
+        "platform": "大麦 / 猫眼"
+      }
+    ],
+    "source_url": "https://weibo.com/6524267181/Rsy5JaFn2",
+    "related_urls": [
+      "https://weibo.com/6524267181/RsHBidEOp",
+      "https://weibo.com/6524267181/Rsy5JaFn2"
+    ],
+    "_priority": 1
+  },
+  {
+    "artist": "ONER",
+    "city": "北京站",
+    "venue": "北京市华熙生物・润百颜 ECM 中心",
+    "show_date": "2026-12-05 00:00",
+    "rounds": [
+      {
+        "round_name": "二开",
+        "sale_time": "2026-11-23 13:14",
+        "platform": "大麦 / 猫眼"
+      }
+    ],
+    "source_url": "https://weibo.com/6524267181/RsGGvmZ6m",
+    "related_urls": [
+      "https://weibo.com/6524267181/RsGGvmZ6m"
+    ],
+    "_priority": 1
+  },
+  {
+    "artist": "ONER",
+    "city": "佛山站",
+    "venue": "待公布",
+    "show_date": "2026-11-29",
+    "rounds": [],
+    "source_url": "https://weibo.com/6524267181/Rsp3455d8",
+    "related_urls": [
+      "https://weibo.com/6524267181/Rsp3455d8"
+    ],
+    "_priority": 1
+  },
+  {
+    "artist": "ONER",
+    "city": "上海站",
+    "venue": "浦发银行东方体育中心",
+    "show_date": "2026-02-07 18:00",
+    "rounds": [
+      {
+        "round_name": "三开",
+        "sale_time": "2026-02-05 13:14",
+        "platform": "大麦 / 猫眼 / 票星球"
+      }
+    ],
+    "source_url": "https://weibo.com/6062604272/Qq8puDe6w",
+    "related_urls": [
+      "https://weibo.com/6062604272/QqrunxUJu",
+      "https://weibo.com/6062604272/QqiCVEfKA",
+      "https://weibo.com/6062604272/Qq8puDe6w"
+    ],
+    "_priority": 1
+  },
+  {
+    "artist": "岳岳",
+    "city": "长沙站",
+    "venue": "达丰空间（锦秀店）",
+    "show_date": "2026-09-12 19:00",
+    "rounds": [],
+    "source_url": "https://weibo.com/6392771552/Rh9sedFVC",
+    "related_urls": [
+      "https://weibo.com/6392771552/Rh9sedFVC"
     ],
     "_priority": 3
   }
