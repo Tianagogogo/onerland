@@ -423,7 +423,7 @@ function buildSlotHoverBadgeHTML(slotText, scheduleImgs, popoverId, titleLabel) 
         </div>
         <div class="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto no-scrollbar">
           ${imgs.map((src, i) => `
-            <img src="${src}" data-cap="${safeTitle} · 时间表 #${i + 1}" loading="lazy" decoding="async" onload="this.classList.add(&#39;is-loaded&#39;)"
+            <img src="${src}" data-cap="${safeTitle} · 时间表 #${i + 1}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)"
               onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)"
               class="w-full h-24 object-cover rounded-lg border border-slate-200 cursor-zoom-in hover:opacity-90 bg-slate-50" />
           `).join('')}
@@ -1156,7 +1156,7 @@ function openSeriesModal(themeKey) {
         return `
           <div class="p-3 rounded-xl bg-white border border-slate-200 flex gap-3 text-xs">
             <div class="w-16 poster-square-box shrink-0">
-              ${s.posterUrl ? `<img src="${s.posterUrl}" alt="${safeTitle}" data-cap="${safeTitle} · 海报" loading="lazy" decoding="async" onload="this.classList.add(&#39;is-loaded&#39;)" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" />` : `<div class="w-full h-full flex items-center justify-center text-[10px] text-slate-400">ONER</div>`}
+              ${s.posterUrl ? `<img src="${s.posterUrl}" alt="${safeTitle}" data-cap="${safeTitle} · 海报" loading="lazy" decoding="async" referrerpolicy="no-referrer" onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" />` : `<div class="w-full h-full flex items-center justify-center text-[10px] text-slate-400">ONER</div>`}
             </div>
             <div class="min-w-0 flex-1 space-y-1">
               <div class="flex items-center justify-between gap-1">
@@ -1906,7 +1906,7 @@ function renderTourCards() {
       <div class="p-4 rounded-2xl metal-card flex flex-col gap-3" data-show-card="${item.cloudId || idx}" style="--fan-theme:${getFanPrefThemeColor()}">
         <div class="flex gap-3.5">
           <div class="w-24 poster-square-box shrink-0">
-            ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeCity}" data-cap="${safeCity} · 演出海报" loading="lazy" decoding="async" onload="this.classList.add(&#39;is-loaded&#39;)" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
+            ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeCity}" data-cap="${safeCity} · 演出海报" loading="lazy" decoding="async" referrerpolicy="no-referrer" onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
           </div>
           <div class="flex-1 min-w-0 space-y-1.5">
             <div class="flex items-start justify-between gap-2">
@@ -1924,7 +1924,7 @@ function renderTourCards() {
             ${item.prices ? `<p class="text-[11px] text-slate-600">💰 ${item.prices}</p>` : ''}
             ${safeBooth ? `<p class="text-[11px] text-slate-500 truncate" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</p>` : ''}
             <div class="flex items-center gap-1.5 flex-wrap">
-              ${seatUrl ? `<button type="button" onclick="openLightbox(this.dataset.seatUrl, '座位图')" data-seat-url="${seatUrl}" class="tour-action-btn tour-action-btn--mini">💺 查看座位图</button>` : ''}
+              ${(seatUrl || item.hasSeatMap) ? `<button type="button" onclick="openSeatMapForShow('${item.cloudId || ''}', this.dataset.seatUrl || '', '座位图')" data-seat-url="${seatUrl}" class="tour-action-btn tour-action-btn--mini">💺 查看座位图</button>` : ''}
               <button type="button" onclick="requestExternalToolJump('${shiyeLiveUrl}', '视野 live（非官方座位视野工具站）', '${cleanVenue || safeCity}')" class="tour-action-btn tour-action-btn--mini">🔭 视野 live ↗</button>
               ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeCity)}
             </div>
@@ -2016,15 +2016,14 @@ function renderTourCards() {
 
             <div class="space-y-1 pt-1 border-t border-slate-100">
               <span class="text-[11px] font-semibold text-slate-700">联系方式（选填，仅双方同意后互换）：</span>
-              <div class="flex gap-1.5">
-                <select id="buddy-platform-${item.cloudId}" class="select-clean px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-[11px] shrink-0">
+              <div class="buddy-contact-row">
+                <select id="buddy-platform-${item.cloudId}" class="buddy-platform-select">
                   ${BUDDY_PLATFORMS.map(pf => `<option value="${pf}">${pf}</option>`).join('')}
                 </select>
                 <input id="buddy-contact-${item.cloudId}" type="text" maxlength="30" autocomplete="off"
-                  placeholder="账号 ID（勿填手机号/网址）"
-                  class="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-[11px]" />
+                  placeholder="账号 ID（勿填手机号/网址）" class="buddy-contact-input" />
               </div>
-              <p class="text-[10px] text-slate-400 leading-relaxed">⚠️ 严禁填写手机号、身份证号或转账链接，线下见面请核对票根并注意安全</p>
+              <p class="buddy-safety-hint">⚠️ 严禁填写手机号、身份证号或转账链接，线下见面请核对票根并注意安全</p>
             </div>
           </div>
 
@@ -2242,7 +2241,7 @@ function renderArchiveTimeline() {
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div class="flex items-center gap-3.5 min-w-0 w-full">
             <div class="w-16 poster-square-box shrink-0">
-              ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" data-cap="${safeTitle} · 往日海报" loading="lazy" decoding="async" onload="this.classList.add(&#39;is-loaded&#39;)" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs text-slate-400">ONER</div>`}
+              ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" data-cap="${safeTitle} · 往日海报" loading="lazy" decoding="async" referrerpolicy="no-referrer" onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs text-slate-400">ONER</div>`}
             </div>
             <div class="min-w-0 space-y-1">
               <div class="flex items-center gap-1.5 flex-wrap">

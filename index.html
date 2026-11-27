@@ -192,16 +192,16 @@
       </div>
       <div class="space-y-1">
         <label for="buddy-req-contact" class="text-[11px] font-semibold text-slate-700">我的联系方式（必填，仅对方同意后可见）：</label>
-        <div class="flex gap-1.5">
-          <select id="buddy-req-platform" class="select-clean px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-[11px] shrink-0">
+        <div class="buddy-contact-row">
+          <select id="buddy-req-platform" class="buddy-platform-select">
             <option value="小红书号">小红书号</option>
             <option value="微博ID">微博ID</option>
             <option value="微信号">微信号</option>
           </select>
           <input id="buddy-req-contact" type="text" maxlength="30" autocomplete="off"
-            placeholder="账号 ID（勿填手机号/网址）" class="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-[11px]" />
+            placeholder="账号 ID（勿填手机号/网址）" class="buddy-contact-input" />
         </div>
-        <p class="text-[10px] text-slate-400 leading-relaxed">⚠️ 严禁填写手机号、身份证号或转账链接，线下见面请核对票根并注意安全</p>
+        <p class="buddy-safety-hint">⚠️ 严禁填写手机号、身份证号或转账链接，线下见面请核对票根并注意安全</p>
       </div>
       <button type="button" onclick="submitBuddyRequestFromModal()" class="tour-action-btn w-full font-semibold">发送申请</button>
     </div>
@@ -262,6 +262,13 @@
             <input id="adm-title" type="text" placeholder="站次标题 / 演出名称" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
             <input id="adm-date" type="text" placeholder="演出日期 YYYY-MM-DD" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
             <input id="adm-poster" type="text" placeholder="海报链接或 Base64（选填）" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
+            <div class="col-span-2 flex gap-2 items-center">
+              <input id="adm-seat" type="text" placeholder="座位图链接或 Base64（选填，列表不预加载）" class="flex-1 px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
+              <label class="cursor-pointer px-2.5 py-1.5 rounded-lg liquid-silver-btn font-medium shrink-0">
+                上传座位图
+                <input type="file" accept="image/*" class="hidden" onchange="handleAdminSeatFile(event)" />
+              </label>
+            </div>
             <input id="adm-url" type="text" placeholder="原帖/购票链接 https://..." class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
             <input id="adm-sale-time" type="datetime-local" title="开票时间（用于倒计时）" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
             <input id="adm-sale-plat" type="text" placeholder="购票平台（如:大麦）" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
@@ -336,6 +343,7 @@
     if (location.hash === '#admin') openHiddenAdminDrawer();
     switchMainTab('home');
     loadTourData();
+    if (typeof startPosterTimeoutGuard === 'function') startPosterTimeoutGuard();
     setInterval(updateCountdowns, 1000);
   </script>
 

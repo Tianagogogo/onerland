@@ -324,7 +324,7 @@ if (typeof window.updateAuthButtonUI !== 'function') {
 // SB_HEADERS 统一由 js/config.js 提供（config.js 先于 store.js 加载），此处不再重复声明
 
 // ================= 图片压缩工具 =================
-function compressImageToDataURL(file, maxWidth = 800, quality = 0.72) {
+function compressImageToDataURL(file, maxWidth = 800, quality = 0.72, maxBytes = 150 * 1024) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = ev => {
@@ -336,7 +336,35 @@ function compressImageToDataURL(file, maxWidth = 800, quality = 0.72) {
         canvas.height = Math.max(1, Math.round(img.height * ratio));
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+
+        const encode = (type, q) => {
+          try { return canvas.toDataURL(type, q); } catch (e) { return ''; }
+        };
+        // 优先 WebP（体积更小），不支持时回退 JPEG
+        let out = encode('image/webp', quality);
+        if (!out || !out.startsWith('data:image/webp')) out = encode('image/jpeg', quality);
+
+        // 单张控制在 150KB 以内：逐步降质，仍超标则缩尺寸
+        let q = quality;
+        while (out && out.length * 0.75 > maxBytes && q > 0.45) {
+          q -= 0.08;
+          const next = encode('image/webp', q) || encode('image/jpeg', q);
+          if (!next) break;
+          out = next;
+        }
+        let guard = 0;
+        while (out && out.length * 0.75 > maxBytes && canvas.width > 240 && guard < 4) {
+          const shrink = document.createElement('canvas');
+          shrink.width = Math.round(canvas.width * 0.8);
+          shrink.height = Math.round(canvas.height * 0.8);
+          shrink.getContext('2d').drawImage(canvas, 0, 0, shrink.width, shrink.height);
+          canvas.width = shrink.width;
+          canvas.height = shrink.height;
+          canvas.getContext('2d').drawImage(shrink, 0, 0);
+          out = encode('image/webp', q) || encode('image/jpeg', q);
+          guard += 1;
+        }
+        resolve(out);
       };
       img.onerror = reject;
       img.src = ev.target.result;
@@ -344,6 +372,60 @@ function compressImageToDataURL(file, maxWidth = 800, quality = 0.72) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+// ================= 外链海报：3 秒超时降级 + 座位图按需查询 =================
+function degradePosterImage(img) {
+  if (!img || img.dataset.degraded === '1') return;
+  img.dataset.degraded = '1';
+  const box = img.closest ? img.closest('.poster-square-box') : null;
+  if (box) box.classList.add('is-poster-fallback');
+  img.style.display = 'none';
+}
+
+function handlePosterImageError(img) {
+  degradePosterImage(img);
+}
+
+function startPosterTimeoutGuard() {
+  if (window.__posterGuardStarted) return;
+  window.__posterGuardStarted = true;
+  setInterval(() => {
+    document.querySelectorAll('.poster-square-box img').forEach(img => {
+      if (img.dataset.degraded === '1') return;
+      const loaded = img.complete && img.naturalWidth > 0;
+      if (loaded) { img.dataset.firstSeen = ''; return; }
+      if (!img.dataset.firstSeen) { img.dataset.firstSeen = String(Date.now()); return; }
+      if (Date.now() - Number(img.dataset.firstSeen) > 3000) degradePosterImage(img);
+    });
+  }, 800);
+}
+
+// 座位图/视野大图不随列表预加载，点击时按 id 单独查询云端记录
+async function openSeatMapForShow(cloudId, fallbackUrl, caption) {
+  const localUrl = fallbackUrl || '';
+  if (!cloudId || typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) {
+    if (localUrl) openLightbox(localUrl, caption || '座位图');
+    else alert('该场次暂未上传座位图');
+    return;
+  }
+  let seatUrl = '';
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tickets?id=eq.${encodeURIComponent(cloudId)}&select=platform`, {
+      headers: SB_HEADERS, cache: 'no-store'
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      const raw = rows && rows[0] ? String(rows[0].platform || '') : '';
+      const jsonText = raw.startsWith('META:') ? raw.slice(5) : raw;
+      let meta = {};
+      try { meta = JSON.parse(jsonText); } catch (e) { meta = {}; }
+      seatUrl = meta.seatUrl || meta.seatMapUrl || meta.seatMap || meta.seat_map || meta.seat_url || '';
+    }
+  } catch (e) { /* 网络失败走本地兜底 */ }
+  const finalUrl = seatUrl || localUrl;
+  if (finalUrl) openLightbox(finalUrl, caption || '座位图');
+  else alert('该场次暂未上传座位图');
 }
 
 // ================= 全局图片灯箱（置顶防遮挡） =================
@@ -389,8 +471,9 @@ async function loadLocalTourData() {
   const response = await fetch('./tour_data.json', { cache: 'no-store' });
   if (!response.ok) throw new Error(`本地演出数据 HTTP ${response.status}`);
   const rows = await response.json();
-  const list = Array.isArray(rows) ? rows : [];
-  AppState.cloudTickets = list.filter(item => item && item.show_date).map((item, index) => ({
+  // 兼容数组或 {0:...,1:...} 对象两种导出格式
+  const list = Array.isArray(rows) ? rows : Object.values(rows || {});
+  const localTickets = list.filter(item => item && item.show_date).map((item, index) => ({
     ...item,
     cloudId: item.cloudId || `local-${index + 1}`,
     artist: item.artist || 'ONER',
@@ -399,42 +482,95 @@ async function loadLocalTourData() {
     rounds: Array.isArray(item.rounds) ? item.rounds : [],
     source_url: item.source_url || item.url || ''
   }));
-  AppState.cloudArchives = list.filter(item => item && item.showDate).map((item, index) => ({
+  AppState.cloudTickets = mergeShowRecords(localTickets, [], false);
+  const localArchives = list.filter(item => item && item.showDate).map((item, index) => ({
     ...item,
     cloudId: item.cloudId || `local-archive-${index + 1}`,
     artist: item.artist || 'ONER',
     year: item.year || String(item.showDate).slice(0, 4),
     subType: item.subType || 'tour'
   }));
+  AppState.cloudArchives = mergeShowRecords(localArchives, [], true);
   AppState.showLoadError = '';
+}
+
+function normalizeShowDateKey(value) {
+  const str = String(value || '');
+  const m = str.match(/\d{4}-\d{2}-\d{2}/);
+  return m ? m[0] : '';
 }
 
 function mergeShowRecords(localRecords, cloudRecords, isArchive) {
   const keyOf = item => isArchive
     ? `${item.artist || ''}|${item.title || ''}|${item.showDate || ''}`
     : `${item.artist || ''}|${item.city || ''}|${item.show_date || ''}`;
-  // 并集合并：本地内置完整数据集打底，云端记录补充/覆盖同场次字段，
-  // 云端返回为空或只返回少量记录时，本地 2026 巡演与历年档案依然保留。
+
+  const dateOf = item => normalizeShowDateKey(isArchive ? item.showDate : item.show_date);
+  const geoOf = item => `${item.city || ''}${item.title || ''}${item.venue || ''}`;
+
+  // 同日期 + 城市/场馆关键字重合 → 视为同一场，云端记录为准
+  const isSameShow = (a, b) => {
+    const da = dateOf(a), db = dateOf(b);
+    if (!da || !db || da !== db) return false;
+    const ca = String(a.city || a.title || '');
+    const cb = String(b.city || b.title || '');
+    const cityMatch = Boolean(ca && cb) && (
+      ca === cb || ca.includes(cb) || cb.includes(ca) ||
+      (ca.length >= 2 && cb.length >= 2 && ca.slice(0, 2) === cb.slice(0, 2))
+    );
+    const va = String(a.venue || a.title || '');
+    const vb = String(b.venue || b.title || '');
+    const venueMatch = Boolean(va && vb) && (
+      va === vb || va.includes(vb) || vb.includes(va) ||
+      (va.length >= 2 && vb.length >= 2 && va.slice(0, 2) === vb.slice(0, 2))
+    );
+    return cityMatch || venueMatch;
+  };
+
   const merged = new Map();
   (Array.isArray(localRecords) ? localRecords : []).forEach(item => {
     if (item) merged.set(keyOf(item), item);
   });
+
   (Array.isArray(cloudRecords) ? cloudRecords : []).forEach(cloudItem => {
+    if (!cloudItem) return;
     const key = keyOf(cloudItem);
     const localItem = merged.get(key);
+
+    let targetKey = key;
     if (!localItem) {
+      // 语义去重：先剔除同日期同场馆的本地旧预置卡片，再写入云端最新记录
+      for (const [k, local] of merged.entries()) {
+        if (isSameShow(local, cloudItem)) {
+          merged.delete(k);
+          break;
+        }
+      }
       merged.set(key, cloudItem);
       return;
     }
+
     const combined = { ...localItem, ...cloudItem };
     Object.keys(localItem).forEach(field => {
       if ((cloudItem[field] === '' || cloudItem[field] == null) && localItem[field] !== '' && localItem[field] != null) {
         combined[field] = localItem[field];
       }
     });
-    merged.set(key, combined);
+    merged.set(targetKey, combined);
   });
-  return [...merged.values()];
+
+  // 二次兜底：仍存在同日期 + 同城/同场馆的重复时，优先保留带 cloudId 的云端记录
+  const result = [...merged.values()];
+  const seen = [];
+  result.forEach(item => {
+    const dupIdx = seen.findIndex(prev => isSameShow(prev, item));
+    if (dupIdx === -1) { seen.push(item); return; }
+    const prev = seen[dupIdx];
+    const itemIsCloud = item.cloudId != null && !String(item.cloudId).startsWith('local');
+    const prevIsCloud = prev.cloudId != null && !String(prev.cloudId).startsWith('local');
+    if (itemIsCloud && !prevIsCloud) seen[dupIdx] = item;
+  });
+  return seen;
 }
 
 function renderLoadedTourData() {
@@ -521,6 +657,8 @@ async function loadTourData() {
           venue: meta.venue || '演出现场',
           posterUrl: meta.posterUrl || '',
           prices: meta.prices || '',
+          // 座位图不参与列表渲染，点击「查看座位图」时才作为大图打开/按需查询
+          hasSeatMap: Boolean(meta.seatUrl || meta.seatMapUrl || meta.seatMap || meta.seat_map || meta.seat_url),
           seatUrl: meta.seatUrl || meta.seatMapUrl || meta.seatMap || meta.seat_map || meta.seat_url || '',
           slot: meta.slot || '',
           merchBooth: meta.merchBooth || '',
@@ -562,6 +700,7 @@ async function loadTourData() {
           show_date: showDate,
           rounds,
           posterUrl: meta.posterUrl || '',
+          hasSeatMap: Boolean(meta.seatUrl || meta.seatMapUrl || meta.seatMap || meta.seat_map || meta.seat_url),
           seatUrl: meta.seatUrl || meta.seatMapUrl || meta.seatMap || meta.seat_map || meta.seat_url || '',
           prices: meta.prices || '',
           transport: meta.transport || '',

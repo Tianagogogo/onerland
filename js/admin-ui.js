@@ -31,10 +31,21 @@ function addAdminScheduleUrl() {
   renderAdminScheduleThumbs();
 }
 
+async function handleAdminSeatFile(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  // 座位图：最大宽 1200px、质量 0.82、单张 ≤150KB
+  const dataUrl = await compressImageToDataURL(file, 1200, 0.82, 150 * 1024);
+  const seatInput = document.getElementById('adm-seat');
+  if (seatInput) seatInput.value = dataUrl;
+  event.target.value = '';
+}
+
 async function handleAdminPosterFile(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  const dataUrl = await compressImageToDataURL(file, 760, 0.72);
+  // 海报：最大宽 600px、质量 0.78、单张 ≤150KB，浏览器端压成 WebP
+  const dataUrl = await compressImageToDataURL(file, 600, 0.78, 150 * 1024);
   document.getElementById('adm-poster').value = dataUrl;
   const prev = document.getElementById('adm-poster-preview');
   prev.src = dataUrl;
@@ -59,6 +70,9 @@ function startEditShow(kind, cloudId) {
   document.getElementById('adm-date').value = kind === 'archive' ? (item.showDate || '') : ((item.show_date || '').slice(0, 10));
   document.getElementById('adm-body').value = item.venue || '';
   document.getElementById('adm-poster').value = item.posterUrl || '';
+  if (document.getElementById('adm-seat')) {
+    document.getElementById('adm-seat').value = item.seatUrl || '';
+  }
   document.getElementById('adm-slot').value = item.slot || '';
   if (document.getElementById('adm-merch-booth')) {
     document.getElementById('adm-merch-booth').value = item.merchBooth || '';
@@ -77,7 +91,7 @@ function resetAdminForm() {
   AppState.editingKind = null;
   adminScheduleImgs = [];
   renderAdminScheduleThumbs();
-  ['adm-title', 'adm-date', 'adm-body', 'adm-poster', 'adm-slot', 'adm-merch-booth', 'adm-url', 'adm-sale-time'].forEach(id => {
+  ['adm-title', 'adm-date', 'adm-body', 'adm-poster', 'adm-seat', 'adm-slot', 'adm-merch-booth', 'adm-url', 'adm-sale-time'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -93,6 +107,7 @@ async function submitAdminQuickPost() {
   const dateOrTime = document.getElementById('adm-date').value.trim();
   const venueOrBody = document.getElementById('adm-body').value.trim();
   const posterUrl = document.getElementById('adm-poster').value.trim();
+  const seatUrl = (document.getElementById('adm-seat')?.value || '').trim();
   const slotText = (document.getElementById('adm-slot')?.value || '').trim();
   const merchBooth = (document.getElementById('adm-merch-booth')?.value || '').trim();
   const url = document.getElementById('adm-url').value.trim();
@@ -111,6 +126,7 @@ async function submitAdminQuickPost() {
         platform: `META:${JSON.stringify({
           rounds,
           posterUrl,
+          seatUrl,
           slot: slotText,
           merchBooth,
           scheduleImgs: adminScheduleImgs,
@@ -137,7 +153,7 @@ async function submitAdminQuickPost() {
           venue: venueOrBody || '演出现场',
           posterUrl,
           prices: existing?.prices || '',
-          seatUrl: existing?.seatUrl || '',
+          seatUrl: seatUrl || existing?.seatUrl || '',
           slot: slotText,
           merchBooth,
           scheduleImgs: adminScheduleImgs,
