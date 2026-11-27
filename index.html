@@ -177,6 +177,28 @@
     </div>
   </div>
 
+  <!-- 👋 申请互换联系方式（双向同意后才会展示双方联系方式） -->
+  <div id="buddy-request-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="chronicle-card rounded-2xl max-w-sm w-full p-5 space-y-3 bg-white text-xs">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-sm text-slate-900">👋 申请互换联系方式</h3>
+        <button type="button" onclick="document.getElementById('buddy-request-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-800">✕</button>
+      </div>
+      <p class="text-[11px] text-slate-500 leading-relaxed">对方同意后，双方才能互相看到联系方式；公共列表不会展示任何人的社交账号。</p>
+      <div class="space-y-1">
+        <label for="buddy-req-note" class="text-[11px] font-semibold text-slate-700">简短备注（座位区域 / 行程，选填）：</label>
+        <input id="buddy-req-note" type="text" maxlength="60" autocomplete="off"
+          placeholder="如 内场 C 区 / 当天下午到" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-[11px]" />
+      </div>
+      <div class="space-y-1">
+        <label for="buddy-req-contact" class="text-[11px] font-semibold text-slate-700">我的联系方式（必填，仅对方同意后可见）：</label>
+        <input id="buddy-req-contact" type="text" maxlength="40" autocomplete="off"
+          placeholder="微信号 / 小红书号" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-[11px]" />
+      </div>
+      <button type="button" onclick="submitBuddyRequestFromModal()" class="tour-action-btn w-full font-semibold">发送申请</button>
+    </div>
+  </div>
+
   <div id="admin-unlock-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="chronicle-card rounded-2xl max-w-md w-full p-5 space-y-3 bg-white text-xs">
       <div class="flex items-center justify-between">

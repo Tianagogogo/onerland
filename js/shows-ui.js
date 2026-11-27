@@ -1256,28 +1256,93 @@ function getMergedBuddyEntries(cloudId) {
   return [...cloud, ...local.filter(x => !cloudIds.has(String(x.id)))];
 }
 
+function isBuddyOwner(entry) {
+  const owner = String((entry && (entry.deviceId || entry.ownerId)) || '');
+  return Boolean(owner) && owner === String(getDeviceId());
+}
+
+function escapeBuddyText(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function renderBuddyContactRow(label, value) {
+  if (!value) return '';
+  const safe = escapeBuddyText(value);
+  return `<div class="flex items-center gap-1.5 text-[10px] text-slate-600">
+    <span class="shrink-0">${label}</span>
+    <span class="font-mono break-all">${safe}</span>
+    <button type="button" onclick="copyBuddyContact('${safe}', event)" class="tour-action-btn tour-action-btn--mini shrink-0">复制</button>
+  </div>`;
+}
+
+function renderBuddyOwnerRequests(b) {
+  const state = buddyStateFor(b.id);
+  const reqs = state.ownerRequests || [];
+  if (!reqs.length) return '';
+  return `
+    <div class="mt-1.5 pt-1.5 border-t border-slate-100 space-y-1.5">
+      <div class="text-[10px] font-semibold text-slate-500">📨 收到的互换申请（${reqs.length}）</div>
+      ${reqs.map(r => `
+        <div class="p-2 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+          <div class="flex items-center justify-between gap-1.5">
+            <span class="text-[10px] font-semibold text-slate-700">${escapeBuddyText(r.requesterNickname)}</span>
+            <span class="text-[9px] text-slate-400">${escapeBuddyText(r.createdAt)}</span>
+          </div>
+          ${r.note ? `<div class="text-[10px] text-slate-500">备注：${escapeBuddyText(r.note)}</div>` : ''}
+          ${r.status === 'accepted'
+            ? `<div class="space-y-1 pt-0.5">
+                 ${renderBuddyContactRow('对方：', r.contact || '对方未填写')}
+                 ${renderBuddyContactRow('我的：', state.myContact || '')}
+               </div>`
+            : `<div class="flex items-center justify-between gap-1.5 pt-0.5">
+                 <span class="text-[9px] text-slate-400">同意后才会互相展示联系方式</span>
+                 <button type="button" onclick="acceptBuddyRequestUI('${b.id}', '${r.id}', event)" class="tour-action-btn tour-action-btn--mini shrink-0">✅ 同意并互换</button>
+               </div>`}
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
 function renderBuddyEntryCard(cloudId, b, canManage) {
   const bTheme = b.theme || '#64748b';
   const themeSolid = bTheme.includes('gradient') ? (bTheme.match(/#[A-Za-z0-9]{3,6}/)?.[0] || '#64748b') : bTheme;
+  const who = (b.nickname ? `${b.nickname} · ` : '') + (b.fandomType || '');
+  const state = buddyStateFor(b.id);
+  const myReq = state.myRequest;
+
+  let actionHtml = '';
+  if (canManage) {
+    actionHtml = `
+      <div class="flex flex-col gap-1 shrink-0">
+        <button type="button" onclick="withdrawBuddyIntent('${cloudId}', '${b.id}', event)" class="tour-action-btn tour-action-btn--mini">撤销</button>
+        <button type="button" onclick="markBuddyFound('${cloudId}', '${b.id}', event)" class="tour-action-btn tour-action-btn--mini">已找到</button>
+      </div>`;
+  } else if (myReq && myReq.status === 'accepted') {
+    actionHtml = `<div class="shrink-0">${renderBuddyContactRow('对方：', state.publisherContact || '')}</div>`;
+  } else if (myReq && myReq.status === 'pending') {
+    actionHtml = `<span class="text-[10px] text-slate-400 shrink-0">⏳ 等待对方同意</span>`;
+  } else {
+    actionHtml = `<button type="button" onclick="openBuddyRequestModal('${b.id}', '${cloudId}', event)" class="tour-action-btn tour-action-btn--mini shrink-0">👋 申请互换联系方式</button>`;
+  }
+
   return `
-    <div class="p-2.5 rounded-xl bg-white border flex items-start justify-between gap-2 transition-all hover:shadow-md"
+    <div class="p-2.5 rounded-xl bg-white border transition-all hover:shadow-md"
       style="border-color: ${themeSolid}22">
-      <div class="space-y-1.5 min-w-0">
-        <div class="flex items-center gap-1.5 flex-wrap">
-          <span class="px-2 py-0.5 rounded-md text-white text-[10px] font-bold" style="background: ${bTheme}">${b.biasLabel}</span>
-          ${(b.tags || []).map(tg => `
-            <span class="px-2 py-0.5 rounded-md border text-[10px] font-medium"
-              style="background: ${themeSolid}0D; color: ${themeSolid}; border-color: ${themeSolid}33">#${tg}</span>
-          `).join('')}
-          <span class="text-[10px] text-slate-400">${b.createdAt || ''}</span>
+      <div class="flex items-start justify-between gap-2">
+        <div class="space-y-1.5 min-w-0">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="px-2 py-0.5 rounded-md text-white text-[10px] font-bold" style="background: ${bTheme}">${b.biasLabel}</span>
+            ${(b.tags || []).map(tg => `
+              <span class="px-2 py-0.5 rounded-md border text-[10px] font-medium"
+                style="background: ${themeSolid}0D; color: ${themeSolid}; border-color: ${themeSolid}33">#${tg}</span>
+            `).join('')}
+            <span class="text-[10px] text-slate-400">${who}${who ? ' · ' : ''}${b.createdAt || ''}</span>
+          </div>
         </div>
-        ${b.contact ? `<div class="text-[10px] text-slate-500 break-all">📮 联系方式：${b.contact}</div>` : ''}
+        ${actionHtml}
       </div>
-      ${canManage ? `
-        <div class="flex flex-col gap-1 shrink-0">
-          <button type="button" onclick="withdrawBuddyIntent(${cloudId}, '${b.id}', event)" class="tour-action-btn tour-action-btn--mini">撤销</button>
-          <button type="button" onclick="markBuddyFound(${cloudId}, '${b.id}', event)" class="tour-action-btn tour-action-btn--mini">已找到</button>
-        </div>` : ''}
+      ${canManage ? renderBuddyOwnerRequests(b) : ''}
     </div>
   `;
 }
@@ -1287,8 +1352,7 @@ function renderBuddyListHtml(cloudId) {
   if (!entries.length) {
     return `<div class="p-4 rounded-xl bg-white border border-dashed border-slate-300 text-[11px] text-slate-400 text-center">选中上方预设标签，即可一键生成你的同场搭子卡片。</div>`;
   }
-  const me = getGuestOwnerIdSync();
-  return entries.map(b => renderBuddyEntryCard(cloudId, b, String(b.ownerId || '') === String(me))).join('');
+  return entries.map(b => renderBuddyEntryCard(cloudId, b, isBuddyOwner(b))).join('');
 }
 
 function renderBuddyPanel(cloudId) {
@@ -1308,10 +1372,100 @@ function resetBuddyTagButtons(cloudId) {
   });
 }
 
+async function loadBuddyRequestStates(cloudId) {
+  const entries = getMergedBuddyEntries(cloudId).filter(b => !String(b.id).startsWith('tmp-'));
+  for (const b of entries.slice(0, 30)) {
+    if (isBuddyOwner(b)) {
+      const reqs = await fetchBuddyRequests(b.id, b.deviceId || b.ownerId);
+      if (reqs.some(r => r.status === 'accepted')) {
+        const state = buddyStateFor(b.id);
+        if (!state.myContact) state.myContact = await fetchBuddyContact(b.id);
+      }
+    } else {
+      await fetchMyBuddyRequest(b.id);
+    }
+  }
+}
+
 async function refreshBuddyPanel(cloudId) {
   renderBuddyPanel(cloudId);
   const list = await fetchBuddyIntents(cloudId);
-  if (list) renderBuddyPanel(cloudId);
+  if (list) {
+    renderBuddyPanel(cloudId);
+    await loadBuddyRequestStates(cloudId);
+    renderBuddyPanel(cloudId);
+  }
+}
+
+function openBuddyRequestModal(buddyId, eventId, event) {
+  if (event && event.stopPropagation) event.stopPropagation();
+  if (typeof openBuddyRequestDialog === 'function') {
+    openBuddyRequestDialog(buddyId, eventId);
+    return;
+  }
+  alert('申请弹窗暂不可用，请刷新页面重试');
+}
+
+function openBuddyRequestDialog(buddyId, eventId) {
+  window.buddyRequestTarget = { buddyId: String(buddyId), eventId: String(eventId) };
+  const modal = document.getElementById('buddy-request-modal');
+  if (!modal) { alert('申请弹窗缺失，请刷新页面'); return; }
+  modal.classList.remove('hidden');
+  const note = document.getElementById('buddy-req-note');
+  if (note) { note.value = ''; setTimeout(() => note.focus(), 30); }
+  const contact = document.getElementById('buddy-req-contact');
+  if (contact) contact.value = '';
+}
+
+async function submitBuddyRequestFromModal() {
+  const target = window.buddyRequestTarget || {};
+  if (!target.buddyId) return;
+  const noteEl = document.getElementById('buddy-req-note');
+  const contactEl = document.getElementById('buddy-req-contact');
+  const note = (noteEl ? noteEl.value : '').trim();
+  const contact = (contactEl ? contactEl.value : '').trim();
+  if (!contact) return alert('请填写你的联系方式（微信号 / 小红书号），对方同意后才能看到');
+  const entry = getMergedBuddyEntries(target.eventId).find(x => String(x.id) === String(target.buddyId));
+  if (!entry) return alert('该搭子信息已失效，请刷新后重试');
+  const res = await sendBuddyRequest(entry, note, contact);
+  if (!res.ok) {
+    if (res.reason === 'self') return alert('这是你自己发布的搭子信息');
+    return alert(`申请提交失败（${res.reason}），请稍后再试`);
+  }
+  document.getElementById('buddy-request-modal')?.classList.add('hidden');
+  if (noteEl) noteEl.value = '';
+  if (contactEl) contactEl.value = '';
+  renderBuddyPanel(target.eventId);
+  alert('申请已发送，等待对方同意后即可互相看到联系方式');
+}
+
+async function acceptBuddyRequestUI(buddyId, requestId, event) {
+  if (event && event.stopPropagation) event.stopPropagation();
+  const res = await acceptBuddyRequest(buddyId, requestId);
+  if (!res.ok) return alert('同意失败，请稍后重试');
+  const state = buddyStateFor(buddyId);
+  await fetchBuddyRequests(buddyId, getDeviceId());
+  if (!state.myContact) state.myContact = await fetchBuddyContact(buddyId);
+  if (window.__buddyActiveEventId) renderBuddyPanel(window.__buddyActiveEventId);
+  else renderTourCards();
+  alert('已同意，双方联系方式已互相解锁');
+}
+
+function copyBuddyContact(value, event) {
+  if (event && event.stopPropagation) event.stopPropagation();
+  const text = String(value || '').trim();
+  if (!text) return;
+  const done = () => alert('已复制');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => alert('复制失败，请手动长按复制'));
+    return;
+  }
+  const tmp = document.createElement('textarea');
+  tmp.value = text;
+  document.body.appendChild(tmp);
+  tmp.select();
+  try { document.execCommand('copy'); done(); } catch (e) { alert('复制失败，请手动复制'); }
+  tmp.remove();
 }
 
 async function saveLocalBuddyIntent(cloudId, showTitle, event) {
@@ -1324,14 +1478,17 @@ async function saveLocalBuddyIntent(cloudId, showTitle, event) {
 
   const pref = getFanPrefState();
   const theme = getBuddyTheme(pref);
-  const biasLabel = pref.biasType === 'solo'
-    ? `唯粉(${(pref.biasMembers || []).join('/') || '自选'})`
-    : pref.biasType === 'cp'
-      ? `CP偏好(${(pref.biasMembers || []).join('x')})`
-      : '团粉';
+  const memberTags = pref.biasType === 'solo' || pref.biasType === 'cp'
+    ? (pref.biasMembers || []).filter(m => m !== 'ONER')
+    : [];
+  const fandomLabel = pref.biasType === 'solo' ? '唯粉' : pref.biasType === 'cp' ? 'CP偏好' : '团粉';
+  const biasLabel = memberTags.length ? `${fandomLabel}(${memberTags.join('/')})` : fandomLabel;
 
   const entry = {
     showTitle,
+    nickname: getGuestNickname(),
+    fandomType: fandomLabel,
+    memberTags,
     biasLabel,
     tags: [...tags],
     contact,
@@ -1350,7 +1507,7 @@ async function saveLocalBuddyIntent(cloudId, showTitle, event) {
   } catch (e) { /* 云端不可用 → 本地兜底 */ }
 
   if (!published) {
-    addBuddyEntryForShow(cloudId, { ...entry, ownerId: getGuestOwnerIdSync() });
+    addBuddyEntryForShow(cloudId, { ...entry, ownerId: getDeviceId(), deviceId: getDeviceId() });
   }
 
   window.selectedBuddyTags[cloudId] = [];
@@ -1363,13 +1520,12 @@ async function withdrawBuddyIntent(cloudId, entryId, event) {
   if (event && event.stopPropagation) event.stopPropagation();
   const entry = getMergedBuddyEntries(cloudId).find(x => String(x.id) === String(entryId));
   if (!entry) return;
-  const me = await ensureGuestIdentity();
-  if (String(entry.ownerId || '') !== String(me)) {
-    return alert('只能撤销自己发布的搭子信息（换设备或他人无法操作）');
+  if (!isBuddyOwner(entry)) {
+    return alert('只能撤销本机设备发布的搭子信息，无法删除他人记录');
   }
   const isCloud = !String(entryId).startsWith('tmp-') && !/^\d{13}$/.test(String(entryId));
   if (isCloud) {
-    const res = await closeBuddyIntent(cloudId, entryId, entry.ownerId, 'closed');
+    const res = await deleteBuddyIntent(cloudId, entryId, entry.deviceId || entry.ownerId);
     if (!res.ok && res.reason !== 'local-only') return alert('撤销失败，请稍后重试');
     window.buddyCloudCache[cloudId] = (window.buddyCloudCache[cloudId] || []).filter(x => String(x.id) !== String(entryId));
   } else {
@@ -1382,13 +1538,12 @@ async function markBuddyFound(cloudId, entryId, event) {
   if (event && event.stopPropagation) event.stopPropagation();
   const entry = getMergedBuddyEntries(cloudId).find(x => String(x.id) === String(entryId));
   if (!entry) return;
-  const me = await ensureGuestIdentity();
-  if (String(entry.ownerId || '') !== String(me)) {
-    return alert('只能标记自己发布的搭子信息为已找到');
+  if (!isBuddyOwner(entry)) {
+    return alert('只能标记本机设备发布的搭子信息为已找到');
   }
   const isCloud = !String(entryId).startsWith('tmp-') && !/^\d{13}$/.test(String(entryId));
   if (isCloud) {
-    const res = await closeBuddyIntent(cloudId, entryId, entry.ownerId, 'found');
+    const res = await markBuddyIntentFound(cloudId, entryId, entry.deviceId || entry.ownerId, 'found');
     if (!res.ok && res.reason !== 'local-only') return alert('操作失败，请稍后重试');
     window.buddyCloudCache[cloudId] = (window.buddyCloudCache[cloudId] || []).filter(x => String(x.id) !== String(entryId));
   } else {
@@ -1481,6 +1636,7 @@ function setFooterTab(tab, trigger, event) {
   }
   if (tab === 'buddy') {
     const buddyCloudId = card.dataset.showCard;
+    window.__buddyActiveEventId = buddyCloudId;
     if (buddyCloudId && typeof refreshBuddyPanel === 'function') refreshBuddyPanel(buddyCloudId);
   }
   syncOpenDrawerRegistryFromState();
@@ -1788,7 +1944,7 @@ function renderTourCards() {
                   const selected = (window.selectedBuddyTags[item.cloudId] || []).includes(tag);
                   return `
                     <button type="button" data-buddy-tag="${tag}" aria-pressed="${selected}"
-                      onclick="toggleBuddyPresetTag(${item.cloudId}, this.dataset.buddyTag, event)"
+                      onclick="toggleBuddyPresetTag('${item.cloudId}', this.dataset.buddyTag, event)"
                       class="tour-action-btn tour-action-btn--mini ${selected ? 'colored-pill is-active' : ''}"
                       style="${selected ? `background:${getBuddyTheme(pref)};` : ''}">
                       ${tag}
@@ -1806,7 +1962,7 @@ function renderTourCards() {
             </div>
           </div>
 
-          <button type="button" onclick="saveLocalBuddyIntent(${item.cloudId}, '${safeCity}', event)"
+          <button type="button" onclick="saveLocalBuddyIntent('${item.cloudId}', '${safeCity}', event)"
             class="tour-action-btn w-full font-semibold">
             🚀 一键发布搭子意向
           </button>
