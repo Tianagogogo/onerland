@@ -277,51 +277,80 @@ async function signInWithPassword() {
 }
 
 // 注册：POST /auth/v1/signup（配合后台关闭 Confirm email 实现免验证直接登录）
+// 已入库但前端未拿到 session 时，立刻用密码登录兜底，避免误报「该邮箱已注册」
+async function postPasswordLogin(email, password) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    let data = null;
+    try { data = await res.json(); } catch (e) { data = null; }
+    if (res.ok && data && data.access_token) return { ok: true, data };
+    const detail = (data && (data.msg || data.error_description || data.message || data.error)) || `HTTP ${res.status}`;
+    return { ok: false, status: res.status, detail };
+  } catch (e) {
+    return { ok: false, status: 0, detail: e.message || '网络异常' };
+  }
+}
+
+async function signUpThenAutoLogin(email, password) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+    method: 'POST',
+    headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
+  let data = null;
+  try { data = await res.json(); } catch (e) { data = null; }
+
+  if (!res.ok) {
+    const detail = (data && (data.msg || data.error_description || data.message || data.error)) || `HTTP ${res.status}`;
+    const alreadyRegistered = /already\s*(been\s*)?registered|user_already_exists|email\s*exists/i.test(String(detail));
+    if (!alreadyRegistered) {
+      return { ok: false, stage: 'signup', message: translateAuthError(detail, res.status) };
+    }
+    // 该邮箱已入库：不再误报，直接尝试密码登录
+    const existingLogin = await postPasswordLogin(email, password);
+    if (existingLogin.ok) return { ok: true, stage: 'login', data: existingLogin.data };
+    return { ok: false, stage: 'login', existing: true, message: '该邮箱已注册且密码不匹配，请核对密码后点「登录」。' };
+  }
+
+  // 注册请求已成功（入库）：有 session 直接登录
+  if (data && data.access_token) return { ok: true, stage: 'signup', data };
+
+  // 无 session（或 identities 为空，说明该邮箱此前已存在）→ 立刻密码登录兜底
+  const existing = Boolean(data && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0);
+  const loginResult = await postPasswordLogin(email, password);
+  if (loginResult.ok) return { ok: true, stage: 'login', data: loginResult.data };
+  return {
+    ok: false,
+    stage: 'login',
+    existing,
+    message: existing
+      ? '该邮箱已注册且密码不匹配，请核对密码后点「登录」。'
+      : translateAuthError(loginResult.detail, loginResult.status)
+  };
+}
+
 async function signUpWithPassword() {
   const cred = readAuthCredentials();
   if (!cred) return;
   const btn = document.querySelector('#user-auth-modal button[onclick="signUpWithPassword()"]');
   setAuthBusy(btn, true, '注册中…');
   try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: cred.email, password: cred.password })
-    });
-    if (!res.ok) {
-      let detail = `HTTP ${res.status}`;
-      try {
-        const err = await res.json();
-        detail = err.msg || err.error_description || err.message || err.error || detail;
-      } catch (e) { /* 忽略 */ }
-      throw new Error(translateAuthError(detail, res.status));
-    }
-    let data = null;
-    try { data = await res.json(); } catch (e) { data = null; }
-
-    if (data && data.access_token) {
-      handleAuthSuccess(data, cred.email, isAdminEmail(cred.email) ? '注册成功，已自动登录（管理员）' : '注册成功，已自动登录');
+    const result = await signUpThenAutoLogin(cred.email, cred.password);
+    if (result.ok) {
+      handleAuthSuccess(result.data, cred.email, isAdminEmail(cred.email) ? '注册成功，已自动登录（管理员）' : '注册成功，已自动登录');
       return;
     }
-    // 若后台仍开启邮箱确认，signup 只返回 user、不发 access_token → 自动改用密码登录一次
-    const loginRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: cred.email, password: cred.password })
-    });
-    if (loginRes.ok) {
-      const loginData = await loginRes.json();
-      handleAuthSuccess(loginData, cred.email, '注册成功，已自动登录');
+    if (result.stage === 'signup') {
+      alert(`注册失败：${result.message}`);
       return;
     }
-    let detail = '';
-    try {
-      const err = await loginRes.json();
-      detail = err.msg || err.error_description || err.message || err.error || '';
-    } catch (e) { /* 忽略 */ }
-    alert(`注册已提交，但暂未登录成功：${translateAuthError(detail, loginRes.status)}\n\n若提示邮箱未验证，请在 Supabase 后台关闭 Confirm email 后重试。`);
+    alert(result.message);
   } catch (e) {
-    alert(`注册失败：${e.message}`);
+    alert(`注册失败：${e.message || '网络异常，请稍后重试'}`);
   } finally {
     setAuthBusy(btn, false, '', '注册并登录');
   }
