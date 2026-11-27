@@ -28,8 +28,6 @@ window.ARTIST_COLORS = window.ARTIST_COLORS || {
   '坤音娱乐': { id: 'QINS', bg: '#334155' }
 };
 
-const ARTIST_COLORS = window.ARTIST_COLORS;
-
 if (typeof window.updateAuthButtonUI !== 'function') {
   window.updateAuthButtonUI = function updateAuthButtonUI() {
     const btn = document.getElementById('auth-btn') || document.querySelector('[data-auth-btn]');
