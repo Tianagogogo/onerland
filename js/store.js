@@ -656,6 +656,7 @@ async function loadTourData() {
           subType: meta.subType || 'tour',
           venue: meta.venue || '演出现场',
           posterUrl: meta.posterUrl || '',
+          transport: meta.transport || '',
           prices: meta.prices || '',
           // 座位图不参与列表渲染，点击「查看座位图」时才作为大图打开/按需查询
           hasSeatMap: Boolean(meta.seatUrl || meta.seatMapUrl || meta.seatMap || meta.seat_map || meta.seat_url),

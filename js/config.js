@@ -42,9 +42,22 @@ const DEFAULT_ARTISTS = [
 ];
 
 const VENUE_TRANSPORT_DB = [
-  { keywords: ['合肥', '少荃'], routes: '🚇 地铁4号线「综保区站」B口步行约8分钟\n🚄 合肥南站：地铁4号线直达（约45分钟）' },
-  { keywords: ['疆进酒', 'OMNI SPACE'], routes: '🚇 地铁8号线「天桥站」A口出站步行约4分钟（天桥艺术中心B1）' },
-  { keywords: ['北京', '五棵松', '润百颜', '华熙'], routes: '🚇 地铁1号线「五棵松站」B1/B2口步行2分钟\n🚄 北京西站：9号线转1号线（约25分钟）' },
+  {
+    keywords: ['少荃', '合肥'],
+    routes: '🚇 地铁4号线「综保区站」B口出，步行约 8 分钟直达东广场；或「新海公园站」C口步行约 12 分钟\n🚄 合肥南站：地铁4号线直达综保区站（约 35 分钟）；合肥站：地铁3号线至方庙换4号线（约 45 分钟）\n✈️ 新桥国际机场：机场大巴至合肥南站转地铁4号线（约 70 分钟）\n🚗 自驾：场馆东门 P1 停车场，散场建议错峰 20 分钟离场'
+  },
+  {
+    keywords: ['西安奥体', '奥体中心体育馆', '西安'],
+    routes: '🚇 地铁14号线「奥体中心站」D口出，步行约 10 分钟至东广场安检口\n🚄 西安北站：地铁14号线直达奥体中心站（约 30 分钟）；西安站：地铁4号线至北客站换14号线（约 50 分钟）\n✈️ 咸阳国际机场：机场城际至北客站换14号线（约 60 分钟），或机场大巴至市区转地铁\n🚗 自驾：奥体中心地下停车场 P2/P3，演出日 16:00 前入场更顺畅'
+  },
+  {
+    keywords: ['疆进酒', 'OMNI SPACE'],
+    routes: '🚇 地铁8号线「天桥站」A口出站步行约4分钟（天桥艺术中心B1）'
+  },
+  {
+    keywords: ['五棵松', '润百颜', '华熙', '北京'],
+    routes: '🚇 地铁1号线「五棵松站」B1/B2 口出，步行约 2 分钟直达场馆西门\n🚄 北京西站：9号线至军事博物馆换1号线（约 25 分钟）；北京南站：4号线至西单换1号线（约 40 分钟）\n✈️ 首都机场：机场线至东直门换2号线、建国门换1号线（约 70 分钟）；大兴机场：大兴机场线至草桥换10号线、公主坟换1号线（约 75 分钟）\n🚗 自驾：华熙LIVE·五棵松地下停车场，演出日车位紧张，建议地铁前往'
+  },
   { keywords: ['上海', '梅赛德斯', '万代南梦宫', '蜚声', '育音堂', '瓦肆'], routes: '🚇 梅奔8号线中华艺术宫站；万代南梦宫13号线江宁路站；蜚声8号线曲阜路站' },
   { keywords: ['广州', '宝能', '声音共和', '太空间'], routes: '🚇 宝能6/7号线萝岗站；太空间/声音共和8号线沙园站或凤凰新村站' },
   { keywords: ['深圳', '大运', '春茧', 'B10', 'HOU LIVE'], routes: '🚇 大运16号线大运中心站；HOU LIVE下沙店9号线B口；B10 2号线侨城北站' },
@@ -52,10 +65,37 @@ const VENUE_TRANSPORT_DB = [
   { keywords: ['成都', '东安湖', '凤凰山', '正火', '福馆'], routes: '🚇 凤凰山5号线杜家碾站；正火2号线洪河站；福馆1号线锦城广场站' }
 ];
 
-function findPresetTransport(text) {
+const GENERIC_TRANSPORT_GUIDE = '🚇 优先地铁前往，出站后跟随场馆指引步行至安检口\n🚄 高铁抵达后建议预留 60 分钟市内通勤时间\n🛡️ 入场提示：提前 60–90 分钟到场核验身份证；禁止携带打火机、专业长焦相机及超尺寸灯牌\n📍 场馆信息待公布，具体路线以主办方最新公告为准';
+
+// 场馆模糊匹配：合并场馆名与城市名，剔除「市/省」等干扰词后按关键词 includes 命中
+function normalizeVenueText(...values) {
+  return values
+    .filter(Boolean)
+    .join(' ')
+    .replace(/[\s·・,，、/|()（）\[\]【】]/g, '')
+    .replace(/[省市]/g, '')
+    .toLowerCase();
+}
+
+function findPresetTransport(input) {
+  let text = '';
+  if (input && typeof input === 'object') {
+    text = normalizeVenueText(input.venue, input.city, input.title);
+  } else {
+    text = normalizeVenueText(input);
+  }
   if (!text) return '';
-  const hit = VENUE_TRANSPORT_DB.find(item => item.keywords.some(kw => text.toLowerCase().includes(kw.toLowerCase())));
+  const hit = VENUE_TRANSPORT_DB.find(item => item.keywords.some(kw => text.includes(normalizeVenueText(kw))));
   return hit ? hit.routes : '';
+}
+
+// 展示优先级：云端/管理员自定义 transport > 内置场馆词库 > 通用入场兜底
+function getShowTransport(show) {
+  if (!show) return GENERIC_TRANSPORT_GUIDE;
+  const custom = String(show.transport || '').trim();
+  if (custom) return custom;
+  const preset = findPresetTransport({ venue: show.venue, city: show.city || show.title, title: show.title });
+  return preset || GENERIC_TRANSPORT_GUIDE;
 }
 
 // 城市经纬度字典（用于本地观演连线轨迹地图）

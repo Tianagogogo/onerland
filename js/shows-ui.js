@@ -1958,7 +1958,7 @@ function renderTourCards() {
 
         <div id="guide-drawer-${idx}" data-footer-panel="traffic" class="hidden p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-1.5 leading-relaxed">
           <div class="font-bold text-slate-900">🚇 交通与入场指南：</div>
-          <div class="whitespace-pre-line">${item.transport || '• 建议提前 60–90 分钟到达场馆核验身份证入场\n• 禁止携带打火机、专业长焦相机及超尺寸灯牌'}</div>
+          <div class="whitespace-pre-line">${getShowTransport(item)}</div>
         </div>
 
         ${buildVenueExperienceDrawerHTML(item.venue, `vexp-tour-drawer-${idx}`, `vexp-tour-${item.cloudId || idx}`, safeCity, 'ticket', { showDate: item.show_date, artist: item.artist, city: safeCity })}

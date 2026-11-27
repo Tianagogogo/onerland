@@ -70,6 +70,9 @@ function startEditShow(kind, cloudId) {
   document.getElementById('adm-date').value = kind === 'archive' ? (item.showDate || '') : ((item.show_date || '').slice(0, 10));
   document.getElementById('adm-body').value = item.venue || '';
   document.getElementById('adm-poster').value = item.posterUrl || '';
+  if (document.getElementById('adm-transport')) {
+    document.getElementById('adm-transport').value = item.transport || '';
+  }
   if (document.getElementById('adm-seat')) {
     document.getElementById('adm-seat').value = item.seatUrl || '';
   }
@@ -91,7 +94,7 @@ function resetAdminForm() {
   AppState.editingKind = null;
   adminScheduleImgs = [];
   renderAdminScheduleThumbs();
-  ['adm-title', 'adm-date', 'adm-body', 'adm-poster', 'adm-seat', 'adm-slot', 'adm-merch-booth', 'adm-url', 'adm-sale-time'].forEach(id => {
+  ['adm-title', 'adm-date', 'adm-body', 'adm-poster', 'adm-seat', 'adm-transport', 'adm-slot', 'adm-merch-booth', 'adm-url', 'adm-sale-time'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -108,6 +111,7 @@ async function submitAdminQuickPost() {
   const venueOrBody = document.getElementById('adm-body').value.trim();
   const posterUrl = document.getElementById('adm-poster').value.trim();
   const seatUrl = (document.getElementById('adm-seat')?.value || '').trim();
+  const transportText = (document.getElementById('adm-transport')?.value || '').trim();
   const slotText = (document.getElementById('adm-slot')?.value || '').trim();
   const merchBooth = (document.getElementById('adm-merch-booth')?.value || '').trim();
   const url = document.getElementById('adm-url').value.trim();
@@ -127,6 +131,7 @@ async function submitAdminQuickPost() {
           rounds,
           posterUrl,
           seatUrl,
+          transport: transportText,
           slot: slotText,
           merchBooth,
           scheduleImgs: adminScheduleImgs,
@@ -154,6 +159,7 @@ async function submitAdminQuickPost() {
           posterUrl,
           prices: existing?.prices || '',
           seatUrl: seatUrl || existing?.seatUrl || '',
+          transport: transportText || existing?.transport || '',
           slot: slotText,
           merchBooth,
           scheduleImgs: adminScheduleImgs,
