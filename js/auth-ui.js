@@ -219,6 +219,8 @@ function openHiddenAdminDrawer() {
   if (typeof renderAdminTodoQueue === 'function') renderAdminTodoQueue();
   if (typeof renderAdminScheduleThumbs === 'function') renderAdminScheduleThumbs();
   if (typeof updateAiKeyStatusUI === 'function') updateAiKeyStatusUI();
+  // 打开管理台时自动拉一次待复核票根
+  if (typeof loadProofReviewQueue === 'function') loadProofReviewQueue('pending');
 }
 
 // 启动时恢复登录态

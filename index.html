@@ -246,6 +246,15 @@
           </div>
         </div>
         <div class="space-y-2">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="font-bold text-slate-700">🛡️ 脱敏票根待复核队列</div>
+            <button type="button" onclick="loadProofReviewQueue()" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">刷新队列</button>
+          </div>
+          <div id="admin-proof-queue" class="space-y-1.5">
+            <div class="text-xs text-slate-400 py-3">点击「刷新队列」加载待复核票根</div>
+          </div>
+        </div>
+        <div class="space-y-2">
           <div class="font-bold text-slate-700">📋 云端记录快捷管理队列</div>
           <div id="admin-todo-queue" class="space-y-1.5"></div>
         </div>

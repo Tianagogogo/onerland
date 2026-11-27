@@ -19,7 +19,10 @@ const ALLOWED_ACTIONS = new Set([
   'updateTicket',
   'deleteTicket',
   'createFeed',
+  'reviewProof',
 ]);
+
+const REVIEW_STATUSES = new Set(['pending', 'approved', 'rejected']);
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -58,11 +61,76 @@ function isAdminEmail(env, email) {
 export async function onRequest(context) {
   const { request, env } = context;
 
-  if (request.method !== 'POST') {
-    return json({ error: 'method not allowed' }, 405);
-  }
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
     return json({ error: 'server not configured' }, 500);
+  }
+
+  // GET：管理员列出待复核票根（RLS 对 anon 隐藏 pending，必须走 service_role）
+  if (request.method === 'GET') {
+    const user = await resolveUser(env, request.headers.get('Authorization'));
+    if (!user) return json({ error: 'unauthorized' }, 401);
+    if (!isAdminEmail(env, user.email)) return json({ error: 'forbidden: not an admin' }, 403);
+
+    const url0 = new URL(request.url);
+    const status = url0.searchParams.get('status') || 'pending';
+    const limit = Math.min(Number(url0.searchParams.get('limit')) || 30, 100);
+    const wantStatus = status === 'all' ? null : status;
+    if (wantStatus && !REVIEW_STATUSES.has(wantStatus)) {
+      return json({ error: 'invalid status' }, 400);
+    }
+
+    const qs = new URLSearchParams();
+    qs.set('select', 'id,show_key,artist,city,show_date,seat_area,image_url,review_status,reviewer_note,created_at,reviewed_at');
+    if (wantStatus) qs.set('review_status', `eq.${wantStatus}`);
+    qs.set('order', 'created_at.desc');
+    qs.set('limit', String(limit));
+
+    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/ticket_proofs?${qs.toString()}`, {
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    });
+    if (!res.ok) {
+      return json({ error: `supabase ${res.status}`, detail: (await res.text()).slice(0, 500) }, res.status);
+    }
+    const rows = await res.json();
+
+    // 桶是私有的，给每条记录签一个短期可读 URL，避免管理员看不到图
+    const signed = await Promise.all(
+      (Array.isArray(rows) ? rows : []).map(async (row) => {
+        if (!row.image_url) return { ...row, signed_url: null };
+        try {
+          const sres = await fetch(
+            `${env.SUPABASE_URL}/storage/v1/object/sign/ticket-proofs/${row.image_url}`,
+            {
+              method: 'POST',
+              headers: {
+                'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+                'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ expiresIn: 600 }),
+            }
+          );
+          if (!sres.ok) return { ...row, signed_url: null };
+          const sdata = await sres.json();
+          const rel = sdata.signedURL || sdata.signedUrl || '';
+          return {
+            ...row,
+            signed_url: rel ? `${env.SUPABASE_URL}/storage/v1${rel.startsWith('/') ? '' : '/'}${rel}` : null,
+          };
+        } catch (e) {
+          return { ...row, signed_url: null };
+        }
+      })
+    );
+
+    return json({ ok: true, data: signed });
+  }
+
+  if (request.method !== 'POST') {
+    return json({ error: 'method not allowed' }, 405);
   }
 
   const user = await resolveUser(env, request.headers.get('Authorization'));
@@ -122,6 +190,23 @@ export async function onRequest(context) {
       method = 'DELETE';
       data = undefined;
       break;
+
+    // 票根复核：把 review_status 改成 approved / rejected / pending
+    case 'reviewProof': {
+      if (!id) return json({ error: 'missing id' }, 400);
+      const status = String(payload.review_status || '').trim();
+      if (!REVIEW_STATUSES.has(status)) {
+        return json({ error: 'invalid review_status' }, 400);
+      }
+      url = `${env.SUPABASE_URL}/rest/v1/ticket_proofs?id=eq.${encodeURIComponent(id)}`;
+      method = 'PATCH';
+      data = {
+        review_status: status,
+        reviewer_note: payload.reviewer_note ? String(payload.reviewer_note).slice(0, 500) : null,
+        reviewed_at: new Date().toISOString(),
+      };
+      break;
+    }
   }
 
   const init = { method, headers: svcHeaders };

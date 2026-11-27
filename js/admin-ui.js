@@ -201,6 +201,91 @@ async function adminDeleteItem(table, id) {
   renderAdminTodoQueue();
 }
 
+// ================= 脱敏票根复核队列（管理员） =================
+let adminProofQueueCache = [];
+
+async function loadProofReviewQueue(status = 'pending') {
+  const box = document.getElementById('admin-proof-queue');
+  if (!box) return;
+  box.innerHTML = `<div class="text-xs text-slate-400 py-3">加载中…</div>`;
+
+  const session = typeof getStoredSession === 'function' ? getStoredSession() : null;
+  if (!session || !session.access_token) {
+    box.innerHTML = `<div class="text-xs text-rose-500 py-3">登录状态已失效，请重新登录后再试</div>`;
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/admin?status=${encodeURIComponent(status)}&limit=30`, {
+      headers: { 'Authorization': `Bearer ${session.access_token}` }
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || data.detail || `HTTP ${res.status}`);
+    adminProofQueueCache = Array.isArray(data.data) ? data.data : [];
+  } catch (e) {
+    box.innerHTML = `<div class="text-xs text-rose-500 py-3">加载失败：${e.message}<br><span class="text-slate-400">（确认已在 Cloudflare 配置 SUPABASE_SERVICE_ROLE_KEY 与 ADMIN_EMAIL，并已执行 sql/ticket_proofs.sql）</span></div>`;
+    return;
+  }
+
+  if (!adminProofQueueCache.length) {
+    box.innerHTML = `<div class="text-xs text-slate-400 py-3">${status === 'pending' ? '当前没有待复核票根 🎉' : '该状态下没有记录'}</div>`;
+    return;
+  }
+
+  box.innerHTML = adminProofQueueCache.map(p => {
+    const statusTag = {
+      pending: '<span class="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">待复核</span>',
+      approved: '<span class="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">已通过</span>',
+      rejected: '<span class="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">已驳回</span>'
+    }[p.review_status] || p.review_status;
+
+    const thumb = p.signed_url
+      ? `<a href="${p.signed_url}" target="_blank" rel="noopener" class="shrink-0">
+           <img src="${p.signed_url}" alt="脱敏票根" class="w-14 h-14 object-cover rounded border border-slate-200" />
+         </a>`
+      : `<div class="w-14 h-14 rounded border border-dashed border-slate-300 flex items-center justify-center text-[10px] text-slate-400 shrink-0 text-center leading-tight">无图<br>或链接失效</div>`;
+
+    return `
+      <div class="flex items-start gap-2 p-2.5 rounded-lg bg-white border border-slate-200 text-xs">
+        ${thumb}
+        <div class="min-w-0 flex-1 space-y-1">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            ${statusTag}
+            <span class="text-slate-800 font-medium truncate">${p.show_key || '—'}</span>
+          </div>
+          <div class="text-[11px] text-slate-500">
+            区域：${p.seat_area || '未填'} · 提交：${(p.created_at || '').slice(0, 16).replace('T', ' ')}
+            ${p.reviewer_note ? ` · 备注：${p.reviewer_note}` : ''}
+          </div>
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <button type="button" onclick="reviewTicketProof(${p.id}, 'approved')" class="px-2 py-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium">通过</button>
+            <button type="button" onclick="reviewTicketProof(${p.id}, 'rejected')" class="px-2 py-1 rounded bg-rose-50 text-rose-600 hover:bg-rose-100 font-medium">驳回</button>
+            <button type="button" onclick="reviewTicketProof(${p.id}, 'pending')" class="px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200 font-medium">重置</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function reviewTicketProof(id, status) {
+  let note = '';
+  if (status === 'rejected') {
+    const input = prompt('驳回原因（会记录在复核备注，选填）', '票根信息不足以下判断');
+    if (input === null) return;
+    note = input.trim();
+  }
+  try {
+    await adminApi('reviewProof', { review_status: status, reviewer_note: note }, id);
+  } catch (e) {
+    alert(`复核失败：${e.message}`);
+    return;
+  }
+  const label = { approved: '已通过', rejected: '已驳回', pending: '已重置为待复核' }[status] || status;
+  await loadProofReviewQueue('pending');
+  alert(`✅ ${label}`);
+}
+
 // 统一调用服务端写接口（functions/api/admin.js），由服务端校验管理员身份
 async function adminApi(action, payload = {}, id) {
   const session = typeof getStoredSession === 'function' ? getStoredSession() : null;

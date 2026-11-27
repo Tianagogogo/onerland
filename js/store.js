@@ -170,13 +170,10 @@ async function loadTourData() {
         }
 
         const rounds = Array.isArray(meta.rounds) ? meta.rounds : [];
-        if (!rounds.length && row.ticket_time) {
-          rounds.push({
-            round_name: '开票时间',
-            sale_time: row.ticket_time.replace('T', ' '),
-            platform: rawPlat.startsWith('META:') ? '大麦' : (rawPlat || '大麦')
-          });
-        }
+        // 注意：不能再用 ticket_time 兜底造一个"开票时间"轮次。
+        // 历史数据中 ticket_time 常被写成演出当天时间（如 2026-12-05T19:30），
+        // 若当作开票时间会导致"已开完票仍在倒计时"的错觉。
+        // 没有 rounds 就如实保持为空，由状态机判定为「已开票·待演出」。
 
         tickets.push({
           cloudId: row.id,
@@ -334,14 +331,112 @@ function isShowTicketVerified(showKey) {
   return Boolean(map[showKey]?.verified);
 }
 
-function saveDesensitizedTicketProof(showKey, areaLabel) {
+function saveDesensitizedTicketProof(showKey, areaLabel, cloudInfo) {
   const map = getVerifiedTicketMap();
   map[showKey] = {
     verified: true,
     area: (areaLabel || '已脱敏核验').trim(),
-    verifiedAt: new Date().toLocaleDateString()
+    verifiedAt: new Date().toLocaleDateString(),
+    ...(cloudInfo || {})
   };
   localStorage.setItem(VERIFIED_TICKETS_KEY, JSON.stringify(map));
+}
+
+// ---- 云端复核状态（与本地核验并存）----
+function getProofCloudStatus(showKey) {
+  const map = getVerifiedTicketMap();
+  return map[showKey]?.cloudStatus || null;
+}
+
+function setProofCloudStatus(showKey, status, extra) {
+  const map = getVerifiedTicketMap();
+  if (!map[showKey]) return;
+  map[showKey].cloudStatus = status;
+  if (extra) Object.assign(map[showKey], extra);
+  localStorage.setItem(VERIFIED_TICKETS_KEY, JSON.stringify(map));
+}
+
+// 上传脱敏票根到云端，settle 后返回结果但不阻塞本地解锁
+async function uploadTicketProofToCloud({ showKey, artist, city, showDate, seatArea, file }) {
+  if (!file) return null;
+
+  // 压缩到合理尺寸，减少流量与存储占用
+  const dataUrl = await compressImageToDataURL(file, 1200, 0.72);  const blob = await (await fetch(dataUrl)).blob();
+  const ext = (blob.type.split('/')[1] || 'jpeg').replace('jpeg', 'jpg');
+  const path = `${showKey}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+  const upRes = await fetch(`${SUPABASE_URL}/storage/v1/object/ticket-proofs/${path}`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type': blob.type,
+      'x-upsert': 'false'
+    },
+    body: blob
+  });
+  if (!upRes.ok) {
+    throw new Error(`图片上传失败 HTTP ${upRes.status}`);
+  }
+
+  const insRes = await fetch(`${SUPABASE_URL}/rest/v1/ticket_proofs`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify({
+      show_key: showKey,
+      artist: artist || null,
+      city: city || null,
+      show_date: showDate || null,
+      seat_area: seatArea || null,
+      image_url: path,
+      review_status: 'pending'
+    })
+  });
+  if (!insRes.ok) {
+    throw new Error(`核验记录提交失败 HTTP ${insRes.status}`);
+  }
+  const rows = await insRes.json();
+  return { proofId: rows?.[0]?.id || null, imagePath: path };
+}
+
+// 查询某场次已通过复核的人数（用于展示可信度）
+async function fetchApprovedProofCount(showKey) {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/ticket_proofs?show_key=eq.${encodeURIComponent(showKey)}&review_status=eq.approved&select=id`,
+      { headers: SB_HEADERS }
+    );
+    if (!res.ok) return 0;
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows.length : 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+// 把自己本机提交过的核验记录与云端状态对齐
+// 说明：RLS 只允许 anon 读取 approved 记录，因此这里只能"升级"为 approved，
+// 不会误把 pending 覆盖成别的状态。驳回需要管理员侧校验，匿名端拿不到。
+async function syncMyProofStatus(showKey) {
+  if (!showKey || getProofCloudStatus(showKey) === 'approved') return;
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/ticket_proofs?show_key=eq.${encodeURIComponent(showKey)}&review_status=eq.approved&select=id&limit=1`,
+      { headers: SB_HEADERS }
+    );
+    if (!res.ok) return;
+    const rows = await res.json();
+    if (Array.isArray(rows) && rows.length) {
+      setProofCloudStatus(showKey, 'approved');
+    }
+  } catch (e) {
+    /* 静默失败，不影响本地体验 */
+  }
 }
 
 // ================= 3. 公共场馆客观体验评分（不含评语，仅统计客观选项，样本 >= 5 解锁） =================

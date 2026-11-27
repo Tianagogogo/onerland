@@ -42,6 +42,76 @@ function switchMainTab(tabId) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// ================= 演出状态机 =================
+// 统一计算单场演出的生命周期状态，避免各处零散 if/else 判断不一致。
+// 返回 { status, saleTs, showTs, nextRound, futureRounds }
+const SHOW_STATUS = {
+  UPCOMING_SALE: 'UPCOMING_SALE',
+  WAITING_SHOW: 'WAITING_SHOW',
+  ONGOING: 'ONGOING',
+  ENDED: 'ENDED'
+};
+
+// 安全解析日期字符串为时间戳。兼容 "2026-11-27 13:14" / "2026-11-27T13:14" / "2026-12-05"
+function parseLocalTime(raw) {
+  if (!raw) return NaN;
+  const s = String(raw).trim().replace('T', ' ');
+  // 显式按本地时区解析，避免 Safari 对 "YYYY-MM-DD HH:mm" 解析失败
+  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ ](\d{1,2}):(\d{2}))?/);
+  if (!m) return NaN;
+  return new Date(
+    Number(m[1]), Number(m[2]) - 1, Number(m[3]),
+    Number(m[4] || 0), Number(m[5] || 0), 0, 0
+  ).getTime();
+}
+
+function getEventStatus(item, now = Date.now()) {
+  const rounds = Array.isArray(item.rounds) ? item.rounds : [];
+
+  // 只保留合法且晚于当前时间的开票轮次
+  const futureRounds = rounds
+    .map(r => ({ ...r, ts: parseLocalTime(r.sale_time) }))
+    .filter(r => !isNaN(r.ts) && r.ts > now)
+    .sort((a, b) => a.ts - b.ts);
+
+  // 最近一次已发生的开票时间（用于判断"是否已开票"）
+  const pastRounds = rounds
+    .map(r => ({ ...r, ts: parseLocalTime(r.sale_time) }))
+    .filter(r => !isNaN(r.ts) && r.ts <= now)
+    .sort((a, b) => b.ts - a.ts);
+
+  const showTs = parseLocalTime(item.show_date || (item.ticket_time || '').slice(0, 10));
+
+  // 演出时长按 3 小时估算结束时间
+  const SHOW_DURATION = 3 * 3600 * 1000;
+  const showEndTs = isNaN(showTs) ? NaN : showTs + SHOW_DURATION;
+
+  let status;
+  if (!isNaN(showEndTs) && now > showEndTs) {
+    status = SHOW_STATUS.ENDED;
+  } else if (!isNaN(showTs) && now >= showTs) {
+    status = SHOW_STATUS.ONGOING;
+  } else if (futureRounds.length) {
+    // 还有未来的开票轮次 → 待开票
+    status = SHOW_STATUS.UPCOMING_SALE;
+  } else if (pastRounds.length) {
+    // 所有开票轮次都已过期，但演出还没开始 → 已开票待演出
+    status = SHOW_STATUS.WAITING_SHOW;
+  } else {
+    // 完全没有开票数据：演出未开始，归为待演出（不能凭空造开票倒计时）
+    status = SHOW_STATUS.WAITING_SHOW;
+  }
+
+  return {
+    status,
+    saleTs: futureRounds.length ? futureRounds[0].ts : NaN,
+    showTs,
+    showEndTs,
+    futureRounds,
+    nextRound: futureRounds.length ? futureRounds[0] : null
+  };
+}
+
 function requestExternalToolJump(url, siteName, venueName = '') {
   AppState.pendingExternalUrl = url;
   document.getElementById('ext-confirm-site').textContent = siteName;
@@ -66,15 +136,24 @@ function confirmExternalToolJump() {
 function exportShowICS(cloudId) {
   const item = AppState.cloudTickets.find(t => String(t.cloudId) === String(cloudId));
   if (!item) return;
-  const firstRound = (item.rounds || [])[0];
-  const rawTime = firstRound ? firstRound.sale_time : `${(item.show_date || '').slice(0, 10)} 19:30`;
-  const start = new Date(rawTime.replace(/-/g, '/'));
-  if (isNaN(start)) return alert('该场次暂无精确时间，无法生成日历');
+  const state = getEventStatus(item);
+  // 优先用未来最近一轮开票时间；没有则回退到演出开始时间
+  const firstRound = state.nextRound;
+  const targetTs = firstRound ? firstRound.ts : state.showTs;
+  if (isNaN(targetTs)) return alert('该场次暂无精确时间，无法生成日历');
+  const start = new Date(targetTs);
   const end = new Date(start.getTime() + 45 * 60000);
-  const fmt = d => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const fmt = d => {
+    // ICS 标准使用 UTC 时间（末尾 Z），各日历客户端会自动换算为本地时区
+    return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  };
   const label = firstRound ? `抢票(${firstRound.round_name})` : '演出开演';
   const ics = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT',
+    'BEGIN:VCALENDAR', 'VERSION:2.0',
+    'PRODID:-//ONERLAND//Show Reminder//CN',
+    'BEGIN:VEVENT',
+    `UID:onerland-${item.cloudId}-${firstRound ? 'sale' : 'show'}@onerland.pages.dev`,
+    `DTSTAMP:${fmt(new Date())}`,
     `SUMMARY:🎫 ONERLAND提醒：${item.city} - ${label}`,
     `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`,
     `LOCATION:${item.venue}`,
@@ -161,20 +240,50 @@ function removePrivateNoteItem(showKey, noteId, rerenderScope) {
   else renderTourCards();
 }
 
-// ================= 2. 脱敏票根核验（解锁公开发布客观评分） =================
-function handleTicketProofVerify(showKey, formPrefix, rerenderScope) {
+// ================= 2. 脱敏票根核验（本地解锁 + 云端待复核） =================
+async function handleTicketProofVerify(showKey, formPrefix, rerenderScope, ctx = {}) {
   const fileInput = document.getElementById(`${formPrefix}-proof-file`);
   const areaInput = document.getElementById(`${formPrefix}-proof-area`);
   const areaText = (areaInput?.value || '').trim();
+  const file = fileInput?.files?.[0] || null;
 
-  if (!fileInput?.files?.length && !areaText) {
+  if (!file && !areaText) {
     return alert('请上传已打码订单号/二维码的脱敏票根截图，或填写脱敏区域信息进行核验！');
   }
 
-  saveDesensitizedTicketProof(showKey, areaText || '已核验脱敏票根');
+  // 第一步：本地即时解锁（不等待网络，保证体验）
+  saveDesensitizedTicketProof(showKey, areaText || '已核验脱敏票根', { cloudStatus: file ? 'uploading' : 'local-only' });
+
+  if (file) {
+    // 第二步：异步上传云端存 pending，供管理员抽查复核
+    try {
+      const info = await uploadTicketProofToCloud({
+        showKey,
+        artist: null,
+        city: ctx.venue || null,
+        showDate: null,
+        seatArea: areaText,
+        file
+      });
+      setProofCloudStatus(showKey, 'pending', info || {});
+    } catch (e) {
+      // 上传失败不影响本地已解锁状态，仅提示
+      setProofCloudStatus(showKey, 'upload-failed');
+      console.warn('ticket proof upload failed:', e);
+    }
+  }
+
   if (rerenderScope === 'archive') renderArchiveTimeline();
   else renderTourCards();
-  alert('✅ 本场脱敏票根已核验（系统未保存敏感原图），现已解锁公开发布客观体验评分！');
+
+  const cloudStatus = getProofCloudStatus(showKey);
+  if (cloudStatus === 'pending') {
+    alert('✅ 票根已核验，评分已解锁。\n\n脱敏截图已提交云端复核，通过后将显示「已核验票根」徽章。');
+  } else if (cloudStatus === 'upload-failed') {
+    alert('✅ 票根已核验，评分已解锁。\n\n（云端复核上传失败，不影响本次评分，可稍后重试）');
+  } else {
+    alert('✅ 本场脱敏票根已核验（仅记录区域信息，未上传图片）');
+  }
 }
 
 // ================= 3. 公开发布客观体验评分（不含评语） =================
@@ -219,6 +328,20 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
   const verified = isShowTicketVerified(showKey);
   const stats = computeVenueExperienceStats(cleanVenue);
   const privateNotes = getPrivateShowNotes(showKey);
+
+  // 核验徽章：区分「仅本地脱敏」「云端待复核」「云端已通过」「已驳回」
+  const cloudStatus = getProofCloudStatus(showKey);
+  // 有本地核验记录的场次，后台对齐一次云端复核结果（已通过的会静默升级徽章）
+  if (verified) syncMyProofStatus(showKey);
+  const proofBadgeHtml = !verified
+    ? ''
+    : ({
+        'approved': `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-300 font-semibold" title="脱敏票根已通过管理员复核">🛡️ 已核验票根 · 云端复核通过</span>`,
+        'pending': `<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-300 font-semibold" title="脱敏票根已提交，等待管理员抽查复核">⏳ 已核验票根 · 待云端复核</span>`,
+        'rejected': `<span class="text-[10px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-300 font-semibold" title="复核未通过，可重新上传脱敏票根">⚠️ 票根复核未通过</span>`,
+        'upload-failed': `<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-300 font-medium" title="本地已核验，但云端上传失败">✅ 已核验票根 · 云端上传失败</span>`
+      }[cloudStatus] ||
+      `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold" title="已完成本地脱敏核验（未上传图片）">✅ 已核验票根 · 本地脱敏</span>`);
 
   const publicStatsHtml = stats.unlocked
     ? `
@@ -282,9 +405,21 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
     ? `
       <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-2.5">
         <div class="flex items-center justify-between flex-wrap gap-1">
-          <span class="font-bold text-slate-900">✅ 已通过本场脱敏票根核验 · 可公开发布客观体验评分</span>
+          <span class="font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
+            ✅ 已通过本场脱敏票根核验 · 可公开发布客观体验评分
+            ${proofBadgeHtml}
+          </span>
           <span class="text-[11px] text-emerald-700 font-medium">仅发布客观选项，不含评语</span>
         </div>
+
+        ${cloudStatus === 'rejected' ? `
+        <div class="p-2 rounded-lg bg-rose-50 border border-rose-200 text-[11px] text-rose-700">
+          管理员复核未通过。你的评分记录仍保留本机，可重新上传更清晰的脱敏票根。
+        </div>` : ''}
+        ${cloudStatus === 'upload-failed' ? `
+        <div class="p-2 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-600">
+          本地核验已通过，但脱敏图未成功上传云端；不影响你的评分解锁，可稍后重新上传。
+        </div>` : ''}
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <div>
@@ -358,7 +493,10 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
     `
     : `
       <div class="p-3 rounded-xl bg-white border border-amber-300 space-y-2">
-        <div class="font-bold text-slate-900">🔒 公开发布客观体验评分需先完成「脱敏票根核验」</div>
+        <div class="font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
+          ${verified ? '⚠️ 票根复核未通过 · 请重新提交脱敏票根' : '🔒 公开发布客观体验评分需先完成「脱敏票根核验」'}
+          ${proofBadgeHtml}
+        </div>
         <p class="text-[11px] text-slate-500 leading-relaxed">请先涂抹掉票根/订单截图上的<strong>订单号、条形码、二维码、姓名与身份证号</strong>，仅保留演出场次与大区信息；核验后仅允许提交结构化客观评分（不包含评语）。</p>
         <div class="flex flex-col sm:flex-row gap-2">
           <label class="cursor-pointer px-3 py-1.5 rounded-lg liquid-silver-btn font-medium text-center shrink-0">
@@ -366,7 +504,7 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
             <input id="${formPrefix}-proof-file" type="file" accept="image/*" class="hidden" />
           </label>
           <input id="${formPrefix}-proof-area" type="text" placeholder="或填写脱敏区域（如：一层看台A区 / 站席中区）" class="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white" />
-          <button type="button" onclick="handleTicketProofVerify('${safeShowKey}', '${formPrefix}', '${rerenderScope}')" class="px-3 py-1.5 rounded-lg obsidian-btn font-semibold shrink-0">
+          <button type="button" onclick="handleTicketProofVerify('${safeShowKey}', '${formPrefix}', '${rerenderScope}', {venue: '${safeVenueAttr}', showKey: '${safeShowKey}'})" class="px-3 py-1.5 rounded-lg obsidian-btn font-semibold shrink-0">
             核验票根并解锁评分
           </button>
         </div>
@@ -551,22 +689,23 @@ function renderTourCards() {
       return true;
     })
     .map(item => {
-      const futureRounds = (item.rounds || [])
-        .map(r => ({ ...r, ts: new Date((r.sale_time || '').replace(/-/g, '/')).getTime() }))
-        .filter(r => !isNaN(r.ts) && r.ts > now)
-        .sort((a, b) => a.ts - b.ts);
+      const state = getEventStatus(item, now);
       return {
         ...item,
-        activeRounds: futureRounds,
-        nextSaleTs: futureRounds.length ? futureRounds[0].ts : Infinity
+        showState: state,
+        activeRounds: state.futureRounds,
+        nextSaleTs: isNaN(state.saleTs) ? Infinity : state.saleTs,
+        sortKey: !isNaN(state.showTs) ? state.showTs : Infinity
       };
     })
+    .filter(item => item.showState.status !== SHOW_STATUS.ENDED)
     .sort((a, b) => {
-      const aHas = a.nextSaleTs < Infinity ? 0 : 1;
-      const bHas = b.nextSaleTs < Infinity ? 0 : 1;
-      if (aHas !== bHas) return aHas - bHas;
-      if (aHas === 0 && bHas === 0) return a.nextSaleTs - b.nextSaleTs;
-      return (a.show_date || '').localeCompare(b.show_date || '');
+      // 待开票优先（有抢票紧迫感），其次按演出时间由近到远
+      const aSale = a.showState.status === SHOW_STATUS.UPCOMING_SALE ? 0 : 1;
+      const bSale = b.showState.status === SHOW_STATUS.UPCOMING_SALE ? 0 : 1;
+      if (aSale !== bSale) return aSale - bSale;
+      if (aSale === 0 && bSale === 0) return a.nextSaleTs - b.nextSaleTs;
+      return a.sortKey - b.sortKey;
     });
 
   if (!list.length) {
@@ -584,17 +723,45 @@ function renderTourCards() {
     const buddyEntries = getBuddyListByShow(item.cloudId);
     const safeBooth = String(item.merchBooth || '').replace(/['"<>]/g, '');
     const venueStats = computeVenueExperienceStats(item.venue);
+    const st = item.showState;
+    const isSale = st.status === SHOW_STATUS.UPCOMING_SALE;
 
-    const roundsHtml = item.activeRounds.length ? `
+    // 距离演出的天数（向上取整，仅精确到天）
+    const daysToShow = isNaN(st.showTs)
+      ? null
+      : Math.max(0, Math.ceil((st.showTs - now) / 86400000));
+
+    // 顶部状态徽章：待开票用暖色警示，待演出/进行中用冷色
+    const statusBadge = isSale
+      ? `<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-amber-100 border border-amber-400 text-amber-900">🔥 抢票预警</span>`
+      : st.status === SHOW_STATUS.ONGOING
+        ? `<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-purple-100 border border-purple-400 text-purple-900 animate-pulse">🎤 Live 进行中</span>`
+        : `<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-sky-100 border border-sky-400 text-sky-900">🎫 已开票 · 待演出</span>`;
+
+    // 时间展示：待开票跳秒，待演出只显示天数
+    const timePanel = isSale
+      ? `
       <div class="space-y-1.5 pt-1">
         ${item.activeRounds.map(r => `
-          <div class="flex items-center justify-between gap-2 text-xs py-1.5 px-2.5 rounded-lg bg-slate-900 text-white">
+          <div class="flex items-center justify-between gap-2 text-xs py-1.5 px-2.5 rounded-lg bg-amber-950 text-amber-50">
             <span class="truncate">🔥 <strong>${r.round_name || '开票'}</strong>：${r.sale_time} <span class="opacity-75">(${r.platform || '大麦'})</span></span>
             <span class="countdown-badge font-mono font-bold text-amber-300 shrink-0" data-time="${r.sale_time}"></span>
           </div>
         `).join('')}
-      </div>
-    ` : '';
+      </div>`
+      : st.status === SHOW_STATUS.ONGOING
+        ? `<div class="pt-1"><div class="text-xs py-1.5 px-2.5 rounded-lg bg-purple-950 text-purple-50 text-center font-semibold">🎤 今日开演 · Live 进行中</div></div>`
+        : `<div class="pt-1">
+            <div class="flex items-center justify-between gap-2 text-xs py-1.5 px-2.5 rounded-lg bg-sky-950 text-sky-50">
+              <span>🎫 已开票，筹备中</span>
+              <span class="font-mono font-bold text-sky-300">${daysToShow === null ? '待定' : `距开演还有 ${daysToShow} 天`}</span>
+            </div>
+          </div>`;
+
+    // 主操作按钮随状态切换
+    const primaryCta = isSale
+      ? `<button type="button" onclick="exportShowICS(${item.cloudId})" class="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-semibold hover:bg-amber-700 transition">⏰ 抢票提醒</button>`
+      : `<button type="button" onclick="document.getElementById('guide-drawer-${idx}').classList.toggle('hidden')" class="px-3 py-1.5 rounded-lg bg-sky-700 text-white font-semibold hover:bg-sky-800 transition">🚇 场馆交通指南</button>`;
 
     return `
       <div class="p-4 rounded-2xl metal-card flex flex-col justify-between gap-3">
@@ -607,6 +774,7 @@ function renderTourCards() {
               <div class="flex items-center gap-1.5 flex-wrap">
                 <span class="text-[11px] px-2 py-0.5 rounded text-white font-semibold" style="background:${badge}">${item.artist}</span>
                 <h3 class="font-bold text-base text-slate-900">${safeCity}</h3>
+                ${statusBadge}
               </div>
               <div class="flex items-center gap-1.5 shrink-0">
                 ${AppState.isAdmin ? `<button type="button" onclick="startEditShow('ticket', ${item.cloudId})" class="text-[11px] px-2 py-0.5 rounded-lg liquid-silver-btn font-semibold">✏️ 编辑</button>` : ''}
@@ -622,15 +790,17 @@ function renderTourCards() {
           </div>
         </div>
 
-        ${roundsHtml}
+        ${timePanel}
 
         <div class="flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-slate-200/80 text-xs">
           <div class="flex items-center gap-1.5 flex-wrap">
+            ${primaryCta}
             <button type="button" onclick="document.getElementById('guide-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🚇 交通 ▾</button>
             <button type="button" onclick="requestExternalToolJump('${shiyeLiveUrl}', '视野 live（非官方座位视野工具站）', '${cleanVenue || safeCity}')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🔭 视野 live ↗</button>
             <button type="button" onclick="document.getElementById('vexp-tour-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">📊 场馆体验 (${venueStats.total}${venueStats.unlocked ? '·已聚合' : '/5'}) ▾</button>
             <button type="button" onclick="document.getElementById('buddy-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg obsidian-btn text-white font-medium">🤝 找搭子 (${buddyEntries.length}) ▾</button>
           </div>
+
           <div class="flex items-center gap-1.5">
             <button type="button" onclick="exportShowICS(${item.cloudId})" class="px-2 py-1 rounded-lg bg-white border border-slate-300 text-slate-700">📅 日历</button>
             <a href="${amapUrl}" target="_blank" rel="noopener noreferrer" class="px-2 py-1 rounded-lg bg-white border border-slate-300 text-slate-700">地图 ↗</a>
