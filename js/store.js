@@ -627,7 +627,42 @@ function mergeShowRecords(localRecords, cloudRecords, isArchive) {
     const prevIsCloud = prev.cloudId != null && !String(prev.cloudId).startsWith('local');
     if (itemIsCloud && !prevIsCloud) seen[dupIdx] = item;
   });
-  return seen;
+
+  // 覆盖式去重：同城市已有「带海报 / 连场区间」的完整条目时，过滤掉被其日期覆盖的孤立简写条目
+  const rawDateOf = item => String((isArchive ? item.showDate : item.show_date) || '');
+  const areaOf = item => String(item.city || item.title || item.venue || '')
+    .replace(/[「」《》〈〉·・\s]/g, '')
+    .slice(0, 2);
+  const spanOf = item => {
+    const { startDate, endDate } = getShowDateRange(rawDateOf(item));
+    return { startDate, endDate };
+  };
+  const weightOf = item => {
+    const span = spanOf(item);
+    let weight = 0;
+    if (item.posterUrl) weight += 100;
+    if (span.startDate && span.endDate && span.endDate > span.startDate) weight += 50;
+    if (Array.isArray(item.rounds) && item.rounds.length > 1) weight += 20;
+    if (String(item.city || '').includes('「')) weight += 10;
+    return weight;
+  };
+
+  const ordered = [...seen].sort((a, b) => weightOf(b) - weightOf(a));
+  const kept = [];
+  ordered.forEach(item => {
+    const area = areaOf(item);
+    const { startDate, endDate } = spanOf(item);
+    if (!area || !startDate) { kept.push(item); return; }
+    const covered = kept.some(full => {
+      if (areaOf(full) !== area) return false;
+      const fullSpan = spanOf(full);
+      if (!fullSpan.startDate) return false;
+      if (weightOf(full) <= weightOf(item)) return false;
+      return startDate >= fullSpan.startDate && startDate <= fullSpan.endDate;
+    });
+    if (!covered) kept.push(item);
+  });
+  return kept;
 }
 
 function renderLoadedTourData() {
