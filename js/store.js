@@ -850,6 +850,65 @@ async function deleteBuddyIntent(eventId, entryId, deviceId) {
   }
 }
 
+// ================= 搭子联系方式安全校验与冷却 =================
+const BUDDY_BANNED_WORDS = ['黄牛', '代拍', '加价', '出票', '收票', '内部票', '兼职', '刷单', '转让票', '代抢'];
+const BUDDY_COOLDOWN_KEY = 'onerland_buddy_cooldown_v1';
+const BUDDY_PLATFORMS = ['小红书号', '微博ID', '微信号'];
+
+// 前端拦截：手机号 / 网址 / 违规词
+function validateBuddyContactInfo(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return { ok: false, reason: '请填写账号 ID' };
+  if (/1[3-9]\d{9}/.test(text.replace(/[\s-]/g, ''))) {
+    return { ok: false, reason: '包含手机号、网址或违规敏感词，请修改后重试' };
+  }
+  if (/(https?:\/\/|www\.|\.com|\.cn|\.net|\.top|\.xyz)/i.test(text)) {
+    return { ok: false, reason: '包含手机号、网址或违规敏感词，请修改后重试' };
+  }
+  if (BUDDY_BANNED_WORDS.some(w => text.includes(w))) {
+    return { ok: false, reason: '包含手机号、网址或违规敏感词，请修改后重试' };
+  }
+  return { ok: true };
+}
+
+// 60 秒同设备冷却
+function getBuddyCooldownLeft(actionKey) {
+  try {
+    const all = JSON.parse(localStorage.getItem(BUDDY_COOLDOWN_KEY) || '{}');
+    const last = Number(all[actionKey] || 0);
+    const left = 60000 - (Date.now() - last);
+    return left > 0 ? Math.ceil(left / 1000) : 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+function markBuddyCooldown(actionKey) {
+  try {
+    const all = JSON.parse(localStorage.getItem(BUDDY_COOLDOWN_KEY) || '{}');
+    all[actionKey] = Date.now();
+    localStorage.setItem(BUDDY_COOLDOWN_KEY, JSON.stringify(all));
+  } catch (e) { /* 忽略 */ }
+}
+
+// 管理员全站删除（仅在管理员密码解锁后可用）
+async function adminDeleteBuddyIntent(buddyId) {
+  if (typeof AppState !== 'undefined' && !AppState.isAdminPasswordVerified) {
+    return { ok: false, reason: 'forbidden' };
+  }
+  try {
+    const headers = buddyHeaders({ 'Prefer': 'return=minimal' });
+    if (AppState.adminToken) headers['X-Admin-Token'] = AppState.adminToken;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${BUDDY_TABLE}?id=eq.${encodeURIComponent(buddyId)}`, {
+      method: 'DELETE',
+      headers
+    });
+    return { ok: res.ok, reason: res.ok ? '' : `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, reason: e.message || 'network' };
+  }
+}
+
 // ================= 双向同意解锁联系方式（buddy_requests） =================
 // create table if not exists public.buddy_requests (
 //   id bigserial primary key,

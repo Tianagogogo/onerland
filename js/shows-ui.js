@@ -1326,6 +1326,11 @@ function renderBuddyEntryCard(cloudId, b, canManage) {
     actionHtml = `<button type="button" onclick="openBuddyRequestModal('${b.id}', '${cloudId}', event)" class="tour-action-btn tour-action-btn--mini shrink-0">👋 申请互换联系方式</button>`;
   }
 
+  const adminDeleteBtn = (typeof AppState !== 'undefined' && AppState.isAdminPasswordVerified)
+    ? `<button type="button" onclick="adminDeleteBuddyCard('${b.id}', '${cloudId}', event)"
+         class="text-[10px] px-2 py-0.5 rounded-md bg-rose-600 text-white font-semibold shrink-0">🗑️ 管理员删除</button>`
+    : '';
+
   return `
     <div class="p-2.5 rounded-xl bg-white border transition-all hover:shadow-md"
       style="border-color: ${themeSolid}22">
@@ -1342,6 +1347,7 @@ function renderBuddyEntryCard(cloudId, b, canManage) {
         </div>
         ${actionHtml}
       </div>
+      ${adminDeleteBtn ? `<div class="pt-1.5 flex justify-end">${adminDeleteBtn}</div>` : ''}
       ${canManage ? renderBuddyOwnerRequests(b) : ''}
     </div>
   `;
@@ -1423,20 +1429,58 @@ async function submitBuddyRequestFromModal() {
   const noteEl = document.getElementById('buddy-req-note');
   const contactEl = document.getElementById('buddy-req-contact');
   const note = (noteEl ? noteEl.value : '').trim();
-  const contact = (contactEl ? contactEl.value : '').trim();
-  if (!contact) return alert('请填写你的联系方式（微信号 / 小红书号），对方同意后才能看到');
+
   const entry = getMergedBuddyEntries(target.eventId).find(x => String(x.id) === String(target.buddyId));
   if (!entry) return alert('该搭子信息已失效，请刷新后重试');
+
+  // 同一设备对同一条搭子只能申请一次（先判重，再校验表单内容）
+  const state = buddyStateFor(entry.id);
+  if (state.myRequest && (state.myRequest.status === 'pending' || state.myRequest.status === 'accepted')) {
+    return alert('你已申请过该搭子，请等待对方处理，无需重复提交');
+  }
+  const fresh = await fetchMyBuddyRequest(entry.id);
+  if (fresh && (fresh.status === 'pending' || fresh.status === 'accepted')) {
+    return alert('你已申请过该搭子，请等待对方处理，无需重复提交');
+  }
+
+  const cooldownKey = `request:${entry.id}`;
+  const waitLeft = getBuddyCooldownLeft(cooldownKey);
+  if (waitLeft > 0) return alert(`申请太频繁，请 ${waitLeft} 秒后再试`);
+
+  const platformEl = document.getElementById('buddy-req-platform');
+  const platform = platformEl ? platformEl.value : '微信号';
+  const accountId = (contactEl ? contactEl.value : '').trim().slice(0, 30);
+  const check = validateBuddyContactInfo(accountId);
+  if (!check.ok) return alert(check.reason);
+  const contact = `${platform}：${accountId}`;
+
   const res = await sendBuddyRequest(entry, note, contact);
   if (!res.ok) {
     if (res.reason === 'self') return alert('这是你自己发布的搭子信息');
     return alert(`申请提交失败（${res.reason}），请稍后再试`);
   }
+  markBuddyCooldown(cooldownKey);
   document.getElementById('buddy-request-modal')?.classList.add('hidden');
   if (noteEl) noteEl.value = '';
   if (contactEl) contactEl.value = '';
   renderBuddyPanel(target.eventId);
   alert('申请已发送，等待对方同意后即可互相看到联系方式');
+}
+
+async function adminDeleteBuddyCard(buddyId, eventId, event) {
+  if (event && event.stopPropagation) event.stopPropagation();
+  if (typeof AppState === 'undefined' || !AppState.isAdminPasswordVerified) {
+    return alert('需要先使用管理员密码解锁');
+  }
+  if (!confirm('确认删除这条搭子信息？该操作对所有访客生效。')) return;
+  const res = await adminDeleteBuddyIntent(buddyId);
+  if (!res.ok) {
+    if (res.reason === 'forbidden') return alert('需要先使用管理员密码解锁');
+    return alert(`删除失败（${res.reason}），可能受行级权限限制`);
+  }
+  window.buddyCloudCache[eventId] = (window.buddyCloudCache[eventId] || []).filter(x => String(x.id) !== String(buddyId));
+  renderBuddyPanel(eventId);
+  alert('已删除该搭子信息');
 }
 
 async function acceptBuddyRequestUI(buddyId, requestId, event) {
@@ -1470,11 +1514,26 @@ function copyBuddyContact(value, event) {
 
 async function saveLocalBuddyIntent(cloudId, showTitle, event) {
   if (event && event.stopPropagation) event.stopPropagation();
+
+  // 同设备 60 秒冷却（先于其它校验，防止连点刷屏）
+  const cooldownKey = `publish:${cloudId}`;
+  const waitLeft = getBuddyCooldownLeft(cooldownKey);
+  if (waitLeft > 0) return alert(`发布太频繁，请 ${waitLeft} 秒后再试`);
+
   const tags = window.selectedBuddyTags[cloudId] || [];
   if (tags.length === 0) return alert('请至少选中 1 个预设标签以发布搭子意向！');
 
+  const platformEl = document.getElementById(`buddy-platform-${cloudId}`);
   const contactInput = document.getElementById(`buddy-contact-${cloudId}`);
-  const contact = (contactInput ? contactInput.value : '').trim().slice(0, 30);
+  const platform = platformEl ? platformEl.value : '小红书号';
+  const accountId = (contactInput ? contactInput.value : '').trim().slice(0, 30);
+
+  let contact = '';
+  if (accountId) {
+    const check = validateBuddyContactInfo(accountId);
+    if (!check.ok) return alert(check.reason);
+    contact = `${platform}：${accountId}`;
+  }
 
   const pref = getFanPrefState();
   const theme = getBuddyTheme(pref);
@@ -1510,6 +1569,7 @@ async function saveLocalBuddyIntent(cloudId, showTitle, event) {
     addBuddyEntryForShow(cloudId, { ...entry, ownerId: getDeviceId(), deviceId: getDeviceId() });
   }
 
+  markBuddyCooldown(cooldownKey);
   window.selectedBuddyTags[cloudId] = [];
   resetBuddyTagButtons(cloudId);
   renderBuddyPanel(cloudId);
@@ -1955,10 +2015,16 @@ function renderTourCards() {
             </div>
 
             <div class="space-y-1 pt-1 border-t border-slate-100">
-              <label for="buddy-contact-${item.cloudId}" class="text-[11px] font-semibold text-slate-700">联系方式 / 社交账号（选填，仅对同场匹配展示）：</label>
-              <input id="buddy-contact-${item.cloudId}" type="text" maxlength="30" autocomplete="off"
-                placeholder="如 小红书号 / 微博ID，最多 30 字"
-                class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-[11px]" />
+              <span class="text-[11px] font-semibold text-slate-700">联系方式（选填，仅双方同意后互换）：</span>
+              <div class="flex gap-1.5">
+                <select id="buddy-platform-${item.cloudId}" class="select-clean px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-[11px] shrink-0">
+                  ${BUDDY_PLATFORMS.map(pf => `<option value="${pf}">${pf}</option>`).join('')}
+                </select>
+                <input id="buddy-contact-${item.cloudId}" type="text" maxlength="30" autocomplete="off"
+                  placeholder="账号 ID（勿填手机号/网址）"
+                  class="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-[11px]" />
+              </div>
+              <p class="text-[10px] text-slate-400 leading-relaxed">⚠️ 严禁填写手机号、身份证号或转账链接，线下见面请核对票根并注意安全</p>
             </div>
           </div>
 
