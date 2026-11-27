@@ -38,7 +38,23 @@ async function handleAdminSeatFile(event) {
   const dataUrl = await compressImageToDataURL(file, 1200, 0.82, 150 * 1024);
   const seatInput = document.getElementById('adm-seat');
   if (seatInput) seatInput.value = dataUrl;
+  const prev = document.getElementById('adm-seat-preview');
+  if (prev) { prev.src = dataUrl; prev.classList.remove('hidden'); }
   event.target.value = '';
+}
+
+function clearAdminPoster() {
+  const input = document.getElementById('adm-poster');
+  if (input) input.value = '';
+  const prev = document.getElementById('adm-poster-preview');
+  if (prev) { prev.removeAttribute('src'); prev.classList.add('hidden'); }
+}
+
+function clearAdminSeat() {
+  const input = document.getElementById('adm-seat');
+  if (input) input.value = '';
+  const prev = document.getElementById('adm-seat-preview');
+  if (prev) { prev.removeAttribute('src'); prev.classList.add('hidden'); }
 }
 
 async function handleAdminPosterFile(event) {
@@ -84,8 +100,21 @@ function startEditShow(kind, cloudId) {
   document.getElementById('adm-sale-time').value = ((item.rounds || [])[0]?.sale_time || '').replace(' ', 'T').slice(0, 16);
   document.getElementById('adm-sale-plat').value = (item.rounds || [])[0]?.platform || '大麦';
 
+  const posterPrev = document.getElementById('adm-poster-preview');
+  if (posterPrev) {
+    if (item.posterUrl) { posterPrev.src = item.posterUrl; posterPrev.classList.remove('hidden'); }
+    else { posterPrev.removeAttribute('src'); posterPrev.classList.add('hidden'); }
+  }
+  const seatPrev = document.getElementById('adm-seat-preview');
+  if (seatPrev) {
+    if (item.seatUrl) { seatPrev.src = item.seatUrl; seatPrev.classList.remove('hidden'); }
+    else { seatPrev.removeAttribute('src'); seatPrev.classList.add('hidden'); }
+  }
+
   adminScheduleImgs = Array.isArray(item.scheduleImgs) ? [...item.scheduleImgs] : [];
   renderAdminScheduleThumbs();
+  const delBtn = document.getElementById('adm-delete-btn');
+  if (delBtn) delBtn.classList.remove('hidden');
   document.getElementById('adm-submit-btn').textContent = '💾 保存修改';
 }
 
@@ -99,6 +128,8 @@ function resetAdminForm() {
     if (el) el.value = '';
   });
   document.getElementById('adm-poster-preview')?.classList.add('hidden');
+  document.getElementById('adm-seat-preview')?.classList.add('hidden');
+  document.getElementById('adm-delete-btn')?.classList.add('hidden');
   document.getElementById('adm-submit-btn').textContent = '☁️ 同步发布';
 }
 
@@ -139,7 +170,8 @@ async function submitAdminQuickPost() {
         })}`,
         url
       };
-      const isPatch = Boolean(AppState.editingTicketId);
+      const editingId = String(AppState.editingTicketId || '');
+      const isPatch = Boolean(editingId) && !editingId.startsWith('local');
       if (isPatch) {
         await adminApi('updateTicket', payload, AppState.editingTicketId);
       } else {
@@ -169,7 +201,7 @@ async function submitAdminQuickPost() {
         })}`,
         url
       };
-      const isPatch = Boolean(AppState.editingTicketId);
+      const isPatch = Boolean(editingId) && !editingId.startsWith('local');
       if (isPatch) {
         await adminApi('updateTicket', payload, AppState.editingTicketId);
       } else {
@@ -508,5 +540,41 @@ async function bulkCompressLegacyImages() {
     alert(`瘦身失败：${e.message || '网络异常'}`);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '⚡ 一键瘦身历史大图'; }
+  }
+}
+
+// ================= 🗑️ 删除当前编辑的场次（云端删除 / 本地预置加入隐藏列表） =================
+async function deleteEditingShow() {
+  const id = String(AppState.editingTicketId || '');
+  if (!id) return;
+  if (!canEditContent()) {
+    alert('请先通过管理员密码解锁后再删除场次。');
+    return;
+  }
+  const kind = AppState.editingKind === 'archive' ? 'archive' : 'ticket';
+  const source = kind === 'archive' ? AppState.cloudArchives : AppState.cloudTickets;
+  const item = source.find(x => String(x.cloudId) === id);
+  const label = kind === 'archive'
+    ? `${item?.title || ''} ${item?.showDate || ''}`.trim()
+    : `${item?.city || ''} ${item?.show_date || ''}`.trim();
+  if (!confirm(`确认删除该场次${label ? `：${label}` : ''}？\n删除后不可恢复。`)) return;
+
+  const delBtn = document.getElementById('adm-delete-btn');
+  if (delBtn) { delBtn.disabled = true; delBtn.textContent = '⏳ 正在删除…'; }
+  try {
+    if (id.startsWith('local')) {
+      if (item && typeof hideLocalShow === 'function') hideLocalShow(item, kind === 'archive');
+      alert('已从本地预置场次中隐藏该场次。');
+    } else {
+      await adminApi('deleteTicket', {}, id);
+      alert('✅ 已从云端删除该场次。');
+    }
+    resetAdminForm();
+    document.getElementById('hidden-admin-modal')?.classList.add('hidden');
+    await loadTourData();
+  } catch (e) {
+    alert(`删除失败：${e.message || '网络异常，请稍后重试'}`);
+  } finally {
+    if (delBtn) { delBtn.disabled = false; delBtn.textContent = '🗑️ 删除该场次'; }
   }
 }

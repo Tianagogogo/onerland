@@ -478,7 +478,7 @@ async function loadLocalTourData() {
     rounds: Array.isArray(item.rounds) ? item.rounds : [],
     source_url: item.source_url || item.url || ''
   }));
-  AppState.cloudTickets = mergeShowRecords(localTickets, [], false);
+  AppState.cloudTickets = filterHiddenShows(mergeShowRecords(localTickets, [], false), false);
   const localArchives = list.filter(item => item && item.showDate).map((item, index) => ({
     ...item,
     cloudId: item.cloudId || `local-archive-${index + 1}`,
@@ -486,8 +486,47 @@ async function loadLocalTourData() {
     year: item.year || String(item.showDate).slice(0, 4),
     subType: item.subType || 'tour'
   }));
-  AppState.cloudArchives = mergeShowRecords(localArchives, [], true);
+  AppState.cloudArchives = filterHiddenShows(mergeShowRecords(localArchives, [], true), true);
   AppState.showLoadError = '';
+}
+
+// ================= 本地预置场次的隐藏列表（管理员删除本地场次时使用） =================
+const HIDDEN_LOCAL_SHOWS_KEY = 'onerland_hidden_show_keys_v1';
+
+function getHiddenLocalShowKeys() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(HIDDEN_LOCAL_SHOWS_KEY) || '[]');
+    return Array.isArray(raw) ? raw : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function buildLocalShowKey(item, isArchive) {
+  if (!item) return '';
+  const title = isArchive ? (item.title || item.city) : (item.city || item.title);
+  const date = isArchive ? item.showDate : item.show_date;
+  return `${item.artist || ''}|${title || ''}|${date || ''}`;
+}
+
+function hideLocalShow(item, isArchive) {
+  const key = buildLocalShowKey(item, isArchive);
+  if (!key) return;
+  const keys = getHiddenLocalShowKeys();
+  if (!keys.includes(key)) {
+    keys.push(key);
+    try { localStorage.setItem(HIDDEN_LOCAL_SHOWS_KEY, JSON.stringify(keys)); } catch (e) { /* 存储失败时忽略 */ }
+  }
+}
+
+function filterHiddenShows(list, isArchive) {
+  const hidden = getHiddenLocalShowKeys();
+  if (!hidden.length) return list;
+  return (Array.isArray(list) ? list : []).filter(item => {
+    const isLocalRecord = String(item && item.cloudId || '').startsWith('local');
+    if (!isLocalRecord) return true;
+    return !hidden.includes(buildLocalShowKey(item, isArchive));
+  });
 }
 
 function normalizeShowDateKey(value) {
@@ -714,8 +753,8 @@ async function loadTourData() {
       }
     }
 
-    AppState.cloudTickets = mergeShowRecords(localTickets, tickets, false);
-    AppState.cloudArchives = mergeShowRecords(localArchives, archives, true);
+    AppState.cloudTickets = filterHiddenShows(mergeShowRecords(localTickets, tickets, false), false);
+    AppState.cloudArchives = filterHiddenShows(mergeShowRecords(localArchives, archives, true), true);
     AppState.showLoadError = '';
   } catch (err) {
     try {
