@@ -13,6 +13,7 @@ const AppState = {
   pendingExternalUrl: null,
   cloudTickets: [],
   cloudArchives: [],
+  cloudHiddenShowKeys: [],
   footprints: [],
   anniversary: {
     firstMeetDate: '2018-08-30',
@@ -519,13 +520,34 @@ function hideLocalShow(item, isArchive) {
   }
 }
 
+function parseHiddenShowKey(key) {
+  const parts = String(key || '').split('|');
+  if (parts.length < 3) return null;
+  const date = String(parts[parts.length - 1] || '').slice(0, 10);
+  const label = parts.length >= 3 ? parts[1] : '';
+  const trimmed = label.replace(/[「」《》·\s]/g, '');
+  return date && trimmed ? { date, label: trimmed } : null;
+}
+
 function filterHiddenShows(list, isArchive) {
-  const hidden = getHiddenLocalShowKeys();
+  const cloudHidden = Array.isArray(AppState.cloudHiddenShowKeys) ? AppState.cloudHiddenShowKeys : [];
+  const hidden = [...new Set([...getHiddenLocalShowKeys(), ...cloudHidden])];
   if (!hidden.length) return list;
+  const parsed = hidden.map(parseHiddenShowKey).filter(Boolean);
   return (Array.isArray(list) ? list : []).filter(item => {
     const isLocalRecord = String(item && item.cloudId || '').startsWith('local');
     if (!isLocalRecord) return true;
-    return !hidden.includes(buildLocalShowKey(item, isArchive));
+    const exactKey = buildLocalShowKey(item, isArchive);
+    if (hidden.includes(exactKey)) return false;
+    // 语义兜底：同日期 + 城市/场馆关键字重合也视为已隐藏（兼容日期格式差异）
+    const rawDate = isArchive ? item.showDate : item.show_date;
+    const dateKey = normalizeShowDateKey(rawDate);
+    const label = String((isArchive ? item.title : item.city) || item.venue || '').replace(/[「」《》·\s]/g, '');
+    if (!dateKey || !label) return true;
+    return !parsed.some(entry => entry.date === dateKey && (
+      label.includes(entry.label) || entry.label.includes(label) ||
+      (label.slice(0, 2) && entry.label.slice(0, 2) === label.slice(0, 2))
+    ));
   });
 }
 
@@ -651,10 +673,18 @@ async function loadTourData() {
 
     const tickets = [];
     const archives = [];
+    const hiddenFromCloud = [];
 
     for (const row of list) {
       const rawTitle = row.title || '';
       const rawPlat = row.platform || '';
+
+      // 云端隐藏标记行：HIDDEN|艺人|场次标题|日期，跨设备同步隐藏的本地预置场次
+      if (rawTitle.startsWith('HIDDEN|')) {
+        const key = rawTitle.slice(7);
+        if (key) hiddenFromCloud.push(key);
+        continue;
+      }
 
       // 单条脏数据不能让整页演出消失：逐行隔离解析异常。
       try {
@@ -753,6 +783,7 @@ async function loadTourData() {
       }
     }
 
+    AppState.cloudHiddenShowKeys = hiddenFromCloud;
     AppState.cloudTickets = filterHiddenShows(mergeShowRecords(localTickets, tickets, false), false);
     AppState.cloudArchives = filterHiddenShows(mergeShowRecords(localArchives, archives, true), true);
     AppState.showLoadError = '';

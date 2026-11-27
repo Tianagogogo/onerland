@@ -575,6 +575,25 @@ async function deleteEditingShow() {
     if (id.startsWith('local')) {
       // 本地预置场次：先记入本机隐藏列表，同时把云端的同场次副本一并删除，保证多设备一致
       if (item && typeof hideLocalShow === 'function') hideLocalShow(item, kind === 'archive');
+      // 同步写入云端隐藏标记（HIDDEN|key），保证手机与电脑隐藏列表一致
+      const hideKey = item && typeof buildLocalShowKey === 'function' ? buildLocalShowKey(item, kind === 'archive') : '';
+      const cloudHidden = Array.isArray(AppState.cloudHiddenShowKeys) ? AppState.cloudHiddenShowKeys : [];
+      let cloudSynced = false;
+      if (hideKey && !cloudHidden.includes(hideKey)) {
+        try {
+          await adminApi('createTicket', {
+            title: `HIDDEN|${hideKey}`,
+            ticket_time: new Date().toISOString().slice(0, 19).replace('T', ' '),
+            platform: 'META:{"hidden":true}',
+            url: ''
+          });
+          cloudHidden.push(hideKey);
+          AppState.cloudHiddenShowKeys = cloudHidden;
+          cloudSynced = true;
+        } catch (e) {
+          console.warn('云端隐藏标记写入失败（本机仍已隐藏）:', e);
+        }
+      }
       const dateOf = value => {
         const m = String(value || '').match(/\d{4}-\d{2}-\d{2}/);
         return m ? m[0] : '';
@@ -591,13 +610,31 @@ async function deleteEditingShow() {
       if (cloudCopy) {
         await adminApi('deleteTicket', {}, cloudCopy.cloudId);
         alert('已从本地预置隐藏，并同步删除云端同场次记录。');
+      } else if (cloudSynced) {
+        alert('已隐藏该场次，并同步到云端（其它设备打开同样不再显示）。');
       } else {
-        alert('已从本地预置场次中隐藏该场次。');
+        alert('已从本地预置场次中隐藏该场次（云端同步未成功，仅本机生效）。');
       }
     } else {
       await adminApi('deleteTicket', {}, id);
-      // 同步隐藏本机同场次的预置卡片，避免断网回退时旧卡片再次出现
+      // 写入云端 HIDDEN 标记（跨设备生效），并同步隐藏本机同场次的预置卡片
       if (item && typeof hideLocalShow === 'function') hideLocalShow(item, kind === 'archive');
+      const hideKey = item && typeof buildLocalShowKey === 'function' ? buildLocalShowKey(item, kind === 'archive') : '';
+      const cloudHidden = Array.isArray(AppState.cloudHiddenShowKeys) ? AppState.cloudHiddenShowKeys : [];
+      if (hideKey && !cloudHidden.includes(hideKey)) {
+        try {
+          await adminApi('createTicket', {
+            title: `HIDDEN|${hideKey}`,
+            ticket_time: new Date().toISOString().slice(0, 19).replace('T', ' '),
+            platform: 'META:{"hidden":true}',
+            url: ''
+          });
+          cloudHidden.push(hideKey);
+          AppState.cloudHiddenShowKeys = cloudHidden;
+        } catch (e) {
+          console.warn('云端隐藏标记写入失败:', e);
+        }
+      }
       alert('✅ 已从云端删除该场次。');
     }
     resetAdminForm();
