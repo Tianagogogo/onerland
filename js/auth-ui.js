@@ -101,11 +101,15 @@ function syncAuthState() {
       : '免注册即可浏览与发布搭子。这里的昵称只保存在本机，用于搭子卡片署名。';
   }
 
-  // 管理员的批量瘦身工具：仅解锁后可见
-  const compressBtn = document.getElementById('adm-compress-btn');
-  if (compressBtn) {
-    compressBtn.classList.toggle('hidden', !(AppState.isAdminPasswordVerified || AppState.isAdmin));
-  }
+  // 管理员的批量瘦身工具：仅解锁后可见（管理弹窗 + 演出标题栏各一处）
+  const canManage = Boolean(AppState.isAdminPasswordVerified || AppState.isAdmin);
+  ['adm-compress-btn', 'adm-compress-btn-header'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.classList.toggle('hidden', !canManage);
+      if (id === 'adm-compress-btn-header') btn.classList.toggle('inline-flex', canManage);
+    }
+  });
 
   // 本机昵称与设备标识（不依赖邮箱，不阻塞任何前台功能）
   const nicknameInput = document.getElementById('guest-nickname-input');
