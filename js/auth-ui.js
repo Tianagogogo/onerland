@@ -1,4 +1,4 @@
-// ================= 用户认证（Supabase 邮箱 OTP 无密码登录） =================
+// ================= 用户认证（Supabase 邮箱 + 密码，注册/登录二合一） =================
 // 依赖 config.js 提供的 SUPABASE_URL / SUPABASE_ANON_KEY / ADMIN_EMAIL
 
 const AUTH_STORAGE_KEY = 'onerland_auth_session_v1';
@@ -98,7 +98,7 @@ function syncAuthState() {
     if (!email) {
       statusEl.textContent = AppState.isAdminPasswordVerified
         ? '管理员密码已解锁：当前可编辑内容（与邮箱登录态互不影响）。'
-        : '未登录。输入邮箱获取 6 位验证码即可登录，无需密码；也可使用管理员密码独立解锁编辑权限。';
+        : '未登录。输入邮箱与密码即可登录，首次使用请点「注册并登录」；也可使用管理员密码独立解锁编辑权限。';
     } else if (AppState.isAdmin) {
       statusEl.textContent = `已登录：${email}（授权邮箱，可编辑演出与档案）`;
     } else if (AppState.isAdminPasswordVerified) {
@@ -108,9 +108,11 @@ function syncAuthState() {
     }
   }
 
-  // 登录态下隐藏邮箱输入，避免误操作
+  // 登录态下禁用邮箱与密码输入，避免误操作
   const emailInput = document.getElementById('auth-email-input');
   if (emailInput) emailInput.disabled = Boolean(email);
+  const passwordInput = document.getElementById('auth-password-input');
+  if (passwordInput) passwordInput.disabled = Boolean(email);
 
   if (typeof renderTourCards === 'function') renderTourCards();
   if (typeof renderArchiveTimeline === 'function') renderArchiveTimeline();
@@ -195,90 +197,142 @@ function getAdminRequestHeaders() {
   return headers;
 }
 
-async function sendEmailOTP() {
-  const input = document.getElementById('auth-email-input');
-  const email = (input ? input.value : '').trim().toLowerCase();
-  if (!email) return alert('请先输入邮箱地址');
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return alert('邮箱格式不正确');
+// Supabase 认证错误 → 清晰中文提示
+function translateAuthError(raw, status) {
+  const msg = String(raw || '').toLowerCase();
+  if (msg.includes('invalid login credentials') || msg.includes('invalid_grant')) return '邮箱或密码不正确，请检查后重试。';
+  if (msg.includes('email not confirmed')) return '该邮箱尚未完成验证。请在 Supabase 后台关闭 Confirm email 后重试。';
+  if (msg.includes('user already registered') || msg.includes('already been registered')) return '该邮箱已注册，请直接点「登录」。';
+  if (msg.includes('password should be at least')) return '密码太短，至少需要 6 位字符。';
+  if (msg.includes('weak password') || msg.includes('weak_password')) return '密码强度过低，请换用更复杂的密码。';
+  if (msg.includes('unable to validate email') || msg.includes('invalid email') || msg.includes('email address is invalid')) return '邮箱格式不正确，请重新输入。';
+  if (msg.includes('rate limit') || msg.includes('too many requests') || status === 429) return '尝试过于频繁，请稍等 1 分钟再试。';
+  if (msg.includes('signup') && msg.includes('disabled')) return '当前项目已关闭邮箱注册，请联系管理员。';
+  if (status === 0 || msg.includes('failed to fetch') || msg.includes('networkerror')) return '网络连接失败，请检查网络后重试。';
+  if (status >= 500) return '服务端暂时不可用，请稍后再试。';
+  return `操作失败：${raw || `HTTP ${status}`}`;
+}
 
-  const btn = document.querySelector('#user-auth-modal button[onclick="sendEmailOTP()"]');
-  const oldText = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = '发送中…'; }
+function readAuthCredentials() {
+  const emailInput = document.getElementById('auth-email-input');
+  const passwordInput = document.getElementById('auth-password-input');
+  const email = (emailInput ? emailInput.value : '').trim().toLowerCase();
+  const password = passwordInput ? passwordInput.value : '';
+  if (!email) { alert('请先输入邮箱地址'); return null; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('邮箱格式不正确，请重新输入'); return null; }
+  if (!password) { alert('请输入密码'); return null; }
+  if (password.length < 6) { alert('密码至少需要 6 位字符'); return null; }
+  return { email, password, passwordInput };
+}
 
+function setAuthBusy(btn, busy, busyText, idleText) {
+  if (!btn) return;
+  btn.disabled = busy;
+  btn.textContent = busy ? busyText : (idleText || btn.textContent);
+}
+
+function handleAuthSuccess(data, email, successText) {
+  saveSession({
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: data.expires_at || (Math.floor(Date.now() / 1000) + (data.expires_in || 3600)),
+    user: data.user || { email }
+  });
+  AppState.pendingAuthEmail = '';
+  const passwordInput = document.getElementById('auth-password-input');
+  if (passwordInput) passwordInput.value = '';
+  syncAuthState();
+  const modal = document.getElementById('user-auth-modal');
+  if (modal) modal.classList.add('hidden');
+  alert(successText);
+}
+
+// 登录：POST /auth/v1/token?grant_type=password（等价 signInWithPassword）
+async function signInWithPassword() {
+  const cred = readAuthCredentials();
+  if (!cred) return;
+  const btn = document.querySelector('#user-auth-modal button[onclick="signInWithPassword()"]');
+  setAuthBusy(btn, true, '登录中…');
   try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/otp`, {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: 'POST',
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ email, create_user: true })
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cred.email, password: cred.password })
     });
     if (!res.ok) {
       let detail = `HTTP ${res.status}`;
       try {
         const err = await res.json();
-        detail = err.msg || err.error_description || err.message || detail;
+        detail = err.msg || err.error_description || err.message || err.error || detail;
       } catch (e) { /* 忽略非 JSON 响应 */ }
-      throw new Error(detail);
+      throw new Error(translateAuthError(detail, res.status));
     }
-    AppState.pendingAuthEmail = email;
-    alert(`验证码已发送至 ${email}，请查收邮箱（注意垃圾箱）。`);
+    const data = await res.json();
+    handleAuthSuccess(data, cred.email, isAdminEmail(cred.email) ? '管理员登录成功' : '登录成功');
   } catch (e) {
-    alert(`发送失败：${e.message}\n\n若持续失败，请确认 Supabase 已开启 Email OTP 并配置了发信服务。`);
+    alert(`登录失败：${e.message}`);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = oldText || '发验证码'; }
+    setAuthBusy(btn, false, '', '登录');
   }
 }
 
-async function verifyEmailOTP() {
-  const emailInput = document.getElementById('auth-email-input');
-  const otpInput = document.getElementById('auth-otp-input');
-  const email = (AppState.pendingAuthEmail || (emailInput ? emailInput.value : '')).trim().toLowerCase();
-  const token = (otpInput ? otpInput.value : '').trim();
-
-  if (!email) return alert('请先输入邮箱并获取验证码');
-  if (!token) return alert('请输入收到的验证码');
-
-  const btn = document.querySelector('#user-auth-modal button[onclick="verifyEmailOTP()"]');
-  const oldText = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = '验证中…'; }
-
+// 注册：POST /auth/v1/signup（配合后台关闭 Confirm email 实现免验证直接登录）
+async function signUpWithPassword() {
+  const cred = readAuthCredentials();
+  if (!cred) return;
+  const btn = document.querySelector('#user-auth-modal button[onclick="signUpWithPassword()"]');
+  setAuthBusy(btn, true, '注册中…');
   try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/verify`, {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
       method: 'POST',
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ email, token, type: 'email' })
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cred.email, password: cred.password })
     });
     if (!res.ok) {
       let detail = `HTTP ${res.status}`;
       try {
         const err = await res.json();
-        detail = err.msg || err.error_description || err.message || detail;
+        detail = err.msg || err.error_description || err.message || err.error || detail;
       } catch (e) { /* 忽略 */ }
-      throw new Error(detail);
+      throw new Error(translateAuthError(detail, res.status));
     }
-    const data = await res.json();
-    saveSession({
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expires_at: data.expires_at || (Math.floor(Date.now() / 1000) + (data.expires_in || 3600)),
-      user: data.user || { email }
+    let data = null;
+    try { data = await res.json(); } catch (e) { data = null; }
+
+    if (data && data.access_token) {
+      handleAuthSuccess(data, cred.email, isAdminEmail(cred.email) ? '注册成功，已自动登录（管理员）' : '注册成功，已自动登录');
+      return;
+    }
+    // 若后台仍开启邮箱确认，signup 只返回 user、不发 access_token → 自动改用密码登录一次
+    const loginRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cred.email, password: cred.password })
     });
-    AppState.pendingAuthEmail = '';
-    if (otpInput) otpInput.value = '';
-    syncAuthState();
-    const modal = document.getElementById('user-auth-modal');
-    if (modal) modal.classList.add('hidden');
-    alert(isAdminEmail(email) ? '管理员登录成功' : '登录成功');
+    if (loginRes.ok) {
+      const loginData = await loginRes.json();
+      handleAuthSuccess(loginData, cred.email, '注册成功，已自动登录');
+      return;
+    }
+    let detail = '';
+    try {
+      const err = await loginRes.json();
+      detail = err.msg || err.error_description || err.message || err.error || '';
+    } catch (e) { /* 忽略 */ }
+    alert(`注册已提交，但暂未登录成功：${translateAuthError(detail, loginRes.status)}\n\n若提示邮箱未验证，请在 Supabase 后台关闭 Confirm email 后重试。`);
   } catch (e) {
-    alert(`验证失败：${e.message}`);
+    alert(`注册失败：${e.message}`);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = oldText || '验证登录'; }
+    setAuthBusy(btn, false, '', '注册并登录');
   }
+}
+
+// 兼容旧入口（避免历史按钮/脚本调用报错）
+async function sendEmailOTP() {
+  alert('登录方式已升级为「邮箱 + 密码」，请直接输入密码后点「登录」，首次使用请点「注册并登录」。');
+}
+async function verifyEmailOTP() {
+  return signInWithPassword();
 }
 
 function logoutEmailUser() {
@@ -291,8 +345,8 @@ function logoutEmailUser() {
   // 退出邮箱不影响已独立验证的管理员密码解锁态。
   const emailInput = document.getElementById('auth-email-input');
   if (emailInput) { emailInput.disabled = false; emailInput.value = ''; }
-  const otpInput = document.getElementById('auth-otp-input');
-  if (otpInput) otpInput.value = '';
+  const passwordInput = document.getElementById('auth-password-input');
+  if (passwordInput) { passwordInput.value = ''; passwordInput.disabled = false; }
   syncAuthState();
   alert(AppState.isAdminPasswordVerified
     ? '已退出邮箱登录；管理员密码解锁态仍然有效'
