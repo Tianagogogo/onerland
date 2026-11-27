@@ -346,7 +346,7 @@ function buildHomeTimelineList() {
     city: item.city || item.title || '待定场次',
     venue: item.venue || '',
     date: String(item.show_date || '').slice(0, 10),
-    posterUrl: item.posterUrl || '',
+    posterUrl: item.posterUrl || item.poster_url || item.poster || item.cover || item.cover_url || item.image || '',
     cloudId: item.cloudId
   }));
 
@@ -372,7 +372,15 @@ function buildHomeTimelineList() {
 function renderUpcomingMiniTimeline() {
   const box = document.getElementById('home-upcoming-timeline');
   if (!box) return;
-  const list = buildHomeTimelineList().slice(0, 4);
+  // 严格按演出日期倒序（最新在前）后再截取 4 条，避免历史年份被排到最前
+  const list = buildHomeTimelineList()
+    .slice()
+    .sort((a, b) => {
+      const ta = new Date(String(a.date || '').slice(0, 10) + 'T00:00:00').getTime();
+      const tb = new Date(String(b.date || '').slice(0, 10) + 'T00:00:00').getTime();
+      return (isNaN(tb) ? -Infinity : tb) - (isNaN(ta) ? -Infinity : ta);
+    })
+    .slice(0, 4);
   if (!list.length) {
     box.innerHTML = `<div class="p-4 rounded-xl metal-card text-xs text-slate-400">近期暂无演出数据，去「档案」看看往期巡演回顾吧。</div>`;
     return;

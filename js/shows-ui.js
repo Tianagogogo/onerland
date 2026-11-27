@@ -1906,7 +1906,7 @@ function renderTourCards() {
       <div class="p-4 rounded-2xl metal-card flex flex-col gap-3" data-show-card="${item.cloudId || idx}" style="--fan-theme:${getFanPrefThemeColor()}">
         <div class="flex gap-3.5">
           <div class="w-24 poster-square-box shrink-0">
-            ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeCity}" data-cap="${safeCity} · 演出海报" ${posterImgAttrs(item.posterUrl, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
+            ${(item.posterUrl || item.poster_url || item.poster || item.cover || item.image) ? `<img src="${item.posterUrl || item.poster_url || item.poster || item.cover || item.image}" alt="${safeCity}" data-cap="${safeCity} · 演出海报" ${posterImgAttrs(item.posterUrl, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
           </div>
           <div class="flex-1 min-w-0 space-y-1.5">
             <div class="flex items-start justify-between gap-2">

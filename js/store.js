@@ -585,6 +585,27 @@ function mergeShowRecords(localRecords, cloudRecords, isArchive) {
 }
 
 // ================= 隐藏标记行过滤（历史 HIDDEN| 墓碑数据不再当真实演出） =================
+// 海报/座位图字段兼容：数据库列、META、多种历史命名都兼容
+function pickPosterUrl(meta, row) {
+  const m = meta || {};
+  const r = row || {};
+  return m.posterUrl || m.poster_url || m.poster || m.cover || m.cover_url || m.image
+    || r.posterUrl || r.poster_url || r.poster || r.cover || r.cover_url || r.image || '';
+}
+
+function pickSeatMapUrl(meta, row) {
+  const m = meta || {};
+  const r = row || {};
+  return m.seatUrl || m.seat_url || m.seatMapUrl || m.seatMap || m.seat_map
+    || r.seatUrl || r.seat_url || r.seatMapUrl || r.seatMap || r.seat_map || '';
+}
+
+function pickTransportText(meta, row) {
+  const m = meta || {};
+  const r = row || {};
+  return m.transport || m.transport_guide || r.transport || r.transport_guide || '';
+}
+
 function isHiddenMarkerItem(item) {
   if (!item) return true;
   const artist = String(item.artist || '').trim().toUpperCase();
@@ -673,11 +694,11 @@ async function loadTourData() {
             year: showDate.slice(0, 4) || '',
             subType: meta.subType || 'tour',
             venue: meta.venue || '演出现场',
-            posterUrl: meta.posterUrl || '',
-            transport: meta.transport || '',
+            posterUrl: pickPosterUrl(meta, row),
+            transport: pickTransportText(meta, row),
             prices: meta.prices || '',
-            hasSeatMap: Boolean(meta.seatUrl || meta.seatMapUrl || meta.seatMap || meta.seat_map || meta.seat_url),
-            seatUrl: meta.seatUrl || meta.seatMapUrl || meta.seatMap || meta.seat_map || meta.seat_url || '',
+            hasSeatMap: Boolean(pickSeatMapUrl(meta, row)),
+            seatUrl: pickSeatMapUrl(meta, row),
             slot: meta.slot || '',
             merchBooth: meta.merchBooth || '',
             scheduleImgs: Array.isArray(meta.scheduleImgs) ? meta.scheduleImgs : [],
@@ -715,11 +736,11 @@ async function loadTourData() {
           venue,
           show_date: showDateFull,
           rounds,
-          posterUrl: meta.posterUrl || '',
-          hasSeatMap: Boolean(meta.seatUrl || meta.seatMapUrl || meta.seatMap || meta.seat_map || meta.seat_url),
-          seatUrl: meta.seatUrl || meta.seatMapUrl || meta.seatMap || meta.seat_map || meta.seat_url || '',
+          posterUrl: pickPosterUrl(meta, row),
+          hasSeatMap: Boolean(pickSeatMapUrl(meta, row)),
+          seatUrl: pickSeatMapUrl(meta, row),
           prices: meta.prices || '',
-          transport: meta.transport || '',
+          transport: pickTransportText(meta, row),
           slot: meta.slot || slotFromTitle || '',
           merchBooth: meta.merchBooth || '',
           scheduleImgs: Array.isArray(meta.scheduleImgs) ? meta.scheduleImgs : [],
