@@ -1,17 +1,18 @@
 // ================= 全局状态与常量 =================
 const AppState = {
   activeArtistId: 'ALL',
-  activeAccountId: 'ALL',
   activeArchiveType: 'ALL',
+  activeArchiveCity: 'ALL',
   isArchiveExpanded: false,
+  showLoadError: '',
   editingTicketId: null,
   editingKind: null,
   isAdmin: false,
+  isAdminPasswordVerified: false,
+  adminToken: '',
   pendingExternalUrl: null,
   cloudTickets: [],
   cloudArchives: [],
-  cloudFeeds: [],
-  allPosts: [],
   footprints: [],
   anniversary: {
     firstMeetDate: '',
@@ -27,6 +28,12 @@ const AppState = {
 };
 
 window.AppState = AppState;
+
+// 编辑权限：授权邮箱登录态与管理员密码解锁态互相独立，满足任意一种即可。
+function canEditContent() {
+  return Boolean(AppState.isAdmin || AppState.isAdminPasswordVerified);
+}
+window.canEditContent = canEditContent;
 
 window.ARTIST_COLORS = window.ARTIST_COLORS || {
   'ONER': { id: 'ONER', bg: '#1e293b' },
@@ -83,20 +90,30 @@ function openLightbox(src, caption = '') {
   box.classList.remove('hidden');
 }
 
-// ================= 动态/足迹加载占位（暂无云端数据时作为兜底） =================
-async function loadAllFeeds() {
-  // 当前版本动态模块为纯本地/静态展示，云端动态接口未启用
-  // 如有本地 feeds_data.json 数据，可在此解析并写入 AppState.allPosts
-  if (typeof renderTimeline === 'function') renderTimeline();
-  if (typeof renderFeedBriefCard === 'function') renderFeedBriefCard();
-}
-
 // ================= AI Key 状态（暂无对应 UI，先提供空实现避免启动报错） =================
 function updateAiKeyStatusUI() {
   const badge = document.getElementById('ai-key-status');
   if (!badge) return;
   const key = localStorage.getItem(GEMINI_KEY_STORAGE);
   badge.textContent = key ? 'AI 已配置' : '未配置';
+}
+// 演出全量数据（含 base64 海报）响应体较大，网络抖动时可能超时或被截断。
+// 失败时自动重试一次，避免偶发失败直接导致整页演出为空。
+async function fetchTicketRows() {
+  const url = `${SUPABASE_URL}/rest/v1/tickets?select=*&order=id.desc`;
+  let lastErr;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(url, { headers: SB_HEADERS, cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const rows = await res.json();
+      return Array.isArray(rows) ? rows : [];
+    } catch (e) {
+      lastErr = e;
+      if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 800));
+    }
+  }
+  throw lastErr;
 }
 async function loadTourData() {
   if (typeof window.updateAuthButtonUI === 'function') {
@@ -114,12 +131,7 @@ async function loadTourData() {
   }
 
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/tickets?select=*&order=id.desc`, {
-      headers: SB_HEADERS
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const rows = await res.json();
-    const list = Array.isArray(rows) ? rows : [];
+    const list = await fetchTicketRows();
 
     const tickets = [];
     const archives = [];
@@ -128,6 +140,8 @@ async function loadTourData() {
       const rawTitle = row.title || '';
       const rawPlat = row.platform || '';
 
+      // 单条脏数据不能让整页演出消失：逐行隔离解析异常。
+      try {
       if (rawTitle.startsWith('ARCHIVE|')) {
         const parts = rawTitle.split('|');
         const artist = parts[1] || 'ONER';
@@ -137,11 +151,23 @@ async function loadTourData() {
         if (rawPlat.startsWith('ARCHIVE:')) {
           try { meta = JSON.parse(rawPlat.slice(8)); } catch (e) { meta = {}; }
         }
+        // 同一天可能有多场（如连开两天），需要保留具体开场时间用于时间线排序。
+        const showTimeMatch = String(row.ticket_time || '').match(/[T ](\d{1,2}):(\d{2})/);
+        const showTime = showTimeMatch
+          ? `${showTimeMatch[1].padStart(2, '0')}:${showTimeMatch[2]}`
+          : '';
+        const theme = meta.theme == null ? '' : String(meta.theme);
+        let seriesKey = theme;
+        if (typeof normalizeSeriesKey === 'function') {
+          // theme/title 可能是数字或对象等脏数据，解析失败时退回原始专题名，绝不抛出。
+          try { seriesKey = normalizeSeriesKey(String(title), theme); } catch (e) { seriesKey = theme; }
+        }
         archives.push({
           cloudId: row.id,
           artist,
           title,
           showDate,
+          showTime,
           year: showDate.slice(0, 4) || '',
           subType: meta.subType || 'tour',
           venue: meta.venue || '演出现场',
@@ -153,7 +179,9 @@ async function loadTourData() {
           scheduleImgs: Array.isArray(meta.scheduleImgs) ? meta.scheduleImgs : [],
           viewImgs: Array.isArray(meta.viewImgs) ? meta.viewImgs : [],
           setlist: Array.isArray(meta.setlist) ? meta.setlist : [],
-          theme: meta.theme || '',
+          theme,
+          // 所属专题（合集）归并键：时间线卡片据此恢复「专题页」跳转入口。
+          seriesKey,
           url: row.url || '#'
         });
       } else {
@@ -188,17 +216,23 @@ async function loadTourData() {
           slot: meta.slot || slotFromTitle || '',
           merchBooth: meta.merchBooth || '',
           scheduleImgs: Array.isArray(meta.scheduleImgs) ? meta.scheduleImgs : [],
-          theme: meta.theme || '',
+          theme: meta.theme == null ? '' : String(meta.theme),
           url: row.url || '#',
           source_url: row.url || '#'
         });
+      }
+      } catch (rowErr) {
+        console.warn('loadTourData: 跳过解析失败的记录', row && row.id, rowErr);
       }
     }
 
     AppState.cloudTickets = tickets;
     AppState.cloudArchives = archives;
+    AppState.showLoadError = '';
   } catch (err) {
-    console.warn('loadTourData fallback:', err);
+    // 请求失败/响应被截断时保留上一次成功的数据，避免整页演出“凭空消失”。
+    AppState.showLoadError = (err && err.message) || '网络请求失败';
+    console.error('loadTourData failed:', err);
   }
 
   if (typeof renderThemeQuickBar === 'function') renderThemeQuickBar();

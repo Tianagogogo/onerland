@@ -1,7 +1,6 @@
 function renderHomeDashboard() {
   renderAnniversaryCard();
   renderUpcomingMiniTimeline();
-  renderFeedBriefCard();
 }
 
 function renderAnniversaryCard() {
@@ -81,35 +80,4 @@ function renderUpcomingMiniTimeline() {
       </div>
     `;
   }).join('');
-}
-
-function renderFeedBriefCard() {
-  const box = document.getElementById('home-feed-brief');
-  if (!box) return;
-  const weekAgo = Date.now() - 7 * 86400000;
-  const weekPosts = AppState.allPosts.filter(p => p.timestamp >= weekAgo);
-  const byArtist = {};
-  weekPosts.forEach(p => { byArtist[p.artistName] = (byArtist[p.artistName] || 0) + 1; });
-
-  const summaryPills = Object.entries(byArtist)
-    .map(([name, cnt]) => `<span class="px-2 py-0.5 rounded-full bg-white border border-slate-300 text-[11px] text-slate-700">${name} <strong>${cnt}</strong>条</span>`)
-    .join('');
-
-  const latest = AppState.allPosts[0];
-  box.innerHTML = `
-    <div class="p-4 rounded-2xl metal-card space-y-2.5">
-      <div class="flex items-center justify-between gap-2 flex-wrap">
-        <span class="text-xs font-bold text-slate-800">📰 本周全平台动态简报（共 ${weekPosts.length} 条）</span>
-        <div class="flex items-center gap-1.5 flex-wrap">${summaryPills || '<span class="text-[11px] text-slate-400">近7日暂无新抓取</span>'}</div>
-      </div>
-      ${latest ? `
-        <div class="p-2.5 rounded-xl bg-white/90 border border-slate-200 flex items-center justify-between gap-2 text-xs">
-          <div class="truncate text-slate-700">
-            <span class="font-bold text-slate-900">[${latest.artistName} · ${latest.platformName}]</span> ${latest.text}
-          </div>
-          <button type="button" onclick="switchMainTab('feeds')" class="text-slate-700 font-semibold shrink-0 hover:underline">查看全部 ↗</button>
-        </div>
-      ` : ''}
-    </div>
-  `;
 }

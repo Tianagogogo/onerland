@@ -22,12 +22,11 @@
         <button type="button" id="top-tab-home" onclick="switchMainTab('home')" class="px-3.5 py-1 rounded-full obsidian-btn text-white font-semibold transition">🏠 首页</button>
         <button type="button" id="top-tab-shows" onclick="switchMainTab('shows')" class="px-3.5 py-1 rounded-full text-slate-600 hover:text-slate-900 transition">🏛️ 档案</button>
         <button type="button" id="top-tab-footprint" onclick="switchMainTab('footprint')" class="px-3.5 py-1 rounded-full text-slate-600 hover:text-slate-900 transition">🎫 足迹</button>
-        <button type="button" id="top-tab-feeds" onclick="switchMainTab('feeds')" class="px-3.5 py-1 rounded-full text-slate-600 hover:text-slate-900 transition">📱 动态</button>
       </nav>
 
       <div class="flex items-center gap-2">
         <button type="button" id="user-auth-btn" onclick="openUserAuthModal()" class="px-3 py-1.5 rounded-lg liquid-silver-btn text-xs font-medium">👤 登录</button>
-        <button type="button" onclick="loadTourData(); loadAllFeeds();" class="px-3 py-1.5 rounded-lg liquid-silver-btn text-xs font-medium">刷新同步</button>
+        <button type="button" onclick="loadTourData()" class="px-3 py-1.5 rounded-lg liquid-silver-btn text-xs font-medium">刷新同步</button>
       </div>
     </div>
   </header>
@@ -42,7 +41,6 @@
         </div>
         <div id="home-upcoming-timeline" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
       </div>
-      <div id="home-feed-brief"></div>
     </section>
 
     <section id="view-shows-page" class="hidden space-y-6">
@@ -64,6 +62,7 @@
               <button type="button" onclick="setArchiveTypeFilter('festival')" id="arc-filter-festival" class="px-2.5 py-1 rounded-md text-slate-600">音乐节</button>
             </div>
             <select id="archive-year-filter" onchange="renderArchiveTimeline()" class="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700"></select>
+            <select id="archive-city-filter" onchange="renderArchiveTimeline()" class="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 max-w-[9rem]"></select>
           </div>
         </div>
         <div id="archive-timeline-list" class="space-y-3"></div>
@@ -95,19 +94,6 @@
       </div>
     </section>
 
-    <section id="view-feeds-page" class="hidden space-y-4">
-      <div class="metal-card p-4 rounded-2xl space-y-3">
-        <div class="flex items-center justify-between flex-wrap gap-2">
-          <div id="feed-artist-pills" class="flex items-center gap-1.5 flex-wrap"></div>
-          <span id="feed-period-stats" class="text-xs font-medium text-slate-600"></span>
-        </div>
-        <div class="flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-slate-200/80">
-          <div id="platform-tabs" class="flex items-center gap-1.5 flex-wrap"></div>
-          <input id="keyword-filter" type="text" oninput="renderTimeline()" placeholder="搜索动态关键词..." class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs w-44 sm:w-52" />
-        </div>
-      </div>
-      <div id="timeline-list" class="space-y-3"></div>
-    </section>
   </main>
 
   <footer class="max-w-5xl mx-auto px-4 py-6 mt-4 border-t border-slate-300/70 text-[11px] text-slate-500 space-y-1 text-center">
@@ -115,11 +101,10 @@
     <p>站内演出海报版权归原经纪公司及主办方所有，仅作非商业信息索引展示；如有侵权请通过邮箱联系核实删除。</p>
   </footer>
 
-  <nav class="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-xl border-t border-slate-300 grid grid-cols-4 gap-1 p-1.5 text-[11px]">
+  <nav class="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-xl border-t border-slate-300 grid grid-cols-3 gap-1 p-1.5 text-[11px]">
     <button type="button" id="bottom-tab-home" onclick="switchMainTab('home')" class="py-1.5 rounded-xl obsidian-btn text-white font-semibold">🏠 首页</button>
     <button type="button" id="bottom-tab-shows" onclick="switchMainTab('shows')" class="py-1.5 rounded-xl text-slate-600">🏛️ 档案</button>
     <button type="button" id="bottom-tab-footprint" onclick="switchMainTab('footprint')" class="py-1.5 rounded-xl text-slate-600">🎫 足迹</button>
-    <button type="button" id="bottom-tab-feeds" onclick="switchMainTab('feeds')" class="py-1.5 rounded-xl text-slate-600">📱 动态</button>
   </nav>
 
   <div id="image-lightbox" onclick="this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-zoom-out">
@@ -175,8 +160,27 @@
         <input id="auth-otp-input" type="text" placeholder="输入邮箱收到的 6 位验证码" class="flex-1 px-3 py-2 rounded-lg border border-slate-300 bg-white" />
         <button type="button" onclick="verifyEmailOTP()" class="px-3 py-2 rounded-lg obsidian-btn font-semibold shrink-0">验证登录</button>
       </div>
-      <div class="flex justify-end pt-1">
+      <div class="flex items-center justify-between gap-2 pt-1">
+        <button type="button" onclick="openAdminUnlockModal()" class="text-slate-600 hover:underline">🔐 管理员密码解锁</button>
         <button type="button" onclick="logoutEmailUser()" class="text-rose-600 hover:underline">退出当前邮箱</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="admin-unlock-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="chronicle-card rounded-2xl max-w-md w-full p-5 space-y-3 bg-white text-xs">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-sm text-slate-900">🔐 管理员密码解锁</h3>
+        <button type="button" onclick="document.getElementById('admin-unlock-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-800">✕</button>
+      </div>
+      <p class="text-slate-500 leading-relaxed">邮箱授权登录与管理员密码是两种独立方式，满足任意一种即可编辑。密码仅用于向服务端换取临时管理令牌，不会保存在浏览器。</p>
+      <div class="flex gap-2">
+        <input id="admin-password-input" type="password" autocomplete="current-password" placeholder="输入管理员密码" onkeydown="if(event.key==='Enter')verifyAdminPassword()" class="flex-1 px-3 py-2 rounded-lg border border-slate-300 bg-white" />
+        <button type="button" onclick="verifyAdminPassword()" class="px-3 py-2 rounded-lg obsidian-btn font-semibold shrink-0">验证解锁</button>
+      </div>
+      <div class="flex items-center justify-between gap-2 pt-1">
+        <button type="button" onclick="openUserAuthModal()" class="text-slate-600 hover:underline">改用邮箱登录</button>
+        <button type="button" onclick="lockAdminPassword()" class="text-rose-600 hover:underline">锁定密码解锁态</button>
       </div>
     </div>
   </div>
@@ -211,12 +215,11 @@
             <select id="adm-type" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white">
               <option value="ticket">发布：近期演出</option>
               <option value="archive">发布：往日档案</option>
-              <option value="feed">发布：社媒/置顶公告</option>
             </select>
             <select id="adm-artist" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white">
               <option value="ONER">ONER</option><option value="岳岳">岳岳</option><option value="木子洋">木子洋</option><option value="灵超">灵超</option><option value="坤音娱乐">坤音娱乐</option>
             </select>
-            <input id="adm-title" type="text" placeholder="站次标题 或 平台名(如:微博)" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
+            <input id="adm-title" type="text" placeholder="站次标题 / 演出名称" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
             <input id="adm-date" type="text" placeholder="演出日期 YYYY-MM-DD" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
             <input id="adm-poster" type="text" placeholder="海报链接或 Base64（选填）" class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
             <input id="adm-url" type="text" placeholder="原帖/购票链接 https://..." class="px-2.5 py-2 rounded-lg border border-slate-300 bg-white" />
@@ -239,9 +242,8 @@
             </div>
             <div id="adm-schedule-thumbs" class="flex gap-2 flex-wrap"></div>
           </div>
-          <textarea id="adm-body" rows="2" placeholder="场馆名称 或 动态正文..." class="w-full px-2.5 py-2 rounded-lg border border-slate-300 bg-white"></textarea>
-          <div class="flex items-center justify-between">
-            <label class="flex items-center gap-1.5 cursor-pointer"><input id="adm-pin" type="checkbox" /> 设为动态页置顶重要公告</label>
+          <textarea id="adm-body" rows="2" placeholder="场馆名称..." class="w-full px-2.5 py-2 rounded-lg border border-slate-300 bg-white"></textarea>
+          <div class="flex items-center justify-end">
             <button id="adm-submit-btn" type="button" onclick="submitAdminQuickPost()" class="px-4 py-1.5 rounded-lg obsidian-btn font-semibold">☁️ 同步发布</button>
           </div>
         </div>
@@ -268,7 +270,6 @@
   <script src="./js/shows-ui.js"></script>
   <script src="./js/parser.js"></script>
   <script src="./js/footprint-ui.js"></script>
-  <script src="./js/feeds-ui.js"></script>
   <script src="./js/admin-ui.js"></script>
   <script src="./js/auth-ui.js"></script>
   <script>
@@ -280,7 +281,6 @@
     if (location.hash === '#admin') openHiddenAdminDrawer();
     switchMainTab('home');
     loadTourData();
-    loadAllFeeds();
     setInterval(updateCountdowns, 1000);
   </script>
 </body>

@@ -42,6 +42,10 @@ async function handleAdminPosterFile(event) {
 }
 
 function startEditShow(kind, cloudId) {
+  if (!canEditContent()) {
+    if (typeof openAdminUnlockModal === 'function') openAdminUnlockModal();
+    return;
+  }
   const source = kind === 'archive' ? AppState.cloudArchives : AppState.cloudTickets;
   const item = source.find(x => String(x.cloudId) === String(cloudId));
   if (!item) return;
@@ -82,7 +86,7 @@ function resetAdminForm() {
 }
 
 async function submitAdminQuickPost() {
-  if (!AppState.isAdmin) return;
+  if (!canEditContent()) return alert('请先通过授权邮箱登录或管理员密码解锁。');
   const type = document.getElementById('adm-type').value;
   const artist = document.getElementById('adm-artist').value;
   const titleOrPlat = document.getElementById('adm-title').value.trim();
@@ -92,20 +96,13 @@ async function submitAdminQuickPost() {
   const slotText = (document.getElementById('adm-slot')?.value || '').trim();
   const merchBooth = (document.getElementById('adm-merch-booth')?.value || '').trim();
   const url = document.getElementById('adm-url').value.trim();
-  const isPinned = document.getElementById('adm-pin').checked;
   const saleTimeRaw = document.getElementById('adm-sale-time').value;
   const salePlat = document.getElementById('adm-sale-plat').value.trim() || '大麦';
 
-  if (!titleOrPlat) return alert('请填写标题或平台名称！');
+  if (!titleOrPlat) return alert('请填写标题！');
 
   try {
-    if (type === 'feed') {
-      const content = `${isPinned ? '[PIN] ' : ''}${venueOrBody || titleOrPlat}`;
-      await adminApi('createFeed', {
-        artist, platform: titleOrPlat, content, url
-      });
-      await loadAllFeeds();
-    } else if (type === 'ticket') {
+    if (type === 'ticket') {
       const showDate = dateOrTime || new Date().toISOString().slice(0, 10);
       const rounds = saleTimeRaw ? [{ round_name: '正式开票', sale_time: saleTimeRaw.replace('T', ' '), platform: salePlat }] : [];
       const payload = {
@@ -190,6 +187,7 @@ function renderAdminTodoQueue() {
 }
 
 async function adminDeleteItem(table, id) {
+  if (!canEditContent()) return alert('请先通过授权邮箱登录或管理员密码解锁。');
   if (!confirm('确认删除该条记录？')) return;
   try {
     await adminApi('deleteTicket', {}, id);
@@ -209,21 +207,15 @@ async function loadProofReviewQueue(status = 'pending') {
   if (!box) return;
   box.innerHTML = `<div class="text-xs text-slate-400 py-3">加载中…</div>`;
 
-  const session = typeof getStoredSession === 'function' ? getStoredSession() : null;
-  if (!session || !session.access_token) {
-    box.innerHTML = `<div class="text-xs text-rose-500 py-3">登录状态已失效，请重新登录后再试</div>`;
-    return;
-  }
-
   try {
     const res = await fetch(`/api/admin?status=${encodeURIComponent(status)}&limit=30`, {
-      headers: { 'Authorization': `Bearer ${session.access_token}` }
+      headers: getAdminRequestHeaders()
     });
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || data.detail || `HTTP ${res.status}`);
     adminProofQueueCache = Array.isArray(data.data) ? data.data : [];
   } catch (e) {
-    box.innerHTML = `<div class="text-xs text-rose-500 py-3">加载失败：${e.message}<br><span class="text-slate-400">（确认已在 Cloudflare 配置 SUPABASE_SERVICE_ROLE_KEY 与 ADMIN_EMAIL，并已执行 sql/ticket_proofs.sql）</span></div>`;
+    box.innerHTML = `<div class="text-xs text-rose-500 py-3">加载失败：${e.message}<br><span class="text-slate-400">（确认已在 Cloudflare 配置 SUPABASE_SERVICE_ROLE_KEY、ADMIN_EMAIL 或 ADMIN_PASSWORD，并已执行 sql/ticket_proofs.sql）</span></div>`;
     return;
   }
 
@@ -286,22 +278,26 @@ async function reviewTicketProof(id, status) {
   alert(`✅ ${label}`);
 }
 
-// 统一调用服务端写接口（functions/api/admin.js），由服务端校验管理员身份
+// 统一调用服务端写接口（functions/api/admin.js），由服务端校验授权邮箱或管理员密码令牌。
 async function adminApi(action, payload = {}, id) {
-  const session = typeof getStoredSession === 'function' ? getStoredSession() : null;
-  if (!session || !session.access_token) {
-    throw new Error('登录状态已失效，请重新登录');
+  const headers = getAdminRequestHeaders();
+  if (!headers.Authorization && !headers['X-Admin-Token']) {
+    throw new Error('请先通过授权邮箱登录或管理员密码解锁');
   }
   const res = await fetch('/api/admin', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`
-    },
+    headers,
     body: JSON.stringify({ action, payload, id })
   });
   let data = null;
   try { data = await res.json(); } catch (e) { data = null; }
+  if (res.status === 401 || res.status === 403) {
+    if (headers['X-Admin-Token']) {
+      clearAdminToken();
+      syncAuthState();
+    }
+    throw new Error((data && (data.error || data.detail)) || '编辑权限已失效，请重新验证');
+  }
   if (!res.ok || !data || !data.ok) {
     const msg = (data && (data.error || data.detail)) || `HTTP ${res.status}`;
     throw new Error(msg);

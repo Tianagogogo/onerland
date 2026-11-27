@@ -1,23 +1,111 @@
 function normalizeSeriesKey(rawTitle = '', savedTheme = '') {
-  const base = (savedTheme || rawTitle || '').trim();
+  // theme 可能来自手工维护的数据（数字/对象等），统一转字符串，避免 .trim 抛错中断整页渲染。
+  const base = String(savedTheme || rawTitle || '').trim();
   if (!base) return '';
   if (/^chill\s*party/i.test(base)) return 'ChillParty 系列';
   const quoteSeries = base.match(/^([「《][^」》]+[」》]\s*(?:巡回演唱会|演唱会|巡演|音乐节|嘉年华|见面会|派对)?)/);
   if (quoteSeries) return quoteSeries[1].trim();
   const alphaPrefix = base.match(/^([A-Za-z]{3,20})(?:plus|\+|\s|·|-|_|$)/i);
   if (alphaPrefix) return `${alphaPrefix[1]} 系列`;
+  // 合集式专题（如「无限未来·FutureX 2023春夏季全国巡演」）的 theme 往往不带“xx站”后缀，
+  // 旧逻辑只认结尾带“站”的标题，导致整组合集在聚合页被漏掉；这里改为按首个分隔符取系列主体。
+  const collectionHead = base.match(/^([^·\-—|]{2,16}?)\s*[·\-—|]\s*\S/);
+  if (collectionHead) return collectionHead[1].trim();
   const dashMatch = base.match(/^([^·\-—|]+?)\s*[·\-—|]\s*.+站$/);
   if (dashMatch && dashMatch[1].trim().length >= 2) return dashMatch[1].trim();
   return '';
 }
+
+// 专题归并键：忽略大小写、全半角、空白、+、连接符与书名号的写法差异，
+// 让「CHILL PARTY PLUS+」「CHILL PARTY PLUS」这类同一系列的不同写法能被聚合到一起。
+function canonicalSeriesKey(rawKey = '') {
+  let text = String(rawKey || '');
+  if (typeof text.normalize === 'function') text = text.normalize('NFKC');
+  return text.toLowerCase()
+    .replace(/[\s+＋·\-—_|/\\]/g, '')
+    .replace(/[「」《》]/g, '')
+    .replace(/系列$/, '')
+    .trim();
+}
+
+// 演出记录里用于推导专题的原始文本：往日档案看标题，近期场次看城市/标题。
+function getShowSeriesLabel(item, isArchive) {
+  return String((isArchive ? item.title : (item.city || item.title)) || '').trim();
+}
+
+// 统一入口：任意一条演出记录都能返回所属专题（合集）的归并键。
+// theme 优先，theme 解析不出来时回退标题，避免单场/合集内演出在聚合页丢失。
+function resolveShowSeriesKey(item, isArchive) {
+  if (!item) return '';
+  const label = getShowSeriesLabel(item, isArchive);
+  const theme = String(item.theme || '').trim();
+  return normalizeSeriesKey(label, theme) ||
+    String(item.seriesKey || '').trim() ||
+    normalizeSeriesKey(label, '') ||
+    normalizeSeriesKey(theme, '');
+}
+
+function listAllShowRecords() {
+  const records = [];
+  (Array.isArray(AppState.cloudTickets) ? AppState.cloudTickets : [])
+    .forEach(item => records.push({ item, isArchive: false }));
+  (Array.isArray(AppState.cloudArchives) ? AppState.cloudArchives : [])
+    .forEach(item => records.push({ item, isArchive: true }));
+  return records;
+}
+
+function isFestivalShow(item) {
+  if (!item) return false;
+  if (item.subType === 'festival') return true;
+  const label = item.city || item.title || '';
+  return /音乐节|嘉年华/.test(`${label} ${item.theme || ''}`);
+}
+
+function isSameSeries(item, isArchive, seriesKey) {
+  const target = canonicalSeriesKey(seriesKey);
+  if (!target) return false;
+  return canonicalSeriesKey(resolveShowSeriesKey(item, isArchive)) === target;
+}
+
+function countSeriesShows(seriesKey) {
+  if (!canonicalSeriesKey(seriesKey)) return 0;
+  return listAllShowRecords()
+    .filter(({ item, isArchive }) => isSameSeries(item, isArchive, seriesKey))
+    .length;
+}
+
+// 演出日期时间排序键：优先使用档案里记录的精确开场时间，缺失时按当天 00:00 处理。
+function getShowSortTimestamp(showDate, showTime) {
+  const dateText = String(showDate || '').trim();
+  if (!dateText) return NaN;
+  if (showTime && !/\d{1,2}:\d{2}/.test(dateText)) {
+    const withTime = parseLocalTime(`${dateText.slice(0, 10)} ${showTime}`);
+    if (!isNaN(withTime)) return withTime;
+  }
+  return parseLocalTime(dateText);
+}
+
+// 统一的时间线排序：演出日期时间正序，同日多场按具体开场时间、再按记录 ID 次序。
+function compareShowChronology(a, b) {
+  const aTs = getShowSortTimestamp(a.showDate || a.date, a.showTime || a.time);
+  const bTs = getShowSortTimestamp(b.showDate || b.date, b.showTime || b.time);
+  const aValid = !isNaN(aTs);
+  const bValid = !isNaN(bTs);
+  if (aValid !== bValid) return aValid ? -1 : 1;
+  if (aValid && bValid && aTs !== bTs) return aTs - bTs;
+  const aId = Number(a.cloudId);
+  const bId = Number(b.cloudId);
+  if (Number.isFinite(aId) && Number.isFinite(bId) && aId !== bId) return aId - bId;
+  return String(a.showDate || a.date || '').localeCompare(String(b.showDate || b.date || ''));
+}
+
 
 // ================= 全局标签切换 =================
 function switchMainTab(tabId) {
   const sections = {
     home: 'view-home-page',
     shows: 'view-shows-page',
-    footprint: 'view-footprint-page',
-    feeds: 'view-feeds-page'
+    footprint: 'view-footprint-page'
   };
   Object.entries(sections).forEach(([id, sel]) => {
     const el = document.getElementById(sel);
@@ -38,7 +126,6 @@ function switchMainTab(tabId) {
   if (tabId === 'home' && typeof renderHomeDashboard === 'function') renderHomeDashboard();
   if (tabId === 'shows' && typeof renderTourCards === 'function') renderTourCards();
   if (tabId === 'footprint' && typeof renderFootprintPage === 'function') renderFootprintPage();
-  if (tabId === 'feeds' && typeof renderFeedsSectionOnly === 'function') renderFeedsSectionOnly();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -56,8 +143,9 @@ const SHOW_STATUS = {
 function parseLocalTime(raw) {
   if (!raw) return NaN;
   const s = String(raw).trim().replace('T', ' ');
-  // 显式按本地时区解析，避免 Safari 对 "YYYY-MM-DD HH:mm" 解析失败
-  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ ](\d{1,2}):(\d{2}))?/);
+  // 显式按本地时区解析，避免 Safari 对 "YYYY-MM-DD HH:mm" 解析失败；
+  // 同时兼容 "YYYY/MM/DD"、"YYYY.MM.DD"、"YYYY年M月D日" 等历史/后台录入格式。
+  const m = s.match(/^(\d{4})[-\/.年](\d{1,2})[-\/.月](\d{1,2})[日号]?(?:[ ](\d{1,2}):(\d{2}))?/);
   if (!m) return NaN;
   return new Date(
     Number(m[1]), Number(m[2]) - 1, Number(m[3]),
@@ -131,6 +219,130 @@ function confirmExternalToolJump() {
   document.body.appendChild(a);
   a.click();
   a.remove();
+}
+
+// ================= 演出卡片地图唤端菜单 =================
+var showMapFallbackState = { timer: null, cleanup: null };
+
+function encodeShowMapValue(value) {
+  try {
+    return encodeURIComponent(String(value || ''));
+  } catch (_) {
+    return '';
+  }
+}
+
+function decodeShowMapValue(value) {
+  try {
+    return decodeURIComponent(value || '');
+  } catch (_) {
+    return String(value || '');
+  }
+}
+
+function closeShowMapMenus(except) {
+  document.querySelectorAll('[data-show-map-menu]').forEach(menu => {
+    if (menu !== except) menu.classList.add('hidden');
+  });
+}
+
+function bindShowMapMenuDismiss() {
+  if (bindShowMapMenuDismiss.bound) return;
+  bindShowMapMenuDismiss.bound = true;
+  document.addEventListener('click', event => {
+    document.querySelectorAll('[data-show-map-menu]').forEach(menu => {
+      if (!menu.contains(event.target)) menu.classList.add('hidden');
+    });
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeShowMapMenus();
+  });
+  window.addEventListener('resize', () => closeShowMapMenus());
+  window.addEventListener('scroll', () => closeShowMapMenus(), true);
+}
+
+function toggleShowMapMenu(event, trigger) {
+  event.preventDefault();
+  event.stopPropagation();
+  const menu = trigger?.parentElement?.querySelector('[data-show-map-menu]');
+  if (!menu) return;
+  const willOpen = menu.classList.contains('hidden');
+  closeShowMapMenus(menu);
+  if (willOpen) {
+    bindShowMapMenuDismiss();
+    menu.classList.remove('hidden');
+  }
+}
+
+function clearShowMapFallback() {
+  if (showMapFallbackState.timer !== null) {
+    clearTimeout(showMapFallbackState.timer);
+    showMapFallbackState.timer = null;
+  }
+  if (showMapFallbackState.cleanup) {
+    showMapFallbackState.cleanup();
+    showMapFallbackState.cleanup = null;
+  }
+}
+
+function triggerShowMapScheme(url) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  window.setTimeout(() => a.remove(), 1500);
+}
+
+function launchShowMapApp(provider, trigger) {
+  const menu = trigger?.closest('[data-show-map-menu]');
+  const keyword = decodeShowMapValue(menu?.dataset.mapVenue || '') ||
+    decodeShowMapValue(menu?.dataset.mapCity || '');
+  const city = decodeShowMapValue(menu?.dataset.mapCity || '');
+  closeShowMapMenus();
+  if (!keyword) return;
+
+  clearShowMapFallback();
+  const webUrl = `https://uri.amap.com/search?keyword=${encodeURIComponent(keyword)}${city ? `&city=${encodeURIComponent(city)}` : ''}`;
+
+  if (provider === 'web') {
+    const a = document.createElement('a');
+    a.href = webUrl;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    window.setTimeout(() => a.remove(), 0);
+    return;
+  }
+
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const encodedKeyword = encodeURIComponent(keyword);
+  const scheme = provider === 'baidu'
+    ? `baidumap://map/place/search?query=${encodedKeyword}&region=${encodeURIComponent(city)}&src=onerland.pwa`
+    : isIOS
+      ? `iosamap://poi?sourceApplication=ONERLAND&keywords=${encodedKeyword}&dev=0`
+      : `androidamap://poi?sourceApplication=ONERLAND&keywords=${encodedKeyword}&dev=0`;
+
+  triggerShowMapScheme(scheme);
+
+  const onVisibilityChange = () => {
+    if (document.hidden) clearShowMapFallback();
+  };
+  const onPageHide = () => clearShowMapFallback();
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  window.addEventListener('pagehide', onPageHide);
+  showMapFallbackState.cleanup = () => {
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    window.removeEventListener('pagehide', onPageHide);
+  };
+  showMapFallbackState.timer = window.setTimeout(() => {
+    const shouldFallback = !document.hidden && document.hasFocus();
+    clearShowMapFallback();
+    if (shouldFallback) window.location.href = webUrl;
+  }, 900);
 }
 
 function exportShowICS(cloudId) {
@@ -336,19 +548,19 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
   const proofBadgeHtml = !verified
     ? ''
     : ({
-        'approved': `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-300 font-semibold" title="脱敏票根已通过管理员复核">🛡️ 已核验票根 · 云端复核通过</span>`,
-        'pending': `<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-300 font-semibold" title="脱敏票根已提交，等待管理员抽查复核">⏳ 已核验票根 · 待云端复核</span>`,
-        'rejected': `<span class="text-[10px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-300 font-semibold" title="复核未通过，可重新上传脱敏票根">⚠️ 票根复核未通过</span>`,
+        'approved': `<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300 font-semibold" title="脱敏票根已通过管理员复核">🛡️ 已核验票根 · 云端复核通过</span>`,
+        'pending': `<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 border border-slate-300 font-semibold" title="脱敏票根已提交，等待管理员抽查复核">⏳ 已核验票根 · 待云端复核</span>`,
+        'rejected': `<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-400 font-semibold" title="复核未通过，可重新上传脱敏票根">⚠️ 票根复核未通过</span>`,
         'upload-failed': `<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-300 font-medium" title="本地已核验，但云端上传失败">✅ 已核验票根 · 云端上传失败</span>`
       }[cloudStatus] ||
-      `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold" title="已完成本地脱敏核验（未上传图片）">✅ 已核验票根 · 本地脱敏</span>`);
+      `<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300 font-semibold" title="已完成本地脱敏核验（未上传图片）">✅ 已核验票根 · 本地脱敏</span>`);
 
   const publicStatsHtml = stats.unlocked
     ? `
       <div class="p-3 rounded-xl bg-white border border-slate-300 space-y-3">
         <div class="flex items-center justify-between flex-wrap gap-1">
           <span class="font-bold text-slate-900">📊 公共场馆客观体验聚合（已核验 ${stats.total} 条样本）</span>
-          <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">样本 ≥ 5 已解锁</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300 font-semibold">样本 ≥ 5 已解锁</span>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -409,11 +621,11 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
             ✅ 已通过本场脱敏票根核验 · 可公开发布客观体验评分
             ${proofBadgeHtml}
           </span>
-          <span class="text-[11px] text-emerald-700 font-medium">仅发布客观选项，不含评语</span>
+          <span class="text-[11px] text-slate-600 font-medium">仅发布客观选项，不含评语</span>
         </div>
 
         ${cloudStatus === 'rejected' ? `
-        <div class="p-2 rounded-lg bg-rose-50 border border-rose-200 text-[11px] text-rose-700">
+        <div class="p-2 rounded-lg bg-slate-100 border border-slate-300 text-[11px] text-slate-700">
           管理员复核未通过。你的评分记录仍保留本机，可重新上传更清晰的脱敏票根。
         </div>` : ''}
         ${cloudStatus === 'upload-failed' ? `
@@ -492,7 +704,7 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
       </div>
     `
     : `
-      <div class="p-3 rounded-xl bg-white border border-amber-300 space-y-2">
+      <div class="p-3 rounded-xl bg-white border border-slate-300 space-y-2">
         <div class="font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
           ${verified ? '⚠️ 票根复核未通过 · 请重新提交脱敏票根' : '🔒 公开发布客观体验评分需先完成「脱敏票根核验」'}
           ${proofBadgeHtml}
@@ -529,7 +741,7 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
                   <p class="text-xs text-slate-800 break-words">${n.text}</p>
                   <span class="text-[10px] text-slate-400">🔒 仅自己可见 · ${n.createdAt}</span>
                 </div>
-                <button type="button" onclick="removePrivateNoteItem('${safeShowKey}', ${n.id}, '${rerenderScope}')" class="text-[11px] text-rose-600 hover:underline shrink-0">删除</button>
+                <button type="button" onclick="removePrivateNoteItem('${safeShowKey}', ${n.id}, '${rerenderScope}')" class="text-[11px] text-slate-500 hover:text-slate-900 hover:underline shrink-0">删除</button>
               </div>
             `).join('')}
           </div>`
@@ -553,19 +765,21 @@ function renderThemeQuickBar() {
   const themeMap = new Map();
   let festCount = 0;
 
-  [...AppState.cloudTickets, ...AppState.cloudArchives].forEach(item => {
-    const label = item.city || item.title || '';
-    const isFest = item.subType === 'festival' || /音乐节|嘉年华/.test(`${label} ${item.theme || ''}`);
-    if (isFest) { festCount++; return; }
-    const seriesKey = normalizeSeriesKey(label, item.theme);
-    if (seriesKey) themeMap.set(seriesKey, (themeMap.get(seriesKey) || 0) + 1);
+  listAllShowRecords().forEach(({ item, isArchive }) => {
+    if (isFestivalShow(item)) { festCount++; return; }
+    const seriesKey = resolveShowSeriesKey(item, isArchive);
+    const canonKey = canonicalSeriesKey(seriesKey);
+    if (!canonKey) return;
+    const entry = themeMap.get(canonKey) || { label: seriesKey, count: 0 };
+    entry.count += 1;
+    themeMap.set(canonKey, entry);
   });
 
   const btns = [];
-  themeMap.forEach((cnt, seriesKey) => {
-    if (cnt >= 2) {
-      const safe = seriesKey.replace(/['"<>]/g, '');
-      btns.push(`<button type="button" data-theme="${safe}" onclick="openSeriesModal(this.dataset.theme)" class="text-xs px-2.5 py-1 rounded-full liquid-silver-btn font-medium">🏛️ ${safe}（${cnt}场专题）↗</button>`);
+  themeMap.forEach(entry => {
+    if (entry.count >= 2) {
+      const safe = String(entry.label).replace(/['"<>]/g, '');
+      btns.push(`<button type="button" data-theme="${safe}" onclick="openSeriesModal(this.dataset.theme)" class="text-xs px-2.5 py-1 rounded-full liquid-silver-btn font-medium">🏛️ ${safe}（${entry.count}场专题）↗</button>`);
     }
   });
   if (festCount > 0) {
@@ -576,19 +790,18 @@ function renderThemeQuickBar() {
 
 function openSeriesModal(themeKey) {
   const isAllFest = themeKey === '__ALL_FESTIVALS__';
-  const matchFn = item => {
-    const label = item.city || item.title || '';
-    if (isAllFest) return item.subType === 'festival' || /音乐节|嘉年华/.test(`${label} ${item.theme || ''}`);
-    return normalizeSeriesKey(label, item.theme) === themeKey;
-  };
+  // 聚合查询统一走 canonicalSeriesKey 匹配，单场（无 theme）与合集内演出都不会再漏掉。
+  const matchFn = (item, isArchive) => isAllFest
+    ? isFestivalShow(item)
+    : isSameSeries(item, isArchive, themeKey);
 
-  const upcoming = AppState.cloudTickets.filter(matchFn).map(u => ({
-    status: '待开演', title: u.city, date: u.show_date, venue: u.venue, posterUrl: u.posterUrl, artist: u.artist
+  const upcoming = AppState.cloudTickets.filter(item => matchFn(item, false)).map(u => ({
+    status: '待开演', title: u.city, date: u.show_date, cloudId: u.cloudId, venue: u.venue, posterUrl: u.posterUrl, artist: u.artist
   }));
-  const past = AppState.cloudArchives.filter(matchFn).map(p => ({
-    status: '已落幕', title: p.title, date: p.showDate, venue: p.venue, posterUrl: p.posterUrl, artist: p.artist
+  const past = AppState.cloudArchives.filter(item => matchFn(item, true)).map(p => ({
+    status: '已落幕', title: p.title, date: p.showDate, showTime: p.showTime, cloudId: p.cloudId, venue: p.venue, posterUrl: p.posterUrl, artist: p.artist
   }));
-  const stops = [...upcoming, ...past].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const stops = [...upcoming, ...past].sort(compareShowChronology);
 
   document.getElementById('series-modal-title').textContent = isAllFest ? '全部音乐节时光纪念册' : `${themeKey} · 系列专题档案`;
   document.getElementById('series-modal-sub').textContent = `共自动聚合 ${stops.length} 场演出记录（点击海报可查看大图）`;
@@ -606,7 +819,7 @@ function openSeriesModal(themeKey) {
                 <span class="font-bold text-slate-900 truncate">${safeTitle}</span>
                 <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 shrink-0">${s.status}</span>
               </div>
-              <p class="text-slate-500">🗓️ ${s.date}</p>
+              <p class="text-slate-500">🗓️ ${s.date}${s.showTime ? ` ${s.showTime}` : ''}</p>
               <p class="text-slate-500 truncate">📍 ${s.venue}</p>
             </div>
           </div>
@@ -709,7 +922,10 @@ function renderTourCards() {
     });
 
   if (!list.length) {
-    container.innerHTML = `<div class="col-span-full text-xs text-slate-400 py-4">当前筛选条件下暂无待开演场次。</div>`;
+    const loadErr = getShowLoadErrorText();
+    container.innerHTML = loadErr
+      ? `<div class="col-span-full text-xs text-rose-600 py-4">⚠️ 演出数据加载失败：${loadErr}。请点击右上角「刷新同步」重试。</div>`
+      : `<div class="col-span-full text-xs text-slate-400 py-4">当前筛选条件下暂无待开演场次。</div>`;
     return;
   }
 
@@ -718,7 +934,6 @@ function renderTourCards() {
     const safeCity = String(item.city || '').replace(/['"<>]/g, '');
     const cleanVenue = (item.venue || '').replace(/·/g, ' ').trim();
     const shiyeLiveUrl = `https://shijiao.xingpaste.com/?q=${encodeURIComponent(cleanVenue || safeCity)}`;
-    const amapUrl = `https://uri.amap.com/search?keyword=${encodeURIComponent(cleanVenue || safeCity)}`;
     const slotPopoverId = `tour-slot-pop-${item.cloudId || idx}`;
     const buddyEntries = getBuddyListByShow(item.cloudId);
     const safeBooth = String(item.merchBooth || '').replace(/['"<>]/g, '');
@@ -731,37 +946,37 @@ function renderTourCards() {
       ? null
       : Math.max(0, Math.ceil((st.showTs - now) / 86400000));
 
-    // 顶部状态徽章：待开票用暖色警示，待演出/进行中用冷色
+    // 顶部状态徽章：统一使用黑白灰中性配色
     const statusBadge = isSale
-      ? `<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-amber-100 border border-amber-400 text-amber-900">🔥 抢票预警</span>`
+      ? `<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-slate-900 border border-slate-900 text-white">🔥 抢票预警</span>`
       : st.status === SHOW_STATUS.ONGOING
-        ? `<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-purple-100 border border-purple-400 text-purple-900 animate-pulse">🎤 Live 进行中</span>`
-        : `<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-sky-100 border border-sky-400 text-sky-900">🎫 已开票 · 待演出</span>`;
+        ? `<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-slate-100 border border-slate-400 text-slate-900 animate-pulse">🎤 Live 进行中</span>`
+        : `<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-white border border-slate-300 text-slate-700">🎫 已开票 · 待演出</span>`;
 
     // 时间展示：待开票跳秒，待演出只显示天数
     const timePanel = isSale
       ? `
       <div class="space-y-1.5 pt-1">
         ${item.activeRounds.map(r => `
-          <div class="flex items-center justify-between gap-2 text-xs py-1.5 px-2.5 rounded-lg bg-amber-950 text-amber-50">
+          <div class="flex items-center justify-between gap-2 text-xs py-1.5 px-2.5 rounded-lg bg-slate-900 text-slate-50">
             <span class="truncate">🔥 <strong>${r.round_name || '开票'}</strong>：${r.sale_time} <span class="opacity-75">(${r.platform || '大麦'})</span></span>
-            <span class="countdown-badge font-mono font-bold text-amber-300 shrink-0" data-time="${r.sale_time}"></span>
+            <span class="countdown-badge font-mono font-bold text-slate-300 shrink-0" data-time="${r.sale_time}"></span>
           </div>
         `).join('')}
       </div>`
       : st.status === SHOW_STATUS.ONGOING
-        ? `<div class="pt-1"><div class="text-xs py-1.5 px-2.5 rounded-lg bg-purple-950 text-purple-50 text-center font-semibold">🎤 今日开演 · Live 进行中</div></div>`
+        ? `<div class="pt-1"><div class="text-xs py-1.5 px-2.5 rounded-lg bg-slate-800 text-slate-50 text-center font-semibold">🎤 今日开演 · Live 进行中</div></div>`
         : `<div class="pt-1">
-            <div class="flex items-center justify-between gap-2 text-xs py-1.5 px-2.5 rounded-lg bg-sky-950 text-sky-50">
+            <div class="flex items-center justify-between gap-2 text-xs py-1.5 px-2.5 rounded-lg bg-slate-900 text-slate-50">
               <span>🎫 已开票，筹备中</span>
-              <span class="font-mono font-bold text-sky-300">${daysToShow === null ? '待定' : `距开演还有 ${daysToShow} 天`}</span>
+              <span class="font-mono font-bold text-slate-300">${daysToShow === null ? '待定' : `距开演还有 ${daysToShow} 天`}</span>
             </div>
           </div>`;
 
     // 主操作按钮随状态切换
     const primaryCta = isSale
-      ? `<button type="button" onclick="exportShowICS(${item.cloudId})" class="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-semibold hover:bg-amber-700 transition">⏰ 抢票提醒</button>`
-      : `<button type="button" onclick="document.getElementById('guide-drawer-${idx}').classList.toggle('hidden')" class="px-3 py-1.5 rounded-lg bg-sky-700 text-white font-semibold hover:bg-sky-800 transition">🚇 场馆交通指南</button>`;
+      ? `<button type="button" onclick="exportShowICS(${item.cloudId})" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition">⏰ 抢票提醒</button>`
+      : `<button type="button" onclick="document.getElementById('guide-drawer-${idx}').classList.toggle('hidden')" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition">🚇 场馆交通指南</button>`;
 
     return `
       <div class="p-4 rounded-2xl metal-card flex flex-col justify-between gap-3">
@@ -777,14 +992,14 @@ function renderTourCards() {
                 ${statusBadge}
               </div>
               <div class="flex items-center gap-1.5 shrink-0">
-                ${AppState.isAdmin ? `<button type="button" onclick="startEditShow('ticket', ${item.cloudId})" class="text-[11px] px-2 py-0.5 rounded-lg liquid-silver-btn font-semibold">✏️ 编辑</button>` : ''}
+                ${canEditContent() ? `<button type="button" onclick="startEditShow('ticket', ${item.cloudId})" class="text-[11px] px-2 py-0.5 rounded-lg liquid-silver-btn font-semibold">✏️ 编辑</button>` : ''}
                 <button type="button" onclick="recordFootprintFromShow('${safeCity}', '${item.show_date}', '${item.venue}', '${item.artist}')" class="text-[11px] px-2 py-0.5 rounded-lg liquid-silver-btn font-medium">+ 足迹</button>
               </div>
             </div>
             <p class="text-xs text-slate-500">📍 ${item.venue} ｜ 🗓️ ${item.show_date}</p>
             <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
               ${item.prices ? `<span class="text-[11px] px-2 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-700">💰 ${item.prices}</span>` : ''}
-              ${safeBooth ? `<span class="text-[11px] px-2 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-900 font-medium" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</span>` : ''}
+              ${safeBooth ? `<span class="text-[11px] px-2 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-700 font-medium" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</span>` : ''}
               ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeCity)}
             </div>
           </div>
@@ -795,7 +1010,7 @@ function renderTourCards() {
         <div class="flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-slate-200/80 text-xs">
           <div class="flex items-center gap-1.5 flex-wrap">
             ${primaryCta}
-            <button type="button" onclick="document.getElementById('guide-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🚇 交通 ▾</button>
+            ${isSale ? `<button type="button" onclick="document.getElementById('guide-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🚇 交通 ▾</button>` : ''}
             <button type="button" onclick="requestExternalToolJump('${shiyeLiveUrl}', '视野 live（非官方座位视野工具站）', '${cleanVenue || safeCity}')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🔭 视野 live ↗</button>
             <button type="button" onclick="document.getElementById('vexp-tour-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">📊 场馆体验 (${venueStats.total}${venueStats.unlocked ? '·已聚合' : '/5'}) ▾</button>
             <button type="button" onclick="document.getElementById('buddy-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 rounded-lg obsidian-btn text-white font-medium">🤝 找搭子 (${buddyEntries.length}) ▾</button>
@@ -803,7 +1018,14 @@ function renderTourCards() {
 
           <div class="flex items-center gap-1.5">
             <button type="button" onclick="exportShowICS(${item.cloudId})" class="px-2 py-1 rounded-lg bg-white border border-slate-300 text-slate-700">📅 日历</button>
-            <a href="${amapUrl}" target="_blank" rel="noopener noreferrer" class="px-2 py-1 rounded-lg bg-white border border-slate-300 text-slate-700">地图 ↗</a>
+            <div class="relative">
+              <button type="button" data-map-trigger onclick="toggleShowMapMenu(event, this)" class="px-2 py-1 rounded-lg bg-white border border-slate-300 text-slate-700">地图 ▾</button>
+              <div data-show-map-menu data-map-venue="${encodeShowMapValue(cleanVenue || safeCity)}" data-map-city="${encodeShowMapValue(safeCity)}" class="hidden absolute right-0 bottom-full mb-1.5 z-50 w-44 p-1.5 rounded-xl bg-white border border-slate-300 shadow-2xl" role="menu">
+                <button type="button" role="menuitem" onclick="launchShowMapApp('amap', this)" class="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left text-xs text-slate-800 hover:bg-slate-100">🧭 高德 App</button>
+                <button type="button" role="menuitem" onclick="launchShowMapApp('baidu', this)" class="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left text-xs text-slate-800 hover:bg-slate-100">🗺️ 百度 App</button>
+                <button type="button" role="menuitem" onclick="launchShowMapApp('web', this)" class="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left text-xs text-slate-800 hover:bg-slate-100">🌐 网页版地图</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -849,7 +1071,7 @@ function renderTourCards() {
                   ? pref.customTags.map((tag, tIdx) => `
                       <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-300 text-[11px] text-slate-800">
                         <span>#${tag}</span>
-                        <button type="button" onclick="removeFanCustomTag(${tIdx})" class="text-slate-400 hover:text-rose-600 font-bold" title="删除此标签">✕</button>
+                        <button type="button" onclick="removeFanCustomTag(${tIdx})" class="text-slate-400 hover:text-slate-900 font-bold" title="删除此标签">✕</button>
                       </span>
                     `).join('')
                   : `<span class="text-[11px] text-slate-400">暂无标签（可添加如“散场拼车”“看台A区”）</span>`
@@ -880,7 +1102,7 @@ function renderTourCards() {
                       </div>
                       <p class="text-xs text-slate-800 break-words">${b.note}</p>
                     </div>
-                    <button type="button" onclick="removeLocalBuddyIntent(${item.cloudId}, ${b.id})" class="text-[11px] text-rose-600 hover:underline shrink-0">删除</button>
+                    <button type="button" onclick="removeLocalBuddyIntent(${item.cloudId}, ${b.id})" class="text-[11px] text-slate-500 hover:text-slate-900 hover:underline shrink-0">删除</button>
                   </div>
                 `).join('')
               : `<div class="p-2.5 rounded-lg bg-white border border-dashed border-slate-300 text-[11px] text-slate-400 text-center">暂无搭子记录，填写上方意向即可生成第一条同场搭子卡片。</div>`
@@ -912,11 +1134,100 @@ function updateCountdowns() {
   if (needRefresh) renderTourCards();
 }
 
+// ================= 城市提取（数据无独立 city 字段） =================
+// 优先从「… · 城市站」标题中取城市，取不到再从场馆字符串中兜底归一化，
+// 卡片上的具体场馆展示保持不变，仅筛选维度由场馆改为城市。
+const UNKNOWN_CITY = '未知城市';
+const KNOWN_CITY_NAMES = [
+  '北京', '上海', '广州', '深圳', '杭州', '南京', '合肥', '西安', '成都', '重庆', '武汉', '长沙', '苏州', '天津', '郑州', '青岛', '厦门', '沈阳',
+  '福州', '济南', '石家庄', '佛山', '大连', '海口', '聊城', '南宁', '昆明', '贵阳', '南昌', '太原', '兰州', '长春', '哈尔滨', '乌鲁木齐', '呼和浩特',
+  '银川', '西宁', '拉萨', '宁波', '无锡', '常州', '温州', '珠海', '东莞', '中山', '惠州', '汕头', '泉州', '烟台', '潍坊', '临沂', '洛阳', '徐州',
+  '保定', '唐山', '大庆', '吉林', '鞍山', '抚顺', '包头', '鄂尔多斯', '扬州', '镇江', '泰州', '盐城', '湖州', '嘉兴', '绍兴', '金华', '台州',
+  '芜湖', '蚌埠', '安庆', '桂林', '柳州', '三亚', '绵阳', '德阳', '宜宾', '遵义', '大理', '丽江', '张家界', '宜昌', '襄阳', '荆州', '株洲',
+  '湘潭', '衡阳', '岳阳', '常德', '赣州', '九江', '上饶', '景德镇', '莆田', '漳州', '龙岩', '香港', '澳门', '台北'
+];
+
+// 归一化城市名：去掉省市县区等行政区后缀与省名前缀（北京市 → 北京，广东省佛山市 → 佛山）。
+function normalizeCityName(raw) {
+  let name = String(raw || '').trim();
+  if (!name) return '';
+  name = name.replace(/^(?:中国|中华人民共和国)/, '');
+  const cityMatches = [...name.matchAll(/([\u4e00-\u9fa5]{2,6})市/g)];
+  if (cityMatches.length) name = cityMatches[cityMatches.length - 1][1];
+  name = name.replace(/^.*?(?:省|自治区)/, '');
+  return name.replace(/[省市县区]$/g, '').trim();
+}
+
+function extractCityFromVenue(venue) {
+  const text = String(venue || '').trim();
+  if (!text) return '';
+  const cityMatches = [...text.matchAll(/([\u4e00-\u9fa5]{2,6})市/g)];
+  if (cityMatches.length) {
+    const city = normalizeCityName(cityMatches[cityMatches.length - 1][1]);
+    if (city) return city;
+  }
+  // “合肥·奕空间”“聊城·高新区…”这类「城市·场馆」结构
+  const headMatch = text.match(/^([\u4e00-\u9fa5]{2,4})\s*[·\-—|]/);
+  if (headMatch) {
+    const head = normalizeCityName(headMatch[1]);
+    if (head && KNOWN_CITY_NAMES.includes(head)) return head;
+  }
+  return KNOWN_CITY_NAMES.find(city => text.includes(city)) || '';
+}
+
+function extractShowCity(item, isArchive) {
+  if (!item) return '';
+  const label = String((isArchive ? item.title : (item.city || item.title)) || '');
+  // 标题/场次名里最后一个“城市站”最可靠（如「燃点」巡演 · 沈阳站、广东·佛山站）
+  const stopMatches = [...label.matchAll(/([\u4e00-\u9fa5]{2,6})站/g)];
+  for (let i = stopMatches.length - 1; i >= 0; i--) {
+    const candidate = normalizeCityName(stopMatches[i][1]);
+    if (!candidate) continue;
+    if (/收官|加场|返场|首站|最终|巡演|演出|音乐节|演唱会|开票|预售/.test(candidate)) continue;
+    return candidate;
+  }
+  return extractCityFromVenue(item.venue);
+}
+
+function getArchiveCity(item) {
+  return extractShowCity(item, true) || UNKNOWN_CITY;
+}
+
+// 年份与城市筛选选项都从现有往日演出数据中动态去重生成。
+function updateArchiveFilterOptions() {
+  const yearSel = document.getElementById('archive-year-filter');
+  if (yearSel) {
+    const current = yearSel.value || 'ALL';
+    const years = [...new Set(AppState.cloudArchives.map(a => a.year).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+    yearSel.innerHTML = `<option value="ALL">全部年份</option>` + years.map(y => `<option value="${y}">${y} 年</option>`).join('');
+    yearSel.value = years.includes(current) ? current : 'ALL';
+  }
+
+  const citySel = document.getElementById('archive-city-filter');
+  if (citySel) {
+    const current = AppState.activeArchiveCity || citySel.value || 'ALL';
+    const cityMap = new Map();
+    AppState.cloudArchives.forEach(a => {
+      const city = getArchiveCity(a);
+      const entry = cityMap.get(city) || { label: city, count: 0 };
+      entry.count += 1;
+      cityMap.set(city, entry);
+    });
+    const cities = [...cityMap.values()].sort((a, b) =>
+      (b.count - a.count) || a.label.localeCompare(b.label, 'zh-Hans-CN')
+    );
+    citySel.innerHTML = `<option value="ALL">全部城市</option>` + cities.map(c => {
+      const safe = String(c.label).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return `<option value="${safe}" title="${safe}">${safe}（${c.count}场）</option>`;
+    }).join('');
+    const resolved = current === 'ALL' || cityMap.has(String(current).trim()) ? current : 'ALL';
+    citySel.value = resolved;
+    AppState.activeArchiveCity = resolved;
+  }
+}
+
 function updateArchiveYearOptions() {
-  const sel = document.getElementById('archive-year-filter');
-  if (!sel) return;
-  const years = [...new Set(AppState.cloudArchives.map(a => a.year).filter(Boolean))].sort((a, b) => b.localeCompare(a));
-  sel.innerHTML = `<option value="ALL">全部年份</option>` + years.map(y => `<option value="${y}">${y} 年</option>`).join('');
+  updateArchiveFilterOptions();
 }
 
 function setArchiveTypeFilter(type) {
@@ -928,18 +1239,36 @@ function setArchiveTypeFilter(type) {
   renderArchiveTimeline();
 }
 
+// 数据加载失败时的可见提示（接口报错不能静默显示成“暂无演出”）。
+function getShowLoadErrorText() {
+  return String(AppState.showLoadError || '').replace(/[<>]/g, '').trim();
+}
+
 function renderArchiveTimeline() {
   const box = document.getElementById('archive-timeline-list');
   if (!box) return;
-  const year = document.getElementById('archive-year-filter')?.value || 'ALL';
-  const filtered = AppState.cloudArchives.filter(a => {
-    if (AppState.activeArchiveType !== 'ALL' && a.subType !== AppState.activeArchiveType) return false;
-    if (year !== 'ALL' && a.year !== year) return false;
-    return true;
-  });
+  // 筛选默认值统一归一：'' / null / 'all' 一律视为「全部」，避免默认状态误过滤掉全部演出。
+  const rawYear = document.getElementById('archive-year-filter')?.value;
+  const rawCity = document.getElementById('archive-city-filter')?.value;
+  const year = (!rawYear || /^all$/i.test(String(rawYear).trim())) ? 'ALL' : rawYear;
+  const city = (!rawCity || /^all$/i.test(String(rawCity).trim())) ? 'ALL' : rawCity;
+  AppState.activeArchiveCity = city;
+
+  // 往日演出统一按演出日期时间正序排列，同日多场按开场时间、记录 ID 次级排序。
+  const filtered = AppState.cloudArchives
+    .filter(a => {
+      if (AppState.activeArchiveType !== 'ALL' && a.subType !== AppState.activeArchiveType) return false;
+      if (year !== 'ALL' && a.year !== year) return false;
+      if (city !== 'ALL' && getArchiveCity(a) !== city) return false;
+      return true;
+    })
+    .sort(compareShowChronology);
 
   if (!filtered.length) {
-    box.innerHTML = `<div class="text-xs text-slate-400 py-4">暂无符合筛选条件的往日演出档案</div>`;
+    const loadErr = getShowLoadErrorText();
+    box.innerHTML = loadErr
+      ? `<div class="text-xs text-rose-600 py-4">⚠️ 往日演出档案加载失败：${loadErr}。请点击右上角「刷新同步」重试。</div>`
+      : `<div class="text-xs text-slate-400 py-4">暂无符合筛选条件的往日演出档案</div>`;
     return;
   }
 
@@ -950,6 +1279,14 @@ function renderArchiveTimeline() {
     const slotPopoverId = `arc-slot-pop-${item.cloudId || idx}`;
     const safeBooth = String(item.merchBooth || '').replace(/['"<>]/g, '');
     const venueStats = computeVenueExperienceStats(item.venue);
+    // 所属专题信息：优先展示数据里的专题名，回退到归一化后的专题键。
+    const isFest = isFestivalShow(item);
+    const seriesKey = resolveShowSeriesKey(item, true);
+    const seriesCount = seriesKey ? countSeriesShows(seriesKey) : 0;
+    const hasSeries = Boolean(seriesKey) && (isFest || seriesCount >= 2);
+    const seriesLabel = String(item.theme || seriesKey || '').replace(/[<>]/g, '');
+    const jumpTheme = isFest ? '__ALL_FESTIVALS__' : seriesKey;
+    const safeJumpTheme = String(jumpTheme).replace(/['"<>]/g, '');
 
     return `
       <div class="p-4 rounded-2xl metal-card space-y-3">
@@ -962,15 +1299,17 @@ function renderArchiveTimeline() {
               <div class="flex items-center gap-1.5 flex-wrap">
                 <span class="text-[10px] px-2 py-0.5 rounded text-white font-semibold" style="background:${badge}">${item.artist}</span>
                 <span class="font-bold text-sm text-slate-900 truncate">${safeTitle}</span>
-                ${safeBooth ? `<span class="text-[10px] px-2 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-900 font-medium" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</span>` : ''}
+                ${hasSeries && seriesLabel ? `<span class="text-[10px] px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-600 font-medium max-w-[14rem] truncate" title="所属专题：${seriesLabel}">🏛️ ${seriesLabel}</span>` : ''}
+                ${safeBooth ? `<span class="text-[10px] px-2 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-700 font-medium" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</span>` : ''}
                 ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeTitle)}
               </div>
-              <p class="text-xs text-slate-500">🗓️ ${item.showDate} ｜ 📍 ${item.venue}</p>
+              <p class="text-xs text-slate-500">🗓️ ${item.showDate}${item.showTime ? ` ${item.showTime}` : ''} ｜ 📍 ${item.venue}</p>
             </div>
           </div>
           <div class="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+            ${hasSeries ? `<button type="button" data-theme="${safeJumpTheme}" onclick="openSeriesModal(this.dataset.theme)" class="px-2.5 py-1.5 rounded-lg obsidian-btn text-white text-xs font-medium">${isFest ? '🎪 音乐节合集' : `🏛️ 专题页${seriesCount > 1 ? ` (${seriesCount}场)` : ''}`} ↗</button>` : ''}
             <button type="button" onclick="document.getElementById('vexp-arc-drawer-${idx}').classList.toggle('hidden')" class="px-2.5 py-1.5 rounded-lg liquid-silver-btn text-xs font-medium">📊 场馆体验 (${venueStats.total}${venueStats.unlocked ? '·已聚合' : '/5'}) ▾</button>
-            ${AppState.isAdmin ? `<button type="button" onclick="startEditShow('archive', ${item.cloudId})" class="px-2.5 py-1.5 rounded-lg liquid-silver-btn text-xs font-semibold">✏️ 编辑</button>` : ''}
+            ${canEditContent() ? `<button type="button" onclick="startEditShow('archive', ${item.cloudId})" class="px-2.5 py-1.5 rounded-lg liquid-silver-btn text-xs font-semibold">✏️ 编辑</button>` : ''}
             <button type="button" onclick="recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="px-2.5 py-1.5 rounded-lg liquid-silver-btn text-xs font-medium">+ 足迹</button>
           </div>
         </div>

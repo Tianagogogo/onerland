@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onerland-pwa-v3';
+const CACHE_NAME = 'onerland-pwa-v5';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -9,7 +9,6 @@ const STATIC_ASSETS = [
   './js/shows-ui.js',
   './js/parser.js',
   './js/footprint-ui.js',
-  './js/feeds-ui.js',
   './js/admin-ui.js',
   './js/auth-ui.js'
 ];

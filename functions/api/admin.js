@@ -2,27 +2,30 @@
 // 统一处理所有写操作（增删改），用 service_role key 绕过 RLS，
 // 但在服务端严格校验请求者是否为管理员。
 //
+// 编辑权限与邮箱登录态解耦：满足任意一种即可——
+//   1. 已登录的授权邮箱（ADMIN_EMAIL）
+//   2. 已通过 ADMIN_PASSWORD 验证、持有短期管理令牌（X-Admin-Token）
+//
 // 需要的环境变量（Cloudflare Pages → Settings → Environment variables）：
 //   SUPABASE_URL                你的 Supabase 项目 URL
 //   SUPABASE_SERVICE_ROLE_KEY   service_role key（绝不能出现在前端）
 //   ADMIN_EMAIL                 管理员邮箱，多个用逗号分隔
+//   ADMIN_PASSWORD              管理员密码（可选；与 ADMIN_EMAIL 任一即可编辑）
+//   ADMIN_SESSION_SECRET        管理令牌签名密钥（可选，建议配置）
 //
 // 前端调用方式：
-//   fetch('/api/admin', {
-//     method: 'POST',
-//     headers: { Authorization: 'Bearer <用户 access_token>' },
-//     body: JSON.stringify({ action: 'upsertTicket', payload: {...} })
-//   })
+//   授权邮箱：Authorization: Bearer <用户 access_token>
+//   密码解锁：X-Admin-Token: <verifyPassword 返回的短期令牌>
 
 const ALLOWED_ACTIONS = new Set([
   'createTicket',
   'updateTicket',
   'deleteTicket',
-  'createFeed',
   'reviewProof',
 ]);
 
 const REVIEW_STATUSES = new Set(['pending', 'approved', 'rejected']);
+const ADMIN_TOKEN_TTL_SECONDS = 12 * 60 * 60;
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -32,6 +35,88 @@ function json(data, status = 200) {
       'Cache-Control': 'no-store',
     },
   });
+}
+
+function timingSafeEqual(a, b) {
+  const left = String(a || '');
+  const right = String(b || '');
+  let diff = left.length ^ right.length;
+  const len = Math.max(left.length, right.length);
+  for (let i = 0; i < len; i++) {
+    diff |= (left.charCodeAt(i) || 0) ^ (right.charCodeAt(i) || 0);
+  }
+  return diff === 0;
+}
+
+function base64UrlEncode(bytes) {
+  let binary = '';
+  bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64UrlDecode(text) {
+  const padded = String(text || '').replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(padded + '='.repeat((4 - padded.length % 4) % 4));
+  return Uint8Array.from(binary, ch => ch.charCodeAt(0));
+}
+
+function getTokenSecret(env) {
+  return env.ADMIN_SESSION_SECRET ||
+    `${env.ADMIN_PASSWORD || ''}:${env.SUPABASE_SERVICE_ROLE_KEY || ''}:onerland-admin`;
+}
+
+async function getHmacKey(env) {
+  return crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(getTokenSecret(env)),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify']
+  );
+}
+
+async function issueAdminToken(env) {
+  const now = Math.floor(Date.now() / 1000);
+  const expiresAt = now + ADMIN_TOKEN_TTL_SECONDS;
+  const payloadPart = base64UrlEncode(new TextEncoder().encode(JSON.stringify({
+    v: 1,
+    scope: 'admin',
+    iat: now,
+    exp: expiresAt,
+  })));
+  const key = await getHmacKey(env);
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payloadPart));
+  return {
+    token: `${payloadPart}.${base64UrlEncode(new Uint8Array(signature))}`,
+    expiresAt,
+  };
+}
+
+async function verifyAdminToken(env, token) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 2) return false;
+  const [payloadPart, signaturePart] = parts;
+
+  try {
+    const key = await getHmacKey(env);
+    const valid = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      base64UrlDecode(signaturePart),
+      new TextEncoder().encode(payloadPart)
+    );
+    if (!valid) return false;
+
+    const payload = JSON.parse(new TextDecoder().decode(base64UrlDecode(payloadPart)));
+    return Boolean(
+      payload &&
+      payload.v === 1 &&
+      payload.scope === 'admin' &&
+      Number(payload.exp) > Math.floor(Date.now() / 1000)
+    );
+  } catch (e) {
+    return false;
+  }
 }
 
 // 用用户 token 向 Supabase Auth 换取用户信息，确认身份
@@ -58,6 +143,32 @@ function isAdminEmail(env, email) {
   return list.length > 0 && list.includes((email || '').trim().toLowerCase());
 }
 
+// 授权邮箱或管理员密码令牌，任意一种通过即可。
+async function authorizeRequest(env, request) {
+  const user = await resolveUser(env, request.headers.get('Authorization'));
+  if (user && isAdminEmail(env, user.email)) {
+    return { ok: true, via: 'email' };
+  }
+
+  const adminToken = request.headers.get('X-Admin-Token') || '';
+  if (adminToken && await verifyAdminToken(env, adminToken)) {
+    return { ok: true, via: 'password' };
+  }
+
+  return { ok: false, status: user ? 403 : 401 };
+}
+
+async function handleVerifyPassword(env, password) {
+  if (!env.ADMIN_PASSWORD) {
+    return json({ error: 'admin password not configured' }, 503);
+  }
+  if (!timingSafeEqual(password, env.ADMIN_PASSWORD)) {
+    return json({ error: 'invalid admin password' }, 403);
+  }
+  const issued = await issueAdminToken(env);
+  return json({ ok: true, token: issued.token, expires_at: issued.expiresAt });
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -65,12 +176,29 @@ export async function onRequest(context) {
     return json({ error: 'server not configured' }, 500);
   }
 
+  let body = null;
+  if (request.method === 'POST') {
+    try {
+      body = await request.json();
+    } catch (e) {
+      return json({ error: 'invalid json' }, 400);
+    }
+    // 密码验证本身不需要任何既有登录态。
+    if (body && body.action === 'verifyPassword') {
+      return handleVerifyPassword(env, String(body.password || ''));
+    }
+  }
+
+  const auth = await authorizeRequest(env, request);
+  if (!auth.ok) {
+    return json(
+      { error: auth.status === 401 ? 'unauthorized' : 'forbidden: not an admin' },
+      auth.status
+    );
+  }
+
   // GET：管理员列出待复核票根（RLS 对 anon 隐藏 pending，必须走 service_role）
   if (request.method === 'GET') {
-    const user = await resolveUser(env, request.headers.get('Authorization'));
-    if (!user) return json({ error: 'unauthorized' }, 401);
-    if (!isAdminEmail(env, user.email)) return json({ error: 'forbidden: not an admin' }, 403);
-
     const url0 = new URL(request.url);
     const status = url0.searchParams.get('status') || 'pending';
     const limit = Math.min(Number(url0.searchParams.get('limit')) || 30, 100);
@@ -133,21 +261,6 @@ export async function onRequest(context) {
     return json({ error: 'method not allowed' }, 405);
   }
 
-  const user = await resolveUser(env, request.headers.get('Authorization'));
-  if (!user) {
-    return json({ error: 'unauthorized' }, 401);
-  }
-  if (!isAdminEmail(env, user.email)) {
-    return json({ error: 'forbidden: not an admin' }, 403);
-  }
-
-  let body;
-  try {
-    body = await request.json();
-  } catch (e) {
-    return json({ error: 'invalid json' }, 400);
-  }
-
   const { action, payload = {}, id } = body || {};
   if (!ALLOWED_ACTIONS.has(action)) {
     return json({ error: `unknown action: ${action}` }, 400);
@@ -167,12 +280,6 @@ export async function onRequest(context) {
   switch (action) {
     case 'createTicket':
       url = `${env.SUPABASE_URL}/rest/v1/tickets`;
-      method = 'POST';
-      data = payload;
-      break;
-
-    case 'createFeed':
-      url = `${env.SUPABASE_URL}/rest/v1/feeds`;
       method = 'POST';
       data = payload;
       break;

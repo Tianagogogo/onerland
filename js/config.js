@@ -1,8 +1,9 @@
 // 若已在 Cloudflare Pages 部署 functions/sb/[[path]].js，保持 '/sb' 即可实现国内直连
 const SUPABASE_URL ='https://xtgkepaqikpzvmpkoxsa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0Z2tlcGFxaWtwenZtcGtveHNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU2NzU1MDgsImV4cCI6MjExMTI1MTUwOH0.dsY0P3S-alER-Dg9U_sdAvGR5aw90lrShn2vSLpm_4g';
-// 管理员邮箱：以此邮箱通过 Supabase OTP 登录的账号拥有编辑权限
-// 注意：此处仅为前端 UI 显示控制，真正的写权限必须由 Supabase RLS 与服务端校验保证
+// 授权管理员邮箱：以此邮箱通过 Supabase OTP 登录后拥有编辑权限。
+// 该登录态与「管理员密码」解锁态互相独立，满足任意一种即可编辑。
+// 注意：此处仅为前端 UI 显示控制，真正的写权限由 functions/api/admin.js 校验。
 const ADMIN_EMAIL = 'tanyan1997@gmail.com';
 const GEMINI_KEY_STORAGE = 'onerland_gemini_api_key';
 
