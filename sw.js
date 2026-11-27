@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onerland-pwa-v25';
+const CACHE_NAME = 'onerland-pwa-v26';
 const IMAGE_CACHE_NAME = 'onerland-images-v1';
 const STATIC_ASSETS = [
   './',
@@ -17,15 +17,27 @@ const STATIC_ASSETS = [
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(STATIC_ASSETS))
+      .then(() => self.skipWaiting())
   );
+});
+
+// 允许页面主动触发新 SW 接管
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME && k !== IMAGE_CACHE_NAME).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(
+        // 自毁旧版本静态缓存，图片缓存保留（CacheFirst 策略）
+        keys.filter(k => k !== CACHE_NAME && k !== IMAGE_CACHE_NAME).map(k => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
+      .then(clients => clients.forEach(c => c.postMessage({ type: 'SW_UPDATED', cache: CACHE_NAME })))
   );
 });
 

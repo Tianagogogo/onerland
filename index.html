@@ -306,7 +306,22 @@
   <script src="./js/auth-ui.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      // 新版本 SW 接管后自动刷新一次，避免被旧缓存卡住
+      navigator.serviceWorker.addEventListener('message', event => {
+        if (event.data && event.data.type === 'SW_UPDATED' && !sessionStorage.getItem('onerland_sw_reloaded')) {
+          sessionStorage.setItem('onerland_sw_reloaded', '1');
+          location.reload();
+        }
+      });
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (sessionStorage.getItem('onerland_sw_reloaded')) return;
+        sessionStorage.setItem('onerland_sw_reloaded', '1');
+        location.reload();
+      });
+      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
+        reg.update().catch(() => {});
+        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }).catch(() => {});
     }
     updateAuthButtonUI();
     updateAiKeyStatusUI();
