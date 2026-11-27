@@ -73,17 +73,24 @@ function startEditShow(kind, cloudId) {
     if (typeof openAdminUnlockModal === 'function') openAdminUnlockModal();
     return;
   }
-  const source = kind === 'archive' ? AppState.cloudArchives : AppState.cloudTickets;
-  const item = source.find(x => String(x.cloudId) === String(cloudId));
-  if (!item) return;
+  const editKind = kind === 'archive' ? 'archive' : 'ticket';
+  const source = editKind === 'archive' ? AppState.cloudArchives : AppState.cloudTickets;
+  const targetId = String(cloudId == null ? '' : cloudId);
+  // ID 可能是数字自增或 UUID 字符串，统一字符串对比
+  const item = source.find(x => String(x?.cloudId == null ? '' : x.cloudId) === targetId)
+    || source.find(x => String(x?.id == null ? '' : x.id) === targetId);
+  if (!item) {
+    alert('未找到该场次数据，请点击右上角「刷新同步」后重试。');
+    return;
+  }
 
-  AppState.editingTicketId = cloudId;
-  AppState.editingKind = kind;
+  AppState.editingTicketId = item.cloudId != null ? item.cloudId : targetId;
+  AppState.editingKind = editKind;
   document.getElementById('hidden-admin-modal').classList.remove('hidden');
-  document.getElementById('adm-type').value = kind;
+  document.getElementById('adm-type').value = editKind;
   document.getElementById('adm-artist').value = item.artist || 'ONER';
-  document.getElementById('adm-title').value = kind === 'archive' ? (item.title || '') : (item.city || '');
-  document.getElementById('adm-date').value = kind === 'archive' ? (item.showDate || '') : ((item.show_date || '').slice(0, 10));
+  document.getElementById('adm-title').value = editKind === 'archive' ? (item.title || '') : (item.city || '');
+  document.getElementById('adm-date').value = editKind === 'archive' ? (item.showDate || '') : String(item.show_date || '').slice(0, 10);
   document.getElementById('adm-body').value = item.venue || '';
   document.getElementById('adm-poster').value = item.posterUrl || '';
   if (document.getElementById('adm-transport')) {
@@ -93,12 +100,15 @@ function startEditShow(kind, cloudId) {
     document.getElementById('adm-seat').value = item.seatUrl || '';
   }
   document.getElementById('adm-slot').value = item.slot || '';
+  document.getElementById('adm-seat').value = item.seatUrl || '';
+  document.getElementById('adm-prices') && (document.getElementById('adm-prices').value = item.prices || '');
   if (document.getElementById('adm-merch-booth')) {
     document.getElementById('adm-merch-booth').value = item.merchBooth || '';
   }
   document.getElementById('adm-url').value = (item.url && item.url !== '#') ? item.url : ((item.source_url && item.source_url !== '#') ? item.source_url : '');
-  document.getElementById('adm-sale-time').value = ((item.rounds || [])[0]?.sale_time || '').replace(' ', 'T').slice(0, 16);
-  document.getElementById('adm-sale-plat').value = (item.rounds || [])[0]?.platform || '大麦';
+  const firstRound = Array.isArray(item.rounds) && item.rounds[0] ? item.rounds[0] : {};
+  document.getElementById('adm-sale-time').value = String(firstRound.sale_time || '').replace(' ', 'T').slice(0, 16);
+  document.getElementById('adm-sale-plat').value = firstRound.platform || '大麦';
 
   const posterPrev = document.getElementById('adm-poster-preview');
   if (posterPrev) {
@@ -233,7 +243,7 @@ function renderAdminTodoQueue() {
         <span class="text-slate-800">${item.title}</span>
       </div>
       <div class="flex items-center gap-1.5 shrink-0">
-        <button type="button" onclick="startEditShow('${item.kind}', ${item.id})" class="px-2 py-1 rounded bg-slate-100 text-slate-800 hover:bg-slate-200 font-medium">编辑</button>
+        <button type="button" data-edit-show="${String(item.id == null ? '' : item.id).replace(/"/g, '&quot;')}" data-edit-kind="${item.kind}" class="px-2 py-1 rounded bg-slate-100 text-slate-800 hover:bg-slate-200 font-medium">编辑</button>
         <button type="button" onclick="adminDeleteItem('${item.table}', ${item.id})" class="px-2 py-1 rounded bg-rose-50 text-rose-600 hover:bg-rose-100 font-medium">删除</button>
       </div>
     </div>
@@ -577,4 +587,23 @@ async function deleteEditingShow() {
   } finally {
     if (delBtn) { delBtn.disabled = false; delBtn.textContent = '🗑️ 删除该场次'; }
   }
+}
+
+// ================= 编辑按钮事件委托（动态渲染卡片 / 数字或 UUID 均可靠触发） =================
+if (!window.__editShowDelegationBound) {
+  window.__editShowDelegationBound = true;
+  document.addEventListener('click', function (event) {
+    const btn = event.target && event.target.closest ? event.target.closest('[data-edit-show]') : null;
+    if (!btn) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!canEditContent()) {
+      if (typeof openAdminUnlockModal === 'function') openAdminUnlockModal();
+      return;
+    }
+    const id = btn.getAttribute('data-edit-show') || '';
+    const kind = btn.getAttribute('data-edit-kind') === 'archive' ? 'archive' : 'ticket';
+    if (!id) return;
+    startEditShow(kind, id);
+  }, true);
 }
