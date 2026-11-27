@@ -18,13 +18,25 @@ const AppState = {
   }
 };
 
-const ARTIST_COLORS = {
+window.AppState = AppState;
+
+window.ARTIST_COLORS = window.ARTIST_COLORS || {
   'ONER': { id: 'ONER', bg: '#1e293b' },
   '岳岳': { id: 'YUEYUE', bg: '#b91c1c' },
   '木子洋': { id: 'MUZIYANG', bg: '#0369a1' },
   '灵超': { id: 'LINGCHAO', bg: '#6d28d9' },
   '坤音娱乐': { id: 'QINS', bg: '#334155' }
 };
+
+const ARTIST_COLORS = window.ARTIST_COLORS;
+
+if (typeof window.updateAuthButtonUI !== 'function') {
+  window.updateAuthButtonUI = function updateAuthButtonUI() {
+    const btn = document.getElementById('auth-btn') || document.querySelector('[data-auth-btn]');
+    if (!btn) return;
+    btn.textContent = AppState.isAdmin ? '已登录' : '登录';
+  };
+}
 
 const SB_HEADERS = typeof SUPABASE_ANON_KEY !== 'undefined'
   ? {
@@ -74,6 +86,10 @@ function openLightbox(src, caption = '') {
 
 // ================= 云端演出与往日档案加载 =================
 async function loadTourData() {
+  if (typeof window.updateAuthButtonUI === 'function') {
+    window.updateAuthButtonUI();
+  }
+
   if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) {
     if (typeof renderThemeQuickBar === 'function') renderThemeQuickBar();
     if (typeof renderTourCards === 'function') renderTourCards();
