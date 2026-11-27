@@ -13,7 +13,6 @@ const AppState = {
   pendingExternalUrl: null,
   cloudTickets: [],
   cloudArchives: [],
-  cloudHiddenShowKeys: [],
   footprints: [],
   anniversary: {
     firstMeetDate: '2018-08-30',
@@ -464,91 +463,11 @@ async function fetchTicketRows() {
   }
   throw lastErr;
 }
+// 本地默认场次已彻底移除：所有演出数据 100% 来自 Supabase 云端表
 async function loadLocalTourData() {
-  const response = await fetch('./tour_data.json', { cache: 'no-store' });
-  if (!response.ok) throw new Error(`本地演出数据 HTTP ${response.status}`);
-  const rows = await response.json();
-  // 兼容数组或 {0:...,1:...} 对象两种导出格式
-  const list = Array.isArray(rows) ? rows : Object.values(rows || {});
-  const localTickets = list.filter(item => item && item.show_date).map((item, index) => ({
-    ...item,
-    cloudId: item.cloudId || `local-${index + 1}`,
-    artist: item.artist || 'ONER',
-    city: item.city || item.title || '待定场次',
-    venue: item.venue || '场馆待定',
-    rounds: Array.isArray(item.rounds) ? item.rounds : [],
-    source_url: item.source_url || item.url || ''
-  }));
-  AppState.cloudTickets = filterHiddenShows(mergeShowRecords(localTickets, [], false), false);
-  const localArchives = list.filter(item => item && item.showDate).map((item, index) => ({
-    ...item,
-    cloudId: item.cloudId || `local-archive-${index + 1}`,
-    artist: item.artist || 'ONER',
-    year: item.year || String(item.showDate).slice(0, 4),
-    subType: item.subType || 'tour'
-  }));
-  AppState.cloudArchives = filterHiddenShows(mergeShowRecords(localArchives, [], true), true);
+  AppState.cloudTickets = [];
+  AppState.cloudArchives = [];
   AppState.showLoadError = '';
-}
-
-// ================= 本地预置场次的隐藏列表（管理员删除本地场次时使用） =================
-const HIDDEN_LOCAL_SHOWS_KEY = 'onerland_hidden_show_keys_v1';
-
-function getHiddenLocalShowKeys() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(HIDDEN_LOCAL_SHOWS_KEY) || '[]');
-    return Array.isArray(raw) ? raw : [];
-  } catch (e) {
-    return [];
-  }
-}
-
-function buildLocalShowKey(item, isArchive) {
-  if (!item) return '';
-  const title = isArchive ? (item.title || item.city) : (item.city || item.title);
-  const date = isArchive ? item.showDate : item.show_date;
-  return `${item.artist || ''}|${title || ''}|${date || ''}`;
-}
-
-function hideLocalShow(item, isArchive) {
-  const key = buildLocalShowKey(item, isArchive);
-  if (!key) return;
-  const keys = getHiddenLocalShowKeys();
-  if (!keys.includes(key)) {
-    keys.push(key);
-    try { localStorage.setItem(HIDDEN_LOCAL_SHOWS_KEY, JSON.stringify(keys)); } catch (e) { /* 存储失败时忽略 */ }
-  }
-}
-
-function parseHiddenShowKey(key) {
-  const parts = String(key || '').split('|');
-  if (parts.length < 3) return null;
-  const date = String(parts[parts.length - 1] || '').slice(0, 10);
-  const label = parts.length >= 3 ? parts[1] : '';
-  const trimmed = label.replace(/[「」《》·\s]/g, '');
-  return date && trimmed ? { date, label: trimmed } : null;
-}
-
-function filterHiddenShows(list, isArchive) {
-  const cloudHidden = Array.isArray(AppState.cloudHiddenShowKeys) ? AppState.cloudHiddenShowKeys : [];
-  const hidden = [...new Set([...getHiddenLocalShowKeys(), ...cloudHidden])];
-  if (!hidden.length) return list;
-  const parsed = hidden.map(parseHiddenShowKey).filter(Boolean);
-  return (Array.isArray(list) ? list : []).filter(item => {
-    const isLocalRecord = String(item && item.cloudId || '').startsWith('local');
-    if (!isLocalRecord) return true;
-    const exactKey = buildLocalShowKey(item, isArchive);
-    if (hidden.includes(exactKey)) return false;
-    // 语义兜底：同日期 + 城市/场馆关键字重合也视为已隐藏（兼容日期格式差异）
-    const rawDate = isArchive ? item.showDate : item.show_date;
-    const dateKey = normalizeShowDateKey(rawDate);
-    const label = String((isArchive ? item.title : item.city) || item.venue || '').replace(/[「」《》·\s]/g, '');
-    if (!dateKey || !label) return true;
-    return !parsed.some(entry => entry.date === dateKey && (
-      label.includes(entry.label) || entry.label.includes(label) ||
-      (label.slice(0, 2) && entry.label.slice(0, 2) === label.slice(0, 2))
-    ));
-  });
 }
 
 function normalizeShowDateKey(value) {
@@ -680,125 +599,101 @@ async function loadTourData() {
     window.updateAuthButtonUI();
   }
 
-  // 1) 先无条件加载本地内置完整数据集并立即渲染：无论云端是否可用，首屏绝不出现空状态
-  let localTickets = [];
-  let localArchives = [];
-  try {
-    await loadLocalTourData();
-    localTickets = Array.isArray(AppState.cloudTickets) ? AppState.cloudTickets.slice() : [];
-    localArchives = Array.isArray(AppState.cloudArchives) ? AppState.cloudArchives.slice() : [];
-    renderLoadedTourData();
-  } catch (localErr) {
-    console.warn('Built-in local tour data unavailable', localErr);
-  }
+  // 不再合并任何本地预置数据：仅渲染 Supabase 查询到的真实记录
+  AppState.cloudTickets = [];
+  AppState.cloudArchives = [];
+  renderLoadedTourData();
 
   if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) {
+    AppState.showLoadError = 'Supabase 未配置';
     renderLoadedTourData();
     return;
   }
 
   try {
     const list = await fetchTicketRows();
-    if (!Array.isArray(list) || !list.length) {
-      // 云端无数据：保留本地完整数据集，不进入空状态
-      AppState.showLoadError = '';
-      renderLoadedTourData();
-      return;
-    }
-
     const tickets = [];
     const archives = [];
-    const hiddenFromCloud = [];
 
     for (const row of list) {
       const rawTitle = row.title || '';
       const rawPlat = row.platform || '';
 
-      // 云端隐藏标记行：HIDDEN|艺人|场次标题|日期，跨设备同步隐藏的本地预置场次
-      if (rawTitle.startsWith('HIDDEN|')) {
-        const key = rawTitle.slice(7);
-        if (key) hiddenFromCloud.push(key);
-        continue;
-      }
-
       // 单条脏数据不能让整页演出消失：逐行隔离解析异常。
       try {
-      if (rawTitle.startsWith('ARCHIVE|')) {
-        const parts = rawTitle.split('|');
-        let artist = parts[1] || 'ONER';
-        const title = parts[2] || '往日场次';
+        if (rawTitle.startsWith('ARCHIVE|')) {
+          const parts = rawTitle.split('|');
+          let artist = parts[1] || 'ONER';
+          const title = parts[2] || '往日场次';
 
-        // 统一修正「极尽声色」巡演艺人标签为 ONER
-        if (title.includes('极尽声色')) artist = 'ONER';
-        const showDate = parts[3] || (row.ticket_time || '').slice(0, 10) || '';
-        let meta = {};
-        if (rawPlat.startsWith('ARCHIVE:')) {
-          try { meta = JSON.parse(rawPlat.slice(8)); } catch (e) { meta = {}; }
+          // 统一修正「极尽声色」巡演艺人标签为 ONER
+          if (title.includes('极尽声色')) artist = 'ONER';
+          const showDate = parts[3] || (row.ticket_time || '').slice(0, 10) || '';
+          let meta = {};
+          if (rawPlat.startsWith('ARCHIVE:')) {
+            try { meta = JSON.parse(rawPlat.slice(8)); } catch (e) { meta = {}; }
+          }
+          // 同一天可能有多场（如连开两天），需要保留具体开场时间用于时间线排序。
+          const showTimeMatch = String(row.ticket_time || '').match(/[T ](\d{1,2}):(\d{2})/);
+          const showTime = showTimeMatch
+            ? `${showTimeMatch[1].padStart(2, '0')}:${showTimeMatch[2]}`
+            : '';
+          const theme = meta.theme == null ? '' : String(meta.theme);
+          let seriesKey = theme;
+          if (typeof normalizeSeriesKey === 'function') {
+            // theme/title 可能是数字或对象等脏数据，解析失败时退回原始专题名，绝不抛出。
+            try { seriesKey = normalizeSeriesKey(String(title), theme); } catch (e) { seriesKey = theme; }
+          }
+          archives.push({
+            cloudId: row.id,
+            artist,
+            title,
+            showDate,
+            showTime,
+            year: showDate.slice(0, 4) || '',
+            subType: meta.subType || 'tour',
+            venue: meta.venue || '演出现场',
+            posterUrl: meta.posterUrl || '',
+            transport: meta.transport || '',
+            prices: meta.prices || '',
+            hasSeatMap: Boolean(meta.seatUrl || meta.seatMapUrl || meta.seatMap || meta.seat_map || meta.seat_url),
+            seatUrl: meta.seatUrl || meta.seatMapUrl || meta.seatMap || meta.seat_map || meta.seat_url || '',
+            slot: meta.slot || '',
+            merchBooth: meta.merchBooth || '',
+            scheduleImgs: Array.isArray(meta.scheduleImgs) ? meta.scheduleImgs : [],
+            viewImgs: Array.isArray(meta.viewImgs) ? meta.viewImgs : [],
+            setlist: Array.isArray(meta.setlist) ? meta.setlist : [],
+            theme: seriesKey,
+            seriesKey,
+            url: row.url || '#',
+            source_url: row.url || '#'
+          });
+          continue;
         }
-        // 同一天可能有多场（如连开两天），需要保留具体开场时间用于时间线排序。
-        const showTimeMatch = String(row.ticket_time || '').match(/[T ](\d{1,2}):(\d{2})/);
-        const showTime = showTimeMatch
-          ? `${showTimeMatch[1].padStart(2, '0')}:${showTimeMatch[2]}`
-          : '';
-        const theme = meta.theme == null ? '' : String(meta.theme);
-        let seriesKey = theme;
-        if (typeof normalizeSeriesKey === 'function') {
-          // theme/title 可能是数字或对象等脏数据，解析失败时退回原始专题名，绝不抛出。
-          try { seriesKey = normalizeSeriesKey(String(title), theme); } catch (e) { seriesKey = theme; }
-        }
-        archives.push({
-          cloudId: row.id,
-          artist,
-          title,
-          showDate,
-          showTime,
-          year: showDate.slice(0, 4) || '',
-          subType: meta.subType || 'tour',
-          venue: meta.venue || '演出现场',
-          posterUrl: meta.posterUrl || '',
-          transport: meta.transport || '',
-          prices: meta.prices || '',
-          // 座位图不参与列表渲染，点击「查看座位图」时才作为大图打开/按需查询
-          hasSeatMap: Boolean(meta.seatUrl || meta.seatMapUrl || meta.seatMap || meta.seat_map || meta.seat_url),
-          seatUrl: meta.seatUrl || meta.seatMapUrl || meta.seatMap || meta.seat_map || meta.seat_url || '',
-          slot: meta.slot || '',
-          merchBooth: meta.merchBooth || '',
-          scheduleImgs: Array.isArray(meta.scheduleImgs) ? meta.scheduleImgs : [],
-          viewImgs: Array.isArray(meta.viewImgs) ? meta.viewImgs : [],
-          setlist: Array.isArray(meta.setlist) ? meta.setlist : [],
-          theme,
-          // 所属专题（合集）归并键：时间线卡片据此恢复「专题页」跳转入口。
-          seriesKey,
-          url: row.url || '#'
-        });
-      } else {
+
         const parts = rawTitle.split('|');
+        if (parts.length < 4) continue;
         let artist = parts[0] || 'ONER';
-        const city = parts[1] || rawTitle || '待定场次';
-
-        // 统一修正「极尽声色」巡演艺人标签为 ONER
-        if (city.includes('极尽声色')) artist = 'ONER';
+        const city = parts[1] || '待定场次';
         const venue = parts[2] || '场馆待定';
-        const showDate = parts[3] || (row.ticket_time || '').slice(0, 10) || '';
+        const showDateRaw = parts[3] || '';
+        const showDate = getShowDateRange(showDateRaw).startDate || showDateRaw || (row.ticket_time || '').slice(0, 10);
+        const showDateFull = showDateRaw || showDate;
         const slotFromTitle = parts[4] || '';
 
         let meta = {};
-        if (rawPlat.startsWith('META:')) {
-          try { meta = JSON.parse(rawPlat.slice(5)); } catch (e) { meta = {}; }
-        }
+        const platformText = rawPlat.startsWith('META:') ? rawPlat.slice(5) : rawPlat;
+        try { meta = JSON.parse(platformText); } catch (e) { meta = {}; }
 
         const rounds = Array.isArray(meta.rounds) ? meta.rounds : [];
-        // 注意：不能再用 ticket_time 兜底造一个"开票时间"轮次。
-        // 历史数据中 ticket_time 常被写成演出当天时间（如 2026-12-05T19:30），
-        // 若当作开票时间会导致"已开完票仍在倒计时"的错觉。
-        // 没有 rounds 就如实保持为空，由状态机判定为「已开票·待演出」。
+        if (String(city).includes('极尽声色')) artist = 'ONER';
 
         tickets.push({
           cloudId: row.id,
           artist,
           city,
           venue,
-          show_date: showDate,
+          show_date: showDateFull,
           rounds,
           posterUrl: meta.posterUrl || '',
           hasSeatMap: Boolean(meta.seatUrl || meta.seatMapUrl || meta.seatMap || meta.seat_map || meta.seat_url),
@@ -812,22 +707,17 @@ async function loadTourData() {
           url: row.url || '#',
           source_url: row.url || '#'
         });
-      }
       } catch (rowErr) {
         console.warn('loadTourData: 跳过解析失败的记录', row && row.id, rowErr);
       }
     }
 
-    AppState.cloudHiddenShowKeys = hiddenFromCloud;
-    AppState.cloudTickets = filterHiddenShows(mergeShowRecords(localTickets, tickets, false), false);
-    AppState.cloudArchives = filterHiddenShows(mergeShowRecords(localArchives, archives, true), true);
+    AppState.cloudTickets = mergeShowRecords([], tickets, false);
+    AppState.cloudArchives = mergeShowRecords([], archives, true);
     AppState.showLoadError = '';
   } catch (err) {
-    try {
-      await loadLocalTourData();
-    } catch (localErr) {
-      console.error('Local tour fallback failed', localErr);
-    }
+    AppState.cloudTickets = [];
+    AppState.cloudArchives = [];
     AppState.showLoadError = (err && err.message) || '网络请求失败';
     console.error('loadTourData failed:', err);
   }

@@ -553,12 +553,16 @@ async function bulkCompressLegacyImages() {
   }
 }
 
-// ================= 🗑️ 删除当前编辑的场次（云端删除 / 本地预置加入隐藏列表） =================
+// ================= 🗑️ 删除当前编辑的场次（仅云端记录） =================
 async function deleteEditingShow() {
   const id = String(AppState.editingTicketId || '');
   if (!id) return;
   if (!canEditContent()) {
     alert('请先通过管理员密码解锁后再删除场次。');
+    return;
+  }
+  if (id.startsWith('local')) {
+    alert('该场次不是云端记录，无法删除，请刷新同步后重试。');
     return;
   }
   const kind = AppState.editingKind === 'archive' ? 'archive' : 'ticket';
@@ -572,71 +576,8 @@ async function deleteEditingShow() {
   const delBtn = document.getElementById('adm-delete-btn');
   if (delBtn) { delBtn.disabled = true; delBtn.textContent = '⏳ 正在删除…'; }
   try {
-    if (id.startsWith('local')) {
-      // 本地预置场次：先记入本机隐藏列表，同时把云端的同场次副本一并删除，保证多设备一致
-      if (item && typeof hideLocalShow === 'function') hideLocalShow(item, kind === 'archive');
-      // 同步写入云端隐藏标记（HIDDEN|key），保证手机与电脑隐藏列表一致
-      const hideKey = item && typeof buildLocalShowKey === 'function' ? buildLocalShowKey(item, kind === 'archive') : '';
-      const cloudHidden = Array.isArray(AppState.cloudHiddenShowKeys) ? AppState.cloudHiddenShowKeys : [];
-      let cloudSynced = false;
-      if (hideKey && !cloudHidden.includes(hideKey)) {
-        try {
-          await adminApi('createTicket', {
-            title: `HIDDEN|${hideKey}`,
-            ticket_time: new Date().toISOString().slice(0, 19).replace('T', ' '),
-            platform: 'META:{"hidden":true}',
-            url: ''
-          });
-          cloudHidden.push(hideKey);
-          AppState.cloudHiddenShowKeys = cloudHidden;
-          cloudSynced = true;
-        } catch (e) {
-          console.warn('云端隐藏标记写入失败（本机仍已隐藏）:', e);
-        }
-      }
-      const dateOf = value => {
-        const m = String(value || '').match(/\d{4}-\d{2}-\d{2}/);
-        return m ? m[0] : '';
-      };
-      const myDate = dateOf(kind === 'archive' ? item?.showDate : item?.show_date);
-      const myGeo = String((kind === 'archive' ? item?.title : item?.city) || item?.venue || '');
-      const cloudCopy = (kind === 'archive' ? AppState.cloudArchives : AppState.cloudTickets).find(x => {
-        if (!x || String(x.cloudId || '').startsWith('local')) return false;
-        const xDate = dateOf(kind === 'archive' ? x.showDate : x.show_date);
-        if (!myDate || xDate !== myDate) return false;
-        const xGeo = String((kind === 'archive' ? x.title : x.city) || x.venue || '');
-        return Boolean(myGeo && xGeo) && (myGeo.includes(xGeo) || xGeo.includes(myGeo));
-      });
-      if (cloudCopy) {
-        await adminApi('deleteTicket', {}, cloudCopy.cloudId);
-        alert('已从本地预置隐藏，并同步删除云端同场次记录。');
-      } else if (cloudSynced) {
-        alert('已隐藏该场次，并同步到云端（其它设备打开同样不再显示）。');
-      } else {
-        alert('已从本地预置场次中隐藏该场次（云端同步未成功，仅本机生效）。');
-      }
-    } else {
-      await adminApi('deleteTicket', {}, id);
-      // 写入云端 HIDDEN 标记（跨设备生效），并同步隐藏本机同场次的预置卡片
-      if (item && typeof hideLocalShow === 'function') hideLocalShow(item, kind === 'archive');
-      const hideKey = item && typeof buildLocalShowKey === 'function' ? buildLocalShowKey(item, kind === 'archive') : '';
-      const cloudHidden = Array.isArray(AppState.cloudHiddenShowKeys) ? AppState.cloudHiddenShowKeys : [];
-      if (hideKey && !cloudHidden.includes(hideKey)) {
-        try {
-          await adminApi('createTicket', {
-            title: `HIDDEN|${hideKey}`,
-            ticket_time: new Date().toISOString().slice(0, 19).replace('T', ' '),
-            platform: 'META:{"hidden":true}',
-            url: ''
-          });
-          cloudHidden.push(hideKey);
-          AppState.cloudHiddenShowKeys = cloudHidden;
-        } catch (e) {
-          console.warn('云端隐藏标记写入失败:', e);
-        }
-      }
-      alert('✅ 已从云端删除该场次。');
-    }
+    await adminApi('deleteTicket', {}, id);
+    alert('✅ 已从云端删除该场次。');
     resetAdminForm();
     document.getElementById('hidden-admin-modal')?.classList.add('hidden');
     await loadTourData();
@@ -645,23 +586,4 @@ async function deleteEditingShow() {
   } finally {
     if (delBtn) { delBtn.disabled = false; delBtn.textContent = '🗑️ 删除该场次'; }
   }
-}
-
-// ================= 编辑按钮事件委托（动态渲染卡片 / 数字或 UUID 均可靠触发） =================
-if (!window.__editShowDelegationBound) {
-  window.__editShowDelegationBound = true;
-  document.addEventListener('click', function (event) {
-    const btn = event.target && event.target.closest ? event.target.closest('[data-edit-show]') : null;
-    if (!btn) return;
-    event.preventDefault();
-    event.stopPropagation();
-    if (!canEditContent()) {
-      if (typeof openAdminUnlockModal === 'function') openAdminUnlockModal();
-      return;
-    }
-    const id = btn.getAttribute('data-edit-show') || '';
-    const kind = btn.getAttribute('data-edit-kind') === 'archive' ? 'archive' : 'ticket';
-    if (!id) return;
-    startEditShow(kind, id);
-  }, true);
 }
