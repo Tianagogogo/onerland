@@ -190,8 +190,13 @@ async function importOCRBatchShows() {
       }
   );
 
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/tickets`, { method: 'POST', headers: SB_HEADERS, body: JSON.stringify(payloads) });
-  if (!res.ok) return alert(`批量导入失败：HTTP ${res.status}`);
+  try {
+    for (const payload of payloads) {
+      await adminApi('createTicket', payload);
+    }
+  } catch (e) {
+    return alert(`批量导入失败：${e.message}`);
+  }
   document.getElementById('adm-ocr-batch-box').classList.add('hidden');
   alert(`已成功导入 ${payloads.length} 场演出！`);
   await loadTourData();

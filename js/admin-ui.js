@@ -101,11 +101,9 @@ async function submitAdminQuickPost() {
   try {
     if (type === 'feed') {
       const content = `${isPinned ? '[PIN] ' : ''}${venueOrBody || titleOrPlat}`;
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/feeds`, {
-        method: 'POST', headers: SB_HEADERS,
-        body: JSON.stringify({ artist, platform: titleOrPlat, content, url })
+      await adminApi('createFeed', {
+        artist, platform: titleOrPlat, content, url
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await loadAllFeeds();
     } else if (type === 'ticket') {
       const showDate = dateOrTime || new Date().toISOString().slice(0, 10);
@@ -124,9 +122,11 @@ async function submitAdminQuickPost() {
         url
       };
       const isPatch = Boolean(AppState.editingTicketId);
-      const endpoint = isPatch ? `${SUPABASE_URL}/rest/v1/tickets?id=eq.${AppState.editingTicketId}` : `${SUPABASE_URL}/rest/v1/tickets`;
-      const res = await fetch(endpoint, { method: isPatch ? 'PATCH' : 'POST', headers: SB_HEADERS, body: JSON.stringify(payload) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (isPatch) {
+        await adminApi('updateTicket', payload, AppState.editingTicketId);
+      } else {
+        await adminApi('createTicket', payload);
+      }
       await loadTourData();
     } else {
       const showDate = dateOrTime || new Date().toISOString().slice(0, 10);
@@ -151,9 +151,11 @@ async function submitAdminQuickPost() {
         url
       };
       const isPatch = Boolean(AppState.editingTicketId);
-      const endpoint = isPatch ? `${SUPABASE_URL}/rest/v1/tickets?id=eq.${AppState.editingTicketId}` : `${SUPABASE_URL}/rest/v1/tickets`;
-      const res = await fetch(endpoint, { method: isPatch ? 'PATCH' : 'POST', headers: SB_HEADERS, body: JSON.stringify(payload) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (isPatch) {
+        await adminApi('updateTicket', payload, AppState.editingTicketId);
+      } else {
+        await adminApi('createTicket', payload);
+      }
       await loadTourData();
     }
 
@@ -189,7 +191,57 @@ function renderAdminTodoQueue() {
 
 async function adminDeleteItem(table, id) {
   if (!confirm('确认删除该条记录？')) return;
-  await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, { method: 'DELETE', headers: SB_HEADERS });
+  try {
+    await adminApi('deleteTicket', {}, id);
+  } catch (e) {
+    alert(`删除失败：${e.message}`);
+    return;
+  }
   await loadTourData();
   renderAdminTodoQueue();
+}
+
+// 统一调用服务端写接口（functions/api/admin.js），由服务端校验管理员身份
+async function adminApi(action, payload = {}, id) {
+  const session = typeof getStoredSession === 'function' ? getStoredSession() : null;
+  if (!session || !session.access_token) {
+    throw new Error('登录状态已失效，请重新登录');
+  }
+  const res = await fetch('/api/admin', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`
+    },
+    body: JSON.stringify({ action, payload, id })
+  });
+  let data = null;
+  try { data = await res.json(); } catch (e) { data = null; }
+  if (!res.ok || !data || !data.ok) {
+    const msg = (data && (data.error || data.detail)) || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return data.data;
+}
+
+// ================= Gemini API Key 本地配置 =================
+// 密钥仅保存在本机 localStorage，绝不上传云端
+function configGeminiKey() {
+  const current = (localStorage.getItem(GEMINI_KEY_STORAGE) || '').trim();
+  const masked = current ? `${current.slice(0, 6)}••••${current.slice(-4)}` : '';
+  const input = prompt(
+    `输入 Gemini API Key（留空并确定可清除）${masked ? `\n当前：${masked}` : ''}`,
+    ''
+  );
+  if (input === null) return;
+  const val = input.trim();
+  if (!val) {
+    localStorage.removeItem(GEMINI_KEY_STORAGE);
+    if (typeof updateAiKeyStatusUI === 'function') updateAiKeyStatusUI();
+    alert('已清除本地 AI 密钥');
+    return;
+  }
+  localStorage.setItem(GEMINI_KEY_STORAGE, val);
+  if (typeof updateAiKeyStatusUI === 'function') updateAiKeyStatusUI();
+  alert('密钥已保存到本机浏览器，仅用于本地海报识别。');
 }

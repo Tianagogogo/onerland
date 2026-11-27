@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onerland-pwa-v1';
+const CACHE_NAME = 'onerland-pwa-v2';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -7,9 +7,11 @@ const STATIC_ASSETS = [
   './js/store.js',
   './js/home-ui.js',
   './js/shows-ui.js',
+  './js/parser.js',
   './js/footprint-ui.js',
   './js/feeds-ui.js',
-  './js/admin-ui.js'
+  './js/admin-ui.js',
+  './js/auth-ui.js'
 ];
 
 self.addEventListener('install', event => {
