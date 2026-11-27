@@ -1,7 +1,8 @@
-const CACHE_NAME = 'onerland-pwa-v5';
+const CACHE_NAME = 'onerland-pwa-v19';
 const STATIC_ASSETS = [
   './',
   './index.html',
+  './tour_data.json',
   './css/theme.css',
   './js/config.js',
   './js/store.js',

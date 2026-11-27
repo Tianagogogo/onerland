@@ -26,9 +26,9 @@ const SB_HEADERS = {
 const ARTIST_COLORS = {
   'ONER':     { id: 'oner',    hex: '#DD0514', bg: 'linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)' },
   '坤音娱乐': { id: 'qins',    hex: '#1E293B', bg: '#1E293B' },
-  '岳岳':     { id: 'pinkray', hex: '#7C3AED', bg: 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)' },
-  '木子洋':   { id: 'kwin',    hex: '#DB2777', bg: 'linear-gradient(135deg, #DB2777 0%, #9D174D 100%)' },
-  '灵超':     { id: 'didi',    hex: '#0284C7', bg: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)' }
+  '岳岳':     { id: 'pinkray', hex: '#9C73EF', bg: '#9C73EF' },
+  '木子洋':   { id: 'kwin',    hex: '#F90092', bg: '#F90092' },
+  '灵超':     { id: 'didi',    hex: '#32B5E1', bg: '#32B5E1' }
 };
 
 const COLOR_METAL_DEFAULT = 'linear-gradient(135deg, #334155 0%, #0f172a 100%)';

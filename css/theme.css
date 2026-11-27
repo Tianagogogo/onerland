@@ -12,6 +12,18 @@ body {
   body { padding-bottom: 1.5rem; }
 }
 
+:root {
+  --fan-theme: linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%);
+  --accent-gradient: linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%);
+  --cp-stop-a: 38%;
+  --cp-stop-b: 62%;
+  --fan-theme-solid: #DD0514;
+  --fan-theme-alt: #8D0D0E;
+  --footprint-theme: #C8102E;
+  --footprint-theme-solid: #C8102E;
+  --btn-height: 32px;
+}
+
 .metal-card {
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(241, 244, 249, 0.88));
   backdrop-filter: blur(16px);
@@ -26,25 +38,293 @@ body {
   box-shadow: inset 0 1px 0 #ffffff, 0 8px 26px rgba(15, 23, 42, 0.07);
 }
 
-.liquid-silver-btn {
-  background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 52%, #cbd5e1 100%);
-  border: 1px solid #94a3b8;
-  color: #0f172a;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(15, 23, 42, 0.06);
-}
-.liquid-silver-btn:hover {
-  background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 52%, #94a3b8 100%);
+/* ============ 统一冷银白液态金属按钮（8px 圆角 / 30~32px 高） ============ */
+.liquid-silver-btn,
+.tour-action-btn,
+.obsidian-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: var(--btn-height);
+  min-height: var(--btn-height);
+  padding: 0 12px;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f7fa 34%, #e2e8f0 72%, #f1f5f9 100%);
+  color: #1e293b;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.98),
+    inset 0 -1px 0 rgba(148, 163, 184, 0.22),
+    0 1px 2px rgba(15, 23, 42, 0.06);
+  transition: background 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
 }
 
-.obsidian-btn {
-  background: linear-gradient(135deg, #334155 0%, #1e293b 50%, #0f172a 100%);
-  border: 1px solid #475569;
-  color: #f8fafc;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 6px rgba(15, 23, 42, 0.14);
-}
+.liquid-silver-btn:hover,
+.tour-action-btn:hover,
 .obsidian-btn:hover {
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 30%, #cfd8e3 78%, #e8eef5 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 0 rgba(148, 163, 184, 0.3),
+    0 2px 6px rgba(15, 23, 42, 0.08);
 }
+
+.liquid-silver-btn:active,
+.tour-action-btn:active,
+.obsidian-btn:active {
+  transform: translateY(0.5px);
+}
+
+.tour-action-btn:disabled,
+.liquid-silver-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* 激活 / 展开态才亮起当前粉籍应援色 */
+.tour-action-btn.is-active,
+.liquid-silver-btn.is-active,
+.obsidian-btn.is-active,
+.tour-action-btn[aria-expanded="true"] {
+  background: var(--fan-theme, #334155);
+  background-clip: border-box;
+  -webkit-background-clip: border-box;
+  border-color: transparent;
+  color: #ffffff;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* 所有高亮/激活态容器统一收口：禁止边框透出底色、禁止圆角外溢 */
+.tour-action-btn.is-active,
+.tour-action-btn[aria-expanded="true"],
+.liquid-silver-btn.is-active,
+.obsidian-btn.is-active,
+.nav-pill-active,
+.seg-btn.is-active,
+.anniv-chip.is-on,
+.theme-pill,
+.footprint-active-btn,
+.colored-pill {
+  border-color: transparent !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
+  overflow: hidden;
+  outline: none;
+}
+
+/* 成员专属应援色的内联高亮按钮（成员胶囊 / 预设标签等） */
+.colored-pill {
+  color: #ffffff !important;
+  border: 1px solid transparent;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
+}
+
+.tour-action-btn.is-active:hover,
+.liquid-silver-btn.is-active:hover {
+  background: var(--fan-theme, #334155);
+  filter: brightness(1.05);
+}
+
+.tour-action-btn--mini {
+  height: 30px;
+  min-height: 30px;
+  padding: 0 9px;
+  font-size: 11px;
+}
+
+/* 卡片底部 5 键单行：左侧功能组 / 右侧日历·地图组 */
+.tour-actions-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) 1px repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 6px;
+}
+
+.tour-actions-row .tour-action-btn {
+  width: 100%;
+  min-width: 0;
+  padding: 0 4px;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.tour-actions-divider {
+  width: 1px;
+  height: 20px;
+  background: linear-gradient(180deg, rgba(148, 163, 184, 0), rgba(148, 163, 184, 0.75), rgba(148, 163, 184, 0));
+}
+
+@media (min-width: 640px) {
+  .tour-actions-row { gap: 8px; }
+  .tour-actions-row .tour-action-btn { padding: 0 10px; font-size: 12px; }
+}
+
+/* ============ 通透冷银灰渐变玻璃倒计时条 ============ */
+.countdown-glass {
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: linear-gradient(135deg, rgba(248, 250, 252, 0.92) 0%, rgba(226, 232, 240, 0.78) 52%, rgba(203, 213, 225, 0.62) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(148, 163, 184, 0.2),
+    0 2px 10px rgba(15, 23, 42, 0.05);
+}
+
+.countdown-value {
+  color: var(--fan-theme-solid, #DD0514);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.countdown-glass .countdown-round {
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 7px;
+}
+
+/* 店招小胶囊（仅在需要强调时使用粉籍色） */
+.theme-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--fan-theme, #334155);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 11px;
+  box-shadow: 0 1px 6px rgba(15, 23, 42, 0.12);
+}
+
+/* ===== 纯白悬浮胶囊分段器（首页 / 档案 / 足迹） ===== */
+.nav-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 0;
+  border-radius: 999px;
+  background: #EEF2F6;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.nav-segment--block {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  width: 100%;
+}
+
+.nav-pill {
+  height: 28px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #64748B;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.nav-pill:hover {
+  color: #0F172A;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.nav-pill-active {
+  background: #FFFFFF !important;
+  color: #0F172A !important;
+  font-weight: 600;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+}
+
+.nav-pill-active:hover { background: #FFFFFF; }
+
+/* ===== 档案页筛选分段器（全部 / 巡演 / 音乐节） ===== */
+.seg-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 0;
+  border-radius: 999px;
+  background: #EEF2F6;
+}
+
+.seg-btn {
+  height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #64748B;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.seg-btn:hover { color: #0F172A; background: rgba(255, 255, 255, 0.65); }
+
+.seg-btn.is-active {
+  background: #FFFFFF !important;
+  color: #0F172A !important;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+}
+
+/* ===== 冷银白下拉框：去浏览器默认亮蓝粗框 ===== */
+select,
+.select-clean {
+  outline: none !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.select-clean {
+  height: 32px;
+  padding: 0 30px 0 12px;
+  border: 1px solid #DCE3EC;
+  border-radius: 10px;
+  background-color: #FFFFFF;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%2364748B' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 11px 7px;
+  color: #0F172A;
+  font-size: 12px;
+  line-height: 30px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.select-clean:hover { border-color: #C7D2E0; }
+
+.select-clean:focus,
+.select-clean:focus-visible {
+  outline: none !important;
+  border-color: #94A3B8;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.2);
+}
+
+select::-moz-focus-inner { border: 0; }
 
 /* 1:1 正方形防切头海报容器 */
 .poster-square-box {
@@ -75,3 +355,159 @@ body {
 .no-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
 .no-scrollbar::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 999px; }
 .no-scrollbar::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 999px; }
+
+/* 足迹模块动态主题联动 */
+.footprint-active-btn {
+  background: var(--footprint-theme) !important;
+  border-color: transparent !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+}
+
+.footprint-active-border {
+  border-color: var(--footprint-theme-solid) !important;
+}
+
+.footprint-active-text {
+  color: var(--footprint-theme-solid) !important;
+}
+
+/* 时光提醒内联可编辑项 */
+.anniv-editable {
+  border-bottom: 1px dashed rgba(100, 116, 139, 0.55);
+  color: #0f172a;
+  font-weight: 700;
+  cursor: text;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.anniv-editable:hover {
+  color: var(--fan-theme-solid, #0f172a);
+  border-bottom-color: var(--fan-theme-solid, #64748b);
+}
+
+.anniv-inline-input {
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid rgba(148, 163, 184, 0.8);
+  border-radius: 6px;
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  outline: none;
+}
+.anniv-inline-input:focus {
+  border-color: var(--fan-theme-solid, #64748b);
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.25);
+}
+
+.anniv-chip {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: linear-gradient(180deg, #ffffff 0%, #eef2f7 100%);
+  font-size: 11px;
+  color: #334155;
+  transition: all 0.16s ease;
+}
+.anniv-chip.is-on {
+  border-color: transparent !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
+  color: #ffffff !important;
+  font-weight: 600;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+}
+
+.anniv-day-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #475569;
+  white-space: nowrap;
+}
+.anniv-day-item strong { color: #0F172A; font-weight: 600; }
+.anniv-day-item .anniv-days { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.anniv-day-strip {
+  scrollbar-width: none;
+}
+.anniv-day-strip::-webkit-scrollbar { display: none; }
+
+/* ===== 时光提醒核心数字热区：仅纯数字可点击 ===== */
+.anniv-hot-number {
+  display: inline-block;
+  vertical-align: baseline;
+  margin: 0;
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 2px dashed currentColor;
+  border-radius: 2px;
+  background: none;
+  font: inherit;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  transform-origin: center bottom;
+}
+.anniv-hot-number:hover { transform: translateY(-1px) scale(1.08); opacity: 0.92; }
+.anniv-hot-number:active { transform: scale(0.98); }
+.anniv-hot-number:focus-visible {
+  outline: 2px solid rgba(148, 163, 184, 0.6);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .anniv-hot-number { transition: none; }
+  .anniv-hot-number:hover { transform: none; }
+}
+
+/* ===== 激活态彻底收口：清除白圈内描边与 1px 边缘漏色 ===== */
+.tour-action-btn.is-active,
+.tour-action-btn[aria-expanded="true"],
+.liquid-silver-btn.is-active,
+.obsidian-btn.is-active,
+.seg-btn.is-active,
+.nav-pill-active,
+.anniv-chip.is-on,
+.colored-pill,
+.footprint-active-btn {
+  border: none !important;
+  border-width: 0 !important;
+  outline: none !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
+  overflow: hidden;
+}
+
+/* 应援色实底按钮：去掉 inset 内白描边，只保留一层外投影 */
+.tour-action-btn.is-active,
+.tour-action-btn[aria-expanded="true"],
+.liquid-silver-btn.is-active,
+.obsidian-btn.is-active,
+.seg-btn.is-active,
+.colored-pill {
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.16) !important;
+}
+
+.tour-action-btn.is-active::before,
+.tour-action-btn.is-active::after,
+.tour-action-btn[aria-expanded="true"]::before,
+.tour-action-btn[aria-expanded="true"]::after,
+.liquid-silver-btn.is-active::before,
+.liquid-silver-btn.is-active::after,
+.obsidian-btn.is-active::before,
+.obsidian-btn.is-active::after,
+.seg-btn.is-active::before,
+.seg-btn.is-active::after,
+.colored-pill::before,
+.colored-pill::after {
+  display: none !important;
+  content: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
