@@ -384,7 +384,7 @@ function renderUpcomingMiniTimeline() {
       <div class="p-3.5 rounded-xl metal-card flex items-center justify-between gap-3">
         <div class="flex items-center gap-3 min-w-0">
           <div class="w-12 poster-square-box shrink-0">
-            ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" ${idx < 4 ? 'fetchpriority="high" decoding="async"' : 'loading="lazy" decoding="async"'} referrerpolicy="no-referrer" onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
+            ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" ${posterImgAttrs(item.posterUrl, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
           </div>
           <div class="min-w-0">
             <div class="flex items-center gap-1.5">

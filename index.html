@@ -240,8 +240,10 @@
             <button type="button" id="adm-ocr-btn" onclick="runPosterOCRRecognition()" class="px-3 py-1.5 rounded-lg liquid-silver-btn font-semibold">🔍 识别海报场次</button>
             <button type="button" onclick="configGeminiKey()" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-600">🔑 AI密钥 (<span id="ai-key-status">未配置</span>)</button>
             <button type="button" onclick="resetAdminForm()" class="px-2.5 py-1.5 rounded-lg text-slate-500 hover:text-slate-900">重置</button>
+            <button type="button" id="adm-compress-btn" onclick="bulkCompressLegacyImages()" class="hidden px-2.5 py-1.5 rounded-lg liquid-silver-btn font-semibold">⚡ 一键瘦身历史大图</button>
           </div>
           <div id="adm-ocr-status" class="hidden text-[11px] text-slate-600 font-medium"></div>
+          <div id="adm-compress-status" class="hidden text-[11px] text-slate-600 font-medium leading-relaxed"></div>
           <img id="adm-poster-preview" class="hidden max-h-36 rounded-lg border border-slate-300 object-contain" />
           <div id="adm-ocr-batch-box" class="hidden p-2.5 rounded-lg bg-white border border-slate-200 space-y-2">
             <div class="flex items-center justify-between">
@@ -343,7 +345,6 @@
     if (location.hash === '#admin') openHiddenAdminDrawer();
     switchMainTab('home');
     loadTourData();
-    if (typeof startPosterTimeoutGuard === 'function') startPosterTimeoutGuard();
     setInterval(updateCountdowns, 1000);
   </script>
 

@@ -1,5 +1,5 @@
-const CACHE_NAME = 'onerland-pwa-v30';
-const IMAGE_CACHE_NAME = 'onerland-images-v2';
+const CACHE_NAME = 'onerland-pwa-v31';
+const IMAGE_CACHE_NAME = 'onerland-images-v3';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -42,11 +42,14 @@ self.addEventListener('activate', event => {
 });
 
 const IMAGE_PATTERN = /\.(png|jpe?g|webp|gif|avif|svg)(\?.*)?$/i;
+// Supabase Storage 图片链接（含签名参数）也走图片缓存
+const SUPABASE_IMAGE_PATTERN = /\/storage\/v1\/object\//i;
 
 function isImageRequest(request) {
   if (request.destination === 'image') return true;
   try {
     const url = new URL(request.url);
+    if (SUPABASE_IMAGE_PATTERN.test(url.pathname)) return true;
     return IMAGE_PATTERN.test(url.pathname);
   } catch (e) {
     return false;

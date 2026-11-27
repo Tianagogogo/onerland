@@ -374,7 +374,7 @@ function compressImageToDataURL(file, maxWidth = 800, quality = 0.72, maxBytes =
   });
 }
 
-// ================= 外链海报：3 秒超时降级 + 座位图按需查询 =================
+// ================= 海报加载策略：仅真实裂图时降级，不做超时掐断 =================
 function degradePosterImage(img) {
   if (!img || img.dataset.degraded === '1') return;
   img.dataset.degraded = '1';
@@ -383,22 +383,18 @@ function degradePosterImage(img) {
   img.style.display = 'none';
 }
 
+// 仅当浏览器确实加载失败（onerror）时，才切换为本地渐变封面
 function handlePosterImageError(img) {
   degradePosterImage(img);
 }
 
-function startPosterTimeoutGuard() {
-  if (window.__posterGuardStarted) return;
-  window.__posterGuardStarted = true;
-  setInterval(() => {
-    document.querySelectorAll('.poster-square-box img').forEach(img => {
-      if (img.dataset.degraded === '1') return;
-      const loaded = img.complete && img.naturalWidth > 0;
-      if (loaded) { img.dataset.firstSeen = ''; return; }
-      if (!img.dataset.firstSeen) { img.dataset.firstSeen = String(Date.now()); return; }
-      if (Date.now() - Number(img.dataset.firstSeen) > 3000) degradePosterImage(img);
-    });
-  }, 800);
+// 海报属性：首屏前 4 张立即加载并提权，其余懒加载；Base64 图片不加跨域属性
+function posterImgAttrs(src, index) {
+  const isDataUrl = /^data:/i.test(String(src || ''));
+  const priority = typeof index === 'number' && index < 4
+    ? 'loading="eager" fetchpriority="high"'
+    : 'loading="lazy"';
+  return `${priority} decoding="async"${isDataUrl ? '' : ' referrerpolicy="no-referrer"'}`;
 }
 
 // 座位图/视野大图不随列表预加载，点击时按 id 单独查询云端记录

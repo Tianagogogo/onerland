@@ -348,3 +348,165 @@ function configGeminiKey() {
   if (typeof updateAiKeyStatusUI === 'function') updateAiKeyStatusUI();
   alert('密钥已保存到本机浏览器，仅用于本地海报识别。');
 }
+
+// ================= ⚡ 一键瘦身历史大图（海报 / 座位图 → WebP） =================
+function estimateDataUrlBytes(dataUrl) {
+  const str = String(dataUrl || '');
+  const idx = str.indexOf(',');
+  if (idx < 0) return 0;
+  return Math.round((str.length - idx - 1) * 0.75);
+}
+
+function loadImageElement(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('图片解码失败'));
+    img.src = src;
+  });
+}
+
+// 将图片源（Base64 或 http 链接）压成 WebP，返回 dataURL；远程图片拉取失败时返回 null
+async function compressImageSourceToWebp(src, maxWidth, quality) {
+  const isDataUrl = /^data:/i.test(String(src || ''));
+  if (!isDataUrl && estimateDataUrlBytes(src) === 0) {
+    // 远程图片：先取回二进制，体积不大就直接跳过
+    try {
+      const resp = await fetch(src, { mode: 'cors', cache: 'force-cache' });
+      if (!resp.ok) return null;
+      const blob = await resp.blob();
+      if (!/^image\//i.test(blob.type || '')) return null;
+      if (blob.size <= 200 * 1024) return null;
+      const objectUrl = URL.createObjectURL(blob);
+      try {
+        return await drawToWebp(objectUrl, maxWidth, quality);
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    } catch (e) {
+      return null; // 跨域受限或防盗链，直接跳过，不影响其它记录
+    }
+  }
+  return drawToWebp(src, maxWidth, quality);
+}
+
+async function drawToWebp(imgSrc, maxWidth, quality) {
+  const img = await loadImageElement(imgSrc);
+  const ratio = img.width > maxWidth ? maxWidth / img.width : 1;
+  let width = Math.max(1, Math.round(img.width * ratio));
+  let height = Math.max(1, Math.round((img.height || img.width) * ratio));
+
+  let canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+
+  let out = canvas.toDataURL('image/webp', quality);
+  if (!out || !out.startsWith('data:image/webp')) out = canvas.toDataURL('image/jpeg', quality);
+
+  // 仍超过 200KB 时继续降质/缩尺寸，保证更新后真的变轻
+  let q = quality;
+  let guard = 0;
+  while (estimateDataUrlBytes(out) > 200 * 1024 && q > 0.45 && guard < 6) {
+    q -= 0.08;
+    guard += 1;
+    out = canvas.toDataURL('image/webp', q) || canvas.toDataURL('image/jpeg', q);
+  }
+  while (estimateDataUrlBytes(out) > 200 * 1024 && canvas.width > 260 && guard < 12) {
+    const shrink = document.createElement('canvas');
+    shrink.width = Math.round(canvas.width * 0.8);
+    shrink.height = Math.round(canvas.height * 0.8);
+    shrink.getContext('2d').drawImage(canvas, 0, 0, shrink.width, shrink.height);
+    canvas = shrink;
+    out = canvas.toDataURL('image/webp', q) || canvas.toDataURL('image/jpeg', q);
+    guard += 1;
+  }
+  return out;
+}
+
+async function bulkCompressLegacyImages() {
+  if (!canEditContent()) {
+    alert('请先通过管理员密码解锁后再使用该工具。');
+    return;
+  }
+  if (!confirm('将遍历云端所有场次的海报与座位图，把超过 200KB 的图片压缩为 WebP 后写回数据库。\n过程中请勿关闭页面，是否继续？')) return;
+
+  const btn = document.getElementById('adm-compress-btn');
+  const statusEl = document.getElementById('adm-compress-status');
+  const setStatus = text => { if (statusEl) { statusEl.classList.remove('hidden'); statusEl.textContent = text; } };
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 正在瘦身…'; }
+
+  let scanned = 0, updated = 0, skipped = 0, failed = 0;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tickets?select=id,title,ticket_time,platform,url&order=id.desc`, {
+      headers: SB_HEADERS,
+      cache: 'no-store'
+    });
+    if (!res.ok) throw new Error(`读取云端场次失败 HTTP ${res.status}`);
+    const rows = await res.json();
+    const list = Array.isArray(rows) ? rows : [];
+    setStatus(`共 ${list.length} 条场次，开始扫描大图…`);
+
+    for (let i = 0; i < list.length; i++) {
+      const row = list[i];
+      scanned += 1;
+      const raw = String(row.platform || '');
+      const prefix = raw.startsWith('ARCHIVE:') ? 'ARCHIVE:' : 'META:';
+      const jsonText = raw.startsWith('ARCHIVE:') ? raw.slice(8) : (raw.startsWith('META:') ? raw.slice(5) : '');
+      if (!jsonText) { skipped += 1; continue; }
+
+      let meta = null;
+      try { meta = JSON.parse(jsonText); } catch (e) { meta = null; }
+      if (!meta || typeof meta !== 'object') { skipped += 1; continue; }
+
+      let changed = false;
+      const targets = [
+        ['posterUrl', 600, 0.78, '海报'],
+        ['seatUrl', 1200, 0.82, '座位图']
+      ];
+      for (const [field, maxWidth, quality, label] of targets) {
+        const src = meta[field];
+        if (!src || typeof src !== 'string') continue;
+        const isDataUrl = /^data:/i.test(src);
+        if (isDataUrl && estimateDataUrlBytes(src) <= 200 * 1024) continue;
+        try {
+          const next = await compressImageSourceToWebp(src, maxWidth, quality);
+          if (next && next !== src && estimateDataUrlBytes(next) < (isDataUrl ? estimateDataUrlBytes(src) : 200 * 1024)) {
+            meta[field] = next;
+            changed = true;
+            setStatus(`第 ${i + 1}/${list.length} 条：${label}已压缩 ${Math.round(estimateDataUrlBytes(src) / 1024)}KB → ${Math.round(estimateDataUrlBytes(next) / 1024)}KB`);
+          } else {
+            skipped += 1;
+          }
+        } catch (err) {
+          skipped += 1;
+        }
+      }
+
+      if (!changed) continue;
+
+      try {
+        await adminApi('updateTicket', {
+          title: row.title,
+          ticket_time: row.ticket_time,
+          platform: `${prefix}${JSON.stringify(meta)}`,
+          url: row.url || ''
+        }, row.id);
+        updated += 1;
+      } catch (err) {
+        failed += 1;
+        console.warn('瘦身写回失败', row.id, err);
+      }
+      setStatus(`已处理 ${i + 1}/${list.length} 条 · 更新 ${updated} 条 · 跳过 ${skipped} · 失败 ${failed}`);
+    }
+
+    setStatus(`✅ 完成：扫描 ${scanned} 条，更新 ${updated} 条，跳过 ${skipped} 条，失败 ${failed} 条。`);
+    alert(`⚡ 历史大图瘦身完成\n扫描 ${scanned} 条 · 更新 ${updated} 条 · 跳过 ${skipped} 条 · 失败 ${failed} 条`);
+    if (updated > 0 && typeof loadTourData === 'function') await loadTourData();
+  } catch (e) {
+    setStatus(`❌ 瘦身失败：${e.message || '网络异常'}`);
+    alert(`瘦身失败：${e.message || '网络异常'}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⚡ 一键瘦身历史大图'; }
+  }
+}
