@@ -642,6 +642,180 @@ function removeFanCustomTag(idx) {
   saveFanPrefState({ customTags: nextTags });
 }
 
+// ================= 访客身份：匿名会话优先，缺失时落本地 device_id =================
+const DEVICE_ID_KEY = 'onerland_device_id_v1';
+const GUEST_NICKNAME_KEY = 'onerland_guest_nickname_v1';
+
+function getDeviceId() {
+  try {
+    let id = localStorage.getItem(DEVICE_ID_KEY);
+    if (!id) {
+      id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `dev-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      localStorage.setItem(DEVICE_ID_KEY, id);
+    }
+    return id;
+  } catch (e) {
+    return 'device-fallback';
+  }
+}
+
+function getGuestNickname() {
+  try { return localStorage.getItem(GUEST_NICKNAME_KEY) || ''; } catch (e) { return ''; }
+}
+
+function saveGuestNickname(name) {
+  const clean = String(name || '').trim().slice(0, 16);
+  try {
+    if (clean) localStorage.setItem(GUEST_NICKNAME_KEY, clean);
+    else localStorage.removeItem(GUEST_NICKNAME_KEY);
+  } catch (e) { /* 忽略存储失败 */ }
+  return clean;
+}
+
+// 静默匿名会话：等价 supabase.auth.signInAnonymously()（GoTrue 匿名注册），失败自动降级 device_id
+async function ensureGuestIdentity() {
+  if (AppState.guestOwnerId) return AppState.guestOwnerId;
+
+  // 已用邮箱登录 → 直接用该账号身份
+  const session = typeof getStoredSession === 'function' ? getStoredSession() : null;
+  if (session && session.user && (session.user.id || session.user.email)) {
+    AppState.guestOwnerId = `user:${session.user.id || session.user.email}`;
+    return AppState.guestOwnerId;
+  }
+  if (AppState.anonymousOwnerId) {
+    AppState.guestOwnerId = AppState.anonymousOwnerId;
+    return AppState.guestOwnerId;
+  }
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: { anonymous: true }, gotrue_meta_security: {} })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.access_token && data.user && data.user.id) {
+        AppState.anonymousOwnerId = `user:${data.user.id}`;
+        AppState.guestOwnerId = AppState.anonymousOwnerId;
+        AppState.anonymousAccessToken = data.access_token;
+        return AppState.guestOwnerId;
+      }
+    }
+  } catch (e) { /* 匿名登录未开启 → 走本地设备标识 */ }
+
+  AppState.guestOwnerId = `device:${getDeviceId()}`;
+  return AppState.guestOwnerId;
+}
+
+function getGuestOwnerIdSync() {
+  return AppState.guestOwnerId || AppState.anonymousOwnerId || `device:${getDeviceId()}`;
+}
+
+// ================= 同场搭子：云端公共表 + 本地兜底 =================
+// 公共搭子表（所有访客实时可见；本机 device_id / 匿名会话用于限定「只有发布者能撤销」）
+// create table if not exists public.buddy_intents (
+//   id bigserial primary key,
+//   show_key text not null,
+//   owner_id text not null,
+//   contact text,
+//   bias_label text,
+//   tags text[] default '{}',
+//   theme text,
+//   status text default 'open',
+//   created_at timestamptz default now()
+// );
+const BUDDY_TABLE = 'buddy_intents';
+if (!window.buddyCloudCache) window.buddyCloudCache = {};
+
+function buddyHeaders() {
+  const headers = {
+    'apikey': SUPABASE_ANON_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation'
+  };
+  const token = AppState.anonymousAccessToken || (typeof getStoredSession === 'function' && getStoredSession() ? getStoredSession().access_token : '');
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
+
+function normalizeBuddyRow(row) {
+  return {
+    id: row.id,
+    cloudId: row.show_key,
+    ownerId: row.owner_id,
+    contact: row.contact || '',
+    biasLabel: row.bias_label || '团粉',
+    tags: Array.isArray(row.tags) ? row.tags : [],
+    theme: row.theme || '#64748b',
+    status: row.status || 'open',
+    createdAt: row.created_at ? new Date(row.created_at).toLocaleDateString() : ''
+  };
+}
+
+// 拉取全站公开搭子列表；表不存在/网络异常时返回 null（前端自动用本地数据降级）
+async function fetchBuddyIntents(showKey) {
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/${BUDDY_TABLE}?show_key=eq.${encodeURIComponent(showKey)}&status=eq.open&select=*&order=created_at.desc&limit=50`;
+    const res = await fetch(url, { headers: buddyHeaders(), cache: 'no-store' });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return null;
+    const list = rows.map(normalizeBuddyRow);
+    window.buddyCloudCache[showKey] = list;
+    return list;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function publishBuddyIntent(showKey, entry) {
+  const ownerId = await ensureGuestIdentity();
+  const payload = {
+    show_key: String(showKey),
+    owner_id: ownerId,
+    contact: (entry.contact || '').slice(0, 30),
+    bias_label: entry.biasLabel || '团粉',
+    tags: Array.isArray(entry.tags) ? entry.tags : [],
+    theme: entry.theme || '#64748b',
+    status: 'open'
+  };
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${BUDDY_TABLE}`, {
+      method: 'POST',
+      headers: buddyHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) return { ok: false, reason: `HTTP ${res.status}` };
+    let rows = null;
+    try { rows = await res.json(); } catch (e) { rows = null; }
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    return { ok: true, entry: row ? normalizeBuddyRow(row) : { ...entry, ownerId, id: `tmp-${Date.now()}` } };
+  } catch (e) {
+    return { ok: false, reason: e.message || 'network' };
+  }
+}
+
+// 仅发布者本人（owner_id 匹配）可撤销/标记已找到
+async function closeBuddyIntent(showKey, entryId, ownerId, nextStatus) {
+  if (!entryId || String(entryId).startsWith('tmp-')) return { ok: false, reason: 'local-only' };
+  const me = await ensureGuestIdentity();
+  if (String(ownerId || '') !== String(me)) return { ok: false, reason: 'forbidden' };
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/${BUDDY_TABLE}?id=eq.${encodeURIComponent(entryId)}&owner_id=eq.${encodeURIComponent(me)}`;
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: buddyHeaders(),
+      body: JSON.stringify({ status: nextStatus || 'closed' })
+    });
+    return { ok: res.ok, reason: res.ok ? '' : `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, reason: e.message || 'network' };
+  }
+}
+
 // ================= 同场搭子本地记录读写与删除 =================
 const BUDDY_STORAGE_KEY = 'onerland_local_buddy_intents_v2';
 
@@ -657,7 +831,7 @@ function getBuddyListByShow(cloudId) {
 function addBuddyEntryForShow(cloudId, entry) {
   const all = JSON.parse(localStorage.getItem(BUDDY_STORAGE_KEY) || '{}');
   const list = Array.isArray(all[cloudId]) ? all[cloudId] : [];
-  list.unshift({ id: Date.now(), ...entry });
+  list.unshift({ id: Date.now(), ownerId: getGuestOwnerIdSync(), ...entry });
   all[cloudId] = list;
   localStorage.setItem(BUDDY_STORAGE_KEY, JSON.stringify(all));
 }

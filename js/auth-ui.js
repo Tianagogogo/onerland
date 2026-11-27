@@ -85,11 +85,12 @@ function syncAuthState() {
   syncAdminUnlockState();
 
   // 顶部按钮：邮箱登录态优先展示，密码解锁态在没有邮箱时单独显示。
+  const nickname = typeof getGuestNickname === 'function' ? getGuestNickname() : '';
   const topBtn = document.getElementById('user-auth-btn');
   if (topBtn) {
     topBtn.textContent = email
       ? (AppState.isAdmin ? '👤 管理员' : `👤 ${email.split('@')[0]}`)
-      : (AppState.isAdminPasswordVerified ? '🔓 已解锁' : '👤 登录');
+      : (nickname ? `👤 ${nickname}` : (AppState.isAdminPasswordVerified ? '🔓 已解锁' : '👤 我的身份'));
   }
 
   // 弹窗内状态文案
@@ -97,15 +98,27 @@ function syncAuthState() {
   if (statusEl) {
     if (!email) {
       statusEl.textContent = AppState.isAdminPasswordVerified
-        ? '管理员密码已解锁：当前可编辑内容（与邮箱登录态互不影响）。'
-        : '未登录。输入邮箱与密码即可登录，首次使用请点「注册并登录」；也可使用管理员密码独立解锁编辑权限。';
+        ? '管理员密码已解锁：当前可编辑内容。前台搭子等功能无需登录即可使用。'
+        : '免注册即可浏览与发布搭子。这里的昵称只保存在本机，用于搭子卡片署名。';
     } else if (AppState.isAdmin) {
       statusEl.textContent = `已登录：${email}（授权邮箱，可编辑演出与档案）`;
     } else if (AppState.isAdminPasswordVerified) {
       statusEl.textContent = `已登录：${email}（普通用户）；管理员密码已解锁，可编辑演出与档案。`;
     } else {
-      statusEl.textContent = `已登录：${email}（普通用户，仅可浏览；也可用管理员密码解锁编辑权限）。`;
+      statusEl.textContent = `已登录：${email}（普通用户，可浏览；也可用管理员密码解锁编辑权限）。`;
     }
+  }
+
+  // 本机昵称与设备标识（不依赖邮箱，不阻塞任何前台功能）
+  const nicknameInput = document.getElementById('guest-nickname-input');
+  if (nicknameInput && document.activeElement !== nicknameInput) {
+    nicknameInput.value = nickname || '';
+  }
+  const deviceHint = document.getElementById('guest-device-hint');
+  if (deviceHint) {
+    const deviceId = typeof getDeviceId === 'function' ? getDeviceId() : '';
+    deviceHint.textContent = `本机设备标识：${deviceId.slice(0, 8)}…（仅用于允许你撤销自己发布的搭子，不会公开展示）`
+      + (email ? ` · 当前已登录邮箱：${email}` : '');
   }
 
   // 登录态下禁用邮箱与密码输入，避免误操作
@@ -117,6 +130,14 @@ function syncAuthState() {
   if (typeof renderTourCards === 'function') renderTourCards();
   if (typeof renderArchiveTimeline === 'function') renderArchiveTimeline();
   if (typeof updateAuthButtonUI === 'function') updateAuthButtonUI();
+}
+
+function saveGuestNicknameFromModal() {
+  const input = document.getElementById('guest-nickname-input');
+  const name = saveGuestNickname(input ? input.value : '');
+  if (input) input.value = name;
+  syncAuthState();
+  alert(name ? `昵称已保存：${name}` : '已清空昵称，将以匿名访客身份展示');
 }
 
 function openUserAuthModal() {

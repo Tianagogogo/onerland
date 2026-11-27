@@ -156,20 +156,20 @@
   <div id="user-auth-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="chronicle-card rounded-2xl max-w-md w-full p-5 space-y-3 bg-white text-xs">
       <div class="flex items-center justify-between">
-        <h3 class="font-bold text-sm text-slate-900">👤 邮箱登录 / 注册</h3>
+        <h3 class="font-bold text-sm text-slate-900">👤 我的身份（免注册）</h3>
         <button type="button" onclick="document.getElementById('user-auth-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-800">✕</button>
       </div>
       <p id="auth-current-status" class="text-slate-500 leading-relaxed"></p>
-      <form id="auth-credential-form" onsubmit="event.preventDefault();" class="space-y-2" autocomplete="on">
-        <input id="auth-email-input" type="email" placeholder="请输入邮箱地址" autocomplete="email" inputmode="email"
-          class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" />
-        <input id="auth-password-input" type="password" placeholder="请输入密码（至少6位）" autocomplete="new-password"
-          minlength="6" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" />
+      <div class="space-y-2">
+        <label for="guest-nickname-input" class="text-[11px] font-semibold text-slate-700">本机昵称（仅自己可见，用于搭子卡片署名）：</label>
         <div class="flex gap-2">
-          <button type="button" onclick="signInWithPassword()" class="flex-1 px-3 py-2 rounded-lg liquid-silver-btn font-semibold">登录</button>
-          <button type="button" onclick="signUpWithPassword()" class="flex-1 px-3 py-2 rounded-lg tour-action-btn font-semibold">注册并登录</button>
+          <input id="guest-nickname-input" type="text" maxlength="16" autocomplete="nickname"
+            placeholder="如 小豆 / 阿豆，最多 16 字"
+            class="flex-1 px-3 py-2 rounded-lg border border-slate-300 bg-white" />
+          <button type="button" onclick="saveGuestNicknameFromModal()" class="px-3 py-2 rounded-lg liquid-silver-btn font-semibold shrink-0">保存昵称</button>
         </div>
-      </form>
+        <p id="guest-device-hint" class="text-[11px] text-slate-400 leading-relaxed"></p>
+      </div>
       <div class="flex items-center justify-between gap-2 pt-1">
         <button type="button" onclick="openAdminUnlockModal()" class="text-slate-600 hover:underline">🔐 管理员密码解锁</button>
         <button type="button" onclick="logoutEmailUser()" class="text-rose-600 hover:underline">退出当前邮箱</button>
@@ -189,7 +189,7 @@
         <button type="button" onclick="verifyAdminPassword()" class="tour-action-btn font-semibold shrink-0">验证解锁</button>
       </div>
       <div class="flex items-center justify-between gap-2 pt-1">
-        <button type="button" onclick="openUserAuthModal()" class="text-slate-600 hover:underline">改用邮箱登录</button>
+        <button type="button" onclick="openUserAuthModal()" class="text-slate-600 hover:underline">返回身份设置</button>
         <button type="button" onclick="lockAdminPassword()" class="text-rose-600 hover:underline">锁定密码解锁态</button>
       </div>
     </div>

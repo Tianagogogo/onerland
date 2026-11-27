@@ -1249,31 +1249,156 @@ function toggleBuddyPresetTag(cloudId, tag, event) {
   renderTourCards();
 }
 
-function saveLocalBuddyIntent(cloudId, showTitle, event) {
+function getMergedBuddyEntries(cloudId) {
+  const local = getBuddyListByShow(cloudId);
+  const cloud = window.buddyCloudCache[cloudId] || [];
+  const cloudIds = new Set(cloud.map(x => String(x.id)));
+  return [...cloud, ...local.filter(x => !cloudIds.has(String(x.id)))];
+}
+
+function renderBuddyEntryCard(cloudId, b, canManage) {
+  const bTheme = b.theme || '#64748b';
+  const themeSolid = bTheme.includes('gradient') ? (bTheme.match(/#[A-Za-z0-9]{3,6}/)?.[0] || '#64748b') : bTheme;
+  return `
+    <div class="p-2.5 rounded-xl bg-white border flex items-start justify-between gap-2 transition-all hover:shadow-md"
+      style="border-color: ${themeSolid}22">
+      <div class="space-y-1.5 min-w-0">
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="px-2 py-0.5 rounded-md text-white text-[10px] font-bold" style="background: ${bTheme}">${b.biasLabel}</span>
+          ${(b.tags || []).map(tg => `
+            <span class="px-2 py-0.5 rounded-md border text-[10px] font-medium"
+              style="background: ${themeSolid}0D; color: ${themeSolid}; border-color: ${themeSolid}33">#${tg}</span>
+          `).join('')}
+          <span class="text-[10px] text-slate-400">${b.createdAt || ''}</span>
+        </div>
+        ${b.contact ? `<div class="text-[10px] text-slate-500 break-all">📮 联系方式：${b.contact}</div>` : ''}
+      </div>
+      ${canManage ? `
+        <div class="flex flex-col gap-1 shrink-0">
+          <button type="button" onclick="withdrawBuddyIntent(${cloudId}, '${b.id}', event)" class="tour-action-btn tour-action-btn--mini">撤销</button>
+          <button type="button" onclick="markBuddyFound(${cloudId}, '${b.id}', event)" class="tour-action-btn tour-action-btn--mini">已找到</button>
+        </div>` : ''}
+    </div>
+  `;
+}
+
+function renderBuddyListHtml(cloudId) {
+  const entries = getMergedBuddyEntries(cloudId);
+  if (!entries.length) {
+    return `<div class="p-4 rounded-xl bg-white border border-dashed border-slate-300 text-[11px] text-slate-400 text-center">选中上方预设标签，即可一键生成你的同场搭子卡片。</div>`;
+  }
+  const me = getGuestOwnerIdSync();
+  return entries.map(b => renderBuddyEntryCard(cloudId, b, String(b.ownerId || '') === String(me))).join('');
+}
+
+function renderBuddyPanel(cloudId) {
+  const host = document.querySelector(`[data-buddy-list="${cloudId}"]`);
+  if (host) host.innerHTML = renderBuddyListHtml(cloudId);
+  const count = document.querySelector(`[data-buddy-count="${cloudId}"]`);
+  if (count) count.textContent = String(getMergedBuddyEntries(cloudId).length);
+}
+
+function resetBuddyTagButtons(cloudId) {
+  const group = document.querySelector(`[data-buddy-card="${cloudId}"] [data-buddy-tag-group]`);
+  if (!group) return;
+  group.querySelectorAll('[data-buddy-tag]').forEach(btn => {
+    btn.classList.remove('colored-pill', 'is-active');
+    btn.style.background = '';
+    btn.setAttribute('aria-pressed', 'false');
+  });
+}
+
+async function refreshBuddyPanel(cloudId) {
+  renderBuddyPanel(cloudId);
+  const list = await fetchBuddyIntents(cloudId);
+  if (list) renderBuddyPanel(cloudId);
+}
+
+async function saveLocalBuddyIntent(cloudId, showTitle, event) {
   if (event && event.stopPropagation) event.stopPropagation();
   const tags = window.selectedBuddyTags[cloudId] || [];
   if (tags.length === 0) return alert('请至少选中 1 个预设标签以发布搭子意向！');
-  
+
+  const contactInput = document.getElementById(`buddy-contact-${cloudId}`);
+  const contact = (contactInput ? contactInput.value : '').trim().slice(0, 30);
+
   const pref = getFanPrefState();
   const theme = getBuddyTheme(pref);
-  
   const biasLabel = pref.biasType === 'solo'
     ? `唯粉(${(pref.biasMembers || []).join('/') || '自选'})`
     : pref.biasType === 'cp'
       ? `CP偏好(${(pref.biasMembers || []).join('x')})`
       : '团粉';
 
-  addBuddyEntryForShow(cloudId, {
+  const entry = {
     showTitle,
-    biasLabel: biasLabel,
+    biasLabel,
     tags: [...tags],
-    theme: theme,
+    contact,
+    theme,
     createdAt: new Date().toLocaleDateString()
-  });
-  
-  // 发布后清空当前选择
+  };
+
+  let published = false;
+  try {
+    const res = await publishBuddyIntent(cloudId, entry);
+    if (res.ok && res.entry) {
+      if (!window.buddyCloudCache[cloudId]) window.buddyCloudCache[cloudId] = [];
+      window.buddyCloudCache[cloudId].unshift(res.entry);
+      published = true;
+    }
+  } catch (e) { /* 云端不可用 → 本地兜底 */ }
+
+  if (!published) {
+    addBuddyEntryForShow(cloudId, { ...entry, ownerId: getGuestOwnerIdSync() });
+  }
+
   window.selectedBuddyTags[cloudId] = [];
-  renderTourCards();
+  resetBuddyTagButtons(cloudId);
+  renderBuddyPanel(cloudId);
+  if (contactInput) contactInput.value = '';
+}
+
+async function withdrawBuddyIntent(cloudId, entryId, event) {
+  if (event && event.stopPropagation) event.stopPropagation();
+  const entry = getMergedBuddyEntries(cloudId).find(x => String(x.id) === String(entryId));
+  if (!entry) return;
+  const me = await ensureGuestIdentity();
+  if (String(entry.ownerId || '') !== String(me)) {
+    return alert('只能撤销自己发布的搭子信息（换设备或他人无法操作）');
+  }
+  const isCloud = !String(entryId).startsWith('tmp-') && !/^\d{13}$/.test(String(entryId));
+  if (isCloud) {
+    const res = await closeBuddyIntent(cloudId, entryId, entry.ownerId, 'closed');
+    if (!res.ok && res.reason !== 'local-only') return alert('撤销失败，请稍后重试');
+    window.buddyCloudCache[cloudId] = (window.buddyCloudCache[cloudId] || []).filter(x => String(x.id) !== String(entryId));
+  } else {
+    deleteBuddyEntryForShow(cloudId, entryId);
+  }
+  renderBuddyPanel(cloudId);
+}
+
+async function markBuddyFound(cloudId, entryId, event) {
+  if (event && event.stopPropagation) event.stopPropagation();
+  const entry = getMergedBuddyEntries(cloudId).find(x => String(x.id) === String(entryId));
+  if (!entry) return;
+  const me = await ensureGuestIdentity();
+  if (String(entry.ownerId || '') !== String(me)) {
+    return alert('只能标记自己发布的搭子信息为已找到');
+  }
+  const isCloud = !String(entryId).startsWith('tmp-') && !/^\d{13}$/.test(String(entryId));
+  if (isCloud) {
+    const res = await closeBuddyIntent(cloudId, entryId, entry.ownerId, 'found');
+    if (!res.ok && res.reason !== 'local-only') return alert('操作失败，请稍后重试');
+    window.buddyCloudCache[cloudId] = (window.buddyCloudCache[cloudId] || []).filter(x => String(x.id) !== String(entryId));
+  } else {
+    deleteBuddyEntryForShow(cloudId, entryId);
+  }
+  renderBuddyPanel(cloudId);
+}
+
+function removeLocalBuddyIntent(cloudId, entryId, event) {
+  return withdrawBuddyIntent(cloudId, entryId, event);
 }
 
 // 搭子卡片配色与全站粉籍主题保持一致（CP 模式仅两位成员官方色）
@@ -1353,6 +1478,10 @@ function setFooterTab(tab, trigger, event) {
   if (tab === 'map') {
     bindShowMapMenuDismiss();
     closeShowMapMenus(panel);
+  }
+  if (tab === 'buddy') {
+    const buddyCloudId = card.dataset.showCard;
+    if (buddyCloudId && typeof refreshBuddyPanel === 'function') refreshBuddyPanel(buddyCloudId);
   }
   syncOpenDrawerRegistryFromState();
 }
@@ -1511,7 +1640,7 @@ function renderTourCards() {
     const cleanVenue = (item.venue || '').replace(/·/g, ' ').trim();
     const shiyeLiveUrl = `https://shijiao.xingpaste.com/?q=${encodeURIComponent(cleanVenue || safeCity)}`;
     const slotPopoverId = `tour-slot-pop-${item.cloudId || idx}`;
-    const buddyEntries = getBuddyListByShow(item.cloudId);
+    const buddyEntries = getMergedBuddyEntries(item.cloudId);
     const safeBooth = String(item.merchBooth || '').replace(/['"<>]/g, '');
     const seatUrl = String(item.seatUrl || '').replace(/['"<>']/g, '');
     const st = item.showState;
@@ -1618,10 +1747,10 @@ function renderTourCards() {
 
         ${buildVenueExperienceDrawerHTML(item.venue, `vexp-tour-drawer-${idx}`, `vexp-tour-${item.cloudId || idx}`, safeCity, 'ticket', { showDate: item.show_date, artist: item.artist, city: safeCity })}
 
-        <div id="buddy-drawer-${idx}" data-drawer-inner data-footer-panel="buddy" class="hidden p-3.5 rounded-xl bg-slate-50 border border-slate-300 text-xs space-y-3">
+        <div id="buddy-drawer-${idx}" data-drawer-inner data-footer-panel="buddy" data-buddy-card="${item.cloudId}" class="hidden p-3.5 rounded-xl bg-slate-50 border border-slate-300 text-xs space-y-3">
           <div class="flex items-center justify-between flex-wrap gap-1">
             <span class="font-bold text-slate-900">🤝 同场观演搭子界面 · ${safeCity}</span>
-            <span class="text-[11px] text-slate-500">免审一键发布 · 严禁票务交易</span>
+            <span class="text-[11px] text-slate-500">免注册一键发布 · 全站实时可见 · 严禁票务交易</span>
           </div>
 
           <div class="p-2.5 rounded-lg bg-white border border-slate-200 space-y-2.5">
@@ -1668,6 +1797,13 @@ function renderTourCards() {
                 }).join('')}
               </div>
             </div>
+
+            <div class="space-y-1 pt-1 border-t border-slate-100">
+              <label for="buddy-contact-${item.cloudId}" class="text-[11px] font-semibold text-slate-700">联系方式 / 社交账号（选填，仅对同场匹配展示）：</label>
+              <input id="buddy-contact-${item.cloudId}" type="text" maxlength="30" autocomplete="off"
+                placeholder="如 小红书号 / 微博ID，最多 30 字"
+                class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-[11px]" />
+            </div>
           </div>
 
           <button type="button" onclick="saveLocalBuddyIntent(${item.cloudId}, '${safeCity}', event)"
@@ -1676,30 +1812,8 @@ function renderTourCards() {
           </button>
 
           <div class="space-y-1.5 pt-1">
-            <div class="text-[11px] font-semibold text-slate-600">📋 本场搭子动态（${buddyEntries.length}）：</div>
-            ${buddyEntries.length
-              ? buddyEntries.map(b => {
-                  const bTheme = b.theme || '#64748b';
-                  const themeSolid = bTheme.includes('gradient') ? (bTheme.match(/#[A-Za-z0-9]{3,6}/)?.[0] || '#64748b') : bTheme;
-                  return `
-                    <div class="p-2.5 rounded-xl bg-white border flex items-start justify-between gap-2 transition-all hover:shadow-md"
-                      style="border-color: ${themeSolid}22">
-                      <div class="space-y-1.5 min-w-0">
-                        <div class="flex items-center gap-1.5 flex-wrap">
-                          <span class="px-2 py-0.5 rounded-md text-white text-[10px] font-bold" style="background: ${bTheme}">${b.biasLabel}</span>
-                          ${(b.tags || []).map(tg => `
-                            <span class="px-2 py-0.5 rounded-md border text-[10px] font-medium"
-                              style="background: ${themeSolid}0D; color: ${themeSolid}; border-color: ${themeSolid}33">#${tg}</span>
-                          `).join('')}
-                          <span class="text-[10px] text-slate-400">${b.createdAt || ''}</span>
-                        </div>
-                      </div>
-                      <button type="button" onclick="removeLocalBuddyIntent(${item.cloudId}, ${b.id}, event)" class="tour-action-btn tour-action-btn--mini shrink-0">移除</button>
-                    </div>
-                  `;
-                }).join('')
-              : `<div class="p-4 rounded-xl bg-white border border-dashed border-slate-300 text-[11px] text-slate-400 text-center">选中上方预设标签，即可一键生成你的同场搭子卡片。</div>`
-            }
+            <div class="text-[11px] font-semibold text-slate-600">📋 本场搭子动态（<span data-buddy-count="${item.cloudId}">${buddyEntries.length}</span>）：全站公开可见</div>
+            <div data-buddy-list="${item.cloudId}" class="space-y-1.5">${renderBuddyListHtml(item.cloudId)}</div>
           </div>
         </div>
       </div>
