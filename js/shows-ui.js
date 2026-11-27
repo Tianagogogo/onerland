@@ -423,7 +423,7 @@ function buildSlotHoverBadgeHTML(slotText, scheduleImgs, popoverId, titleLabel) 
         </div>
         <div class="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto no-scrollbar">
           ${imgs.map((src, i) => `
-            <img src="${src}" data-cap="${safeTitle} · 时间表 #${i + 1}"
+            <img src="${src}" data-cap="${safeTitle} · 时间表 #${i + 1}" loading="lazy" decoding="async" onload="this.classList.add(&#39;is-loaded&#39;)"
               onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)"
               class="w-full h-24 object-cover rounded-lg border border-slate-200 cursor-zoom-in hover:opacity-90 bg-slate-50" />
           `).join('')}
@@ -1155,8 +1155,8 @@ function openSeriesModal(themeKey) {
         const safeTitle = String(s.title || '').replace(/['"<>]/g, '');
         return `
           <div class="p-3 rounded-xl bg-white border border-slate-200 flex gap-3 text-xs">
-            <div class="w-16 h-16 poster-square-box shrink-0">
-              ${s.posterUrl ? `<img src="${s.posterUrl}" alt="${safeTitle}" data-cap="${safeTitle} · 海报" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" />` : `<div class="w-full h-full flex items-center justify-center text-[10px] text-slate-400">ONER</div>`}
+            <div class="w-16 poster-square-box shrink-0">
+              ${s.posterUrl ? `<img src="${s.posterUrl}" alt="${safeTitle}" data-cap="${safeTitle} · 海报" loading="lazy" decoding="async" onload="this.classList.add(&#39;is-loaded&#39;)" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" />` : `<div class="w-full h-full flex items-center justify-center text-[10px] text-slate-400">ONER</div>`}
             </div>
             <div class="min-w-0 flex-1 space-y-1">
               <div class="flex items-center justify-between gap-1">
@@ -1560,8 +1560,8 @@ function renderTourCards() {
     return `
       <div class="p-4 rounded-2xl metal-card flex flex-col gap-3" data-show-card="${item.cloudId || idx}" style="--fan-theme:${getFanPrefThemeColor()}">
         <div class="flex gap-3.5">
-          <div class="w-24 h-24 poster-square-box shrink-0">
-            ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeCity}" data-cap="${safeCity} · 演出海报" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
+          <div class="w-24 poster-square-box shrink-0">
+            ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeCity}" data-cap="${safeCity} · 演出海报" loading="lazy" decoding="async" onload="this.classList.add(&#39;is-loaded&#39;)" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
           </div>
           <div class="flex-1 min-w-0 space-y-1.5">
             <div class="flex items-start justify-between gap-2">
@@ -1905,8 +1905,8 @@ function renderArchiveTimeline() {
       <div class="p-4 rounded-2xl metal-card space-y-3">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div class="flex items-center gap-3.5 min-w-0 w-full">
-            <div class="w-16 h-16 poster-square-box shrink-0">
-              ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" data-cap="${safeTitle} · 往日海报" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs text-slate-400">ONER</div>`}
+            <div class="w-16 poster-square-box shrink-0">
+              ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" data-cap="${safeTitle} · 往日海报" loading="lazy" decoding="async" onload="this.classList.add(&#39;is-loaded&#39;)" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs text-slate-400">ONER</div>`}
             </div>
             <div class="min-w-0 space-y-1">
               <div class="flex items-center gap-1.5 flex-wrap">

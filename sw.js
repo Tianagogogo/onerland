@@ -1,4 +1,5 @@
-const CACHE_NAME = 'onerland-pwa-v19';
+const CACHE_NAME = 'onerland-pwa-v20';
+const IMAGE_CACHE_NAME = 'onerland-images-v1';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -23,13 +24,44 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== CACHE_NAME && k !== IMAGE_CACHE_NAME).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
 
+const IMAGE_PATTERN = /\.(png|jpe?g|webp|gif|avif|svg)(\?.*)?$/i;
+
+function isImageRequest(request) {
+  if (request.destination === 'image') return true;
+  try {
+    const url = new URL(request.url);
+    return IMAGE_PATTERN.test(url.pathname);
+  } catch (e) {
+    return false;
+  }
+}
+
+// 图片：CacheFirst，首次入缓存后毫秒级直出，不再重复走网络
+function handleImageRequest(request) {
+  return caches.open(IMAGE_CACHE_NAME).then(cache =>
+    cache.match(request).then(cached => {
+      if (cached) return cached;
+      return fetch(request).then(resp => {
+        if (resp && (resp.ok || resp.type === 'opaque')) {
+          cache.put(request, resp.clone()).catch(() => {});
+        }
+        return resp;
+      }).catch(() => Response.error());
+    })
+  );
+}
+
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
+  if (isImageRequest(event.request)) {
+    event.respondWith(handleImageRequest(event.request));
+    return;
+  }
   event.respondWith(
     fetch(event.request)
       .then(resp => {

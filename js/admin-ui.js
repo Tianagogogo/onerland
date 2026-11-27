@@ -6,7 +6,7 @@ function renderAdminScheduleThumbs() {
   box.innerHTML = adminScheduleImgs.length
     ? adminScheduleImgs.map((src, i) => `
         <div class="relative w-14 h-16 rounded-lg overflow-hidden border border-slate-300 bg-white">
-          <img src="${src}" onclick="openLightbox(this.src, '时间表 #${i + 1}')" class="w-full h-full object-cover cursor-zoom-in" />
+          <img src="${src}" onclick="openLightbox(this.src, '时间表 #${i + 1}')" class="w-full h-full object-cover cursor-zoom-in" loading="lazy" decoding="async" />
           <button type="button" onclick="adminScheduleImgs.splice(${i}, 1); renderAdminScheduleThumbs();" class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-slate-900/80 text-white text-[10px]">✕</button>
         </div>
       `).join('')

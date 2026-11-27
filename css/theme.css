@@ -327,19 +327,32 @@ select,
 select::-moz-focus-inner { border: 0; }
 
 /* 1:1 正方形防切头海报容器 */
+/* 海报容器：固定 3/4 比例 + 冷银灰微光骨架屏，加载中不跳动 */
 .poster-square-box {
-  aspect-ratio: 1 / 1;
+  position: relative;
+  aspect-ratio: 3 / 4;
   overflow: hidden;
   border-radius: 0.75rem;
   border: 1px solid #cbd5e1;
-  background-color: #e2e8f0;
+  background: linear-gradient(100deg, #eef2f7 18%, #f8fafc 37%, #e2e8f0 56%, #eef2f7 74%);
+  background-size: 240% 100%;
+  animation: poster-skeleton 1.5s ease-in-out infinite;
+}
+@keyframes poster-skeleton {
+  0% { background-position: 120% 0; }
+  100% { background-position: -60% 0; }
 }
 .poster-square-box img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center 18%; /* 偏上焦点防切头 */
-  transition: transform 0.25s ease;
+  opacity: 0;
+  transition: transform 0.25s ease, opacity 0.28s ease;
+}
+.poster-square-box img.is-loaded { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .poster-square-box { animation: none; }
 }
 .poster-square-box:hover img {
   transform: scale(1.03);

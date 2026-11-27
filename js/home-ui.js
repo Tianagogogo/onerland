@@ -374,7 +374,7 @@ function renderUpcomingMiniTimeline() {
     return;
   }
 
-  box.innerHTML = list.map(item => {
+  box.innerHTML = list.map((item, idx) => {
     const displayArtist = item.artist === 'ONER' || String(item.city).includes('极尽声色') ? 'ONER' : item.artist;
     const badge = (ARTIST_COLORS[displayArtist] || ARTIST_COLORS['ONER']).bg;
     const safeTitle = String(item.city || '').replace(/['"<>]/g, '');
@@ -383,8 +383,8 @@ function renderUpcomingMiniTimeline() {
     return `
       <div class="p-3.5 rounded-xl metal-card flex items-center justify-between gap-3">
         <div class="flex items-center gap-3 min-w-0">
-          <div class="w-12 h-12 poster-square-box shrink-0">
-            ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
+          <div class="w-12 poster-square-box shrink-0">
+            ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" ${idx < 4 ? 'fetchpriority="high" decoding="async"' : 'loading="lazy" decoding="async"'} onload="this.classList.add(&#39;is-loaded&#39;)" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
           </div>
           <div class="min-w-0">
             <div class="flex items-center gap-1.5">
