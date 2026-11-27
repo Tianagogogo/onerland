@@ -573,10 +573,31 @@ async function deleteEditingShow() {
   if (delBtn) { delBtn.disabled = true; delBtn.textContent = '⏳ 正在删除…'; }
   try {
     if (id.startsWith('local')) {
+      // 本地预置场次：先记入本机隐藏列表，同时把云端的同场次副本一并删除，保证多设备一致
       if (item && typeof hideLocalShow === 'function') hideLocalShow(item, kind === 'archive');
-      alert('已从本地预置场次中隐藏该场次。');
+      const dateOf = value => {
+        const m = String(value || '').match(/\d{4}-\d{2}-\d{2}/);
+        return m ? m[0] : '';
+      };
+      const myDate = dateOf(kind === 'archive' ? item?.showDate : item?.show_date);
+      const myGeo = String((kind === 'archive' ? item?.title : item?.city) || item?.venue || '');
+      const cloudCopy = (kind === 'archive' ? AppState.cloudArchives : AppState.cloudTickets).find(x => {
+        if (!x || String(x.cloudId || '').startsWith('local')) return false;
+        const xDate = dateOf(kind === 'archive' ? x.showDate : x.show_date);
+        if (!myDate || xDate !== myDate) return false;
+        const xGeo = String((kind === 'archive' ? x.title : x.city) || x.venue || '');
+        return Boolean(myGeo && xGeo) && (myGeo.includes(xGeo) || xGeo.includes(myGeo));
+      });
+      if (cloudCopy) {
+        await adminApi('deleteTicket', {}, cloudCopy.cloudId);
+        alert('已从本地预置隐藏，并同步删除云端同场次记录。');
+      } else {
+        alert('已从本地预置场次中隐藏该场次。');
+      }
     } else {
       await adminApi('deleteTicket', {}, id);
+      // 同步隐藏本机同场次的预置卡片，避免断网回退时旧卡片再次出现
+      if (item && typeof hideLocalShow === 'function') hideLocalShow(item, kind === 'archive');
       alert('✅ 已从云端删除该场次。');
     }
     resetAdminForm();

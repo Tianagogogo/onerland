@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onerland-pwa-v35';
+const CACHE_NAME = 'onerland-pwa-v36';
 const IMAGE_CACHE_NAME = 'onerland-images-v3';
 const STATIC_ASSETS = [
   './',
@@ -71,17 +71,55 @@ function handleImageRequest(request) {
   );
 }
 
+// 代码资源（HTML/JS/CSS/JSON）：Network-First，优先拿最新版本，断网时才回退缓存
+const CODE_PATTERN = /\.(html?|js|css|json|webmanifest)(\?.*)?$/i;
+
+function isCodeAssetRequest(request) {
+  try {
+    const url = new URL(request.url);
+    if (url.origin !== self.location.origin) return false;
+    if (request.mode === 'navigate') return true;
+    return CODE_PATTERN.test(url.pathname);
+  } catch (e) {
+    return false;
+  }
+}
+
+function handleCodeRequest(request) {
+  return fetch(request, { cache: 'no-store' })
+    .then(resp => {
+      if (resp && resp.ok) {
+        const clone = resp.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(request, clone)).catch(() => {});
+      }
+      return resp;
+    })
+    .catch(() => caches.match(request).then(cached => {
+      if (cached) return cached;
+      // 页面导航离线兜底：回到首页缓存
+      if (request.mode === 'navigate') return caches.match('./index.html');
+      return Response.error();
+    }));
+}
+
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   if (isImageRequest(event.request)) {
     event.respondWith(handleImageRequest(event.request));
     return;
   }
+  if (isCodeAssetRequest(event.request)) {
+    event.respondWith(handleCodeRequest(event.request));
+    return;
+  }
+  // 其它同源静态资源（字体等）：Network-First，失败回退缓存
   event.respondWith(
     fetch(event.request)
       .then(resp => {
-        const clone = resp.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        if (resp && resp.ok) {
+          const clone = resp.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone)).catch(() => {});
+        }
         return resp;
       })
       .catch(() => caches.match(event.request))
