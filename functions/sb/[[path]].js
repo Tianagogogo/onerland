@@ -1,10 +1,10 @@
 export async function onRequest(context) {
   const url = new URL(context.request.url);
   const targetPath = url.pathname.replace(/^\/sb/, '');
-  const targetUrl = `https://xtgkepaqikpzvnmpkoxsa.supabase.co${targetPath}${url.search}`;
+  const targetUrl = `https://xtgkepaqikpzvmpkoxsa.supabase.co${targetPath}${url.search}`;
 
   const headers = new Headers(context.request.headers);
-  headers.set('Host', 'xtgkepaqikpzvnmpkoxsa.supabase.co');
+  headers.set('Host', 'xtgkepaqikpzvmpkoxsa.supabase.co');
   headers.delete('cf-connecting-ip');
   headers.delete('cf-ipcountry');
   headers.delete('cf-ray');
