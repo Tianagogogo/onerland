@@ -12,5 +12,75 @@
       }
     ],
     "source_url": "https://weibo.com"
+  },
+  {
+    "artist": "ONER",
+    "city": "上海站",
+    "venue": "浦发银行东方体育中心",
+    "show_date": "2026-02-07 18:00",
+    "rounds": [
+      {
+        "round_name": "三开",
+        "sale_time": "2026-02-05 13:14",
+        "platform": "大麦 / 猫眼"
+      }
+    ],
+    "source_url": "https://weibo.com/6062604272/Qq8puDe6w",
+    "related_urls": [
+      "https://weibo.com/6062604272/QqrunxUJu",
+      "https://weibo.com/6062604272/QqiCVEfKA",
+      "https://weibo.com/6062604272/Qq8puDe6w"
+    ],
+    "_priority": 1
+  },
+  {
+    "artist": "ONER",
+    "city": "合肥站",
+    "venue": "合肥少荃体育中心体育馆",
+    "show_date": "2026-12-26",
+    "rounds": [
+      {
+        "round_name": "预售",
+        "sale_time": "2026-11-27 13:14",
+        "platform": "大麦 / 坤音商城小程序 / 猫眼 / 携程"
+      }
+    ],
+    "source_url": "https://weibo.com/6400910760/RtbKdeznG",
+    "related_urls": [
+      "https://weibo.com/6392771552/RtbJU3luk",
+      "https://weibo.com/6400910760/RtbKdeznG"
+    ],
+    "_priority": 3
+  },
+  {
+    "artist": "ONER",
+    "city": "西安站",
+    "venue": "西安奥体中心体育馆",
+    "show_date": "2026-12-12 00:00",
+    "rounds": [
+      {
+        "round_name": "预售",
+        "sale_time": "2026-11-20 13:14",
+        "platform": "大麦 / 坤音商城小程序 / 猫眼 / 携程"
+      }
+    ],
+    "source_url": "https://weibo.com/6400910760/Rs5TNeLks",
+    "related_urls": [
+      "https://weibo.com/6392771552/Rs5Tnwav6",
+      "https://weibo.com/6400910760/Rs5TNeLks"
+    ],
+    "_priority": 3
+  },
+  {
+    "artist": "岳岳",
+    "city": "长沙站",
+    "venue": "达丰空间（锦秀店）",
+    "show_date": "2026-09-12 19:00",
+    "rounds": [],
+    "source_url": "https://weibo.com/6392771552/Rh9sedFVC",
+    "related_urls": [
+      "https://weibo.com/6392771552/Rh9sedFVC"
+    ],
+    "_priority": 3
   }
 ]
