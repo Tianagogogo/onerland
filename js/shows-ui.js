@@ -1826,7 +1826,7 @@ function setFooterTab(tab, trigger, event) {
   }
   if (tab === 'seats') {
     const seatEventId = card.dataset.showCard;
-    if (seatEventId && typeof openTicketSeatPanel === 'function') openTicketSeatPanel(seatEventId, '', card.dataset.showVenue || '');
+    if (seatEventId && typeof openTicketSeatPanel === 'function') openTicketSeatPanel(seatEventId);
   }
   syncOpenDrawerRegistryFromState();
 }

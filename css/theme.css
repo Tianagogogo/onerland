@@ -3882,3 +3882,104 @@ input.seat-select { background-image: none; }
 @media (max-width: 640px) {
   .feedback-inbox-actions button { padding: 0 9px; font-size: 11px; }
 }
+
+/* ================= 🎟️ 抢票表 v3：组合下拉 + 二次核对弹窗 ================= */
+.seat-combo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  min-width: 0;
+}
+.seat-combo .seat-select { min-width: 0; }
+
+.seat-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.seat-confirm-card {
+  width: 100%;
+  max-width: 380px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: linear-gradient(150deg, #ffffff 0%, #eef2f7 55%, #dde5ee 100%);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22), inset 0 1px 0 #ffffff;
+  padding: 16px 16px 14px;
+}
+.seat-confirm-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: .02em;
+}
+.seat-confirm-list {
+  margin-top: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(255, 255, 255, 0.75);
+  overflow: hidden;
+}
+.seat-confirm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+  font-size: 11.5px;
+  color: #64748b;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+}
+.seat-confirm-row:last-child { border-bottom: none; }
+.seat-confirm-row strong { color: #0f172a; font-weight: 700; text-align: right; }
+.seat-confirm-warn {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  font-size: 10.5px;
+  line-height: 1.65;
+  color: #92400e;
+}
+.seat-confirm-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.seat-confirm-actions button {
+  flex: 1 1 0;
+  height: 34px;
+  line-height: 34px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.seat-confirm-cancel {
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  background: rgba(255, 255, 255, 0.9);
+  color: #475569;
+}
+.seat-confirm-cancel:hover { border-color: #94a3b8; color: #0f172a; }
+.seat-confirm-ok {
+  border: 1px solid #64748b;
+  background: linear-gradient(135deg, #475569 0%, #334155 100%);
+  color: #f8fafc;
+}
+.seat-confirm-ok:hover { filter: brightness(1.08); }
+
+@media (max-width: 768px) {
+  .seat-combo { grid-template-columns: 1fr 1fr; }
+  .seat-form-actions { flex-direction: column; align-items: stretch; gap: 6px; }
+  .seat-form-actions .seat-chip { width: 100%; }
+  .seat-confirm-card { max-width: 100%; }
+  .seat-confirm-actions button { font-size: 11.5px; }
+}

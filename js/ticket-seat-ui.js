@@ -1,37 +1,44 @@
-/* 🎟️ 抢票与座位对照表（结构化选择 · 零自由文本 · 紧凑云表格） */
+/* 🎟️ 抢票与座位对照表（零自由输入 · 组合下拉 · 紧凑吸顶云表格 · 提交前二次核对） */
 (function () {
   'use strict';
 
-  window.SEAT_PLATFORMS = ['大麦', '猫眼', '纷玩岛', '票星球', '秀动', '其他官方平台'];
+  window.SEAT_PLATFORMS = ['坤音商城', '大麦', '猫眼', '纷玩岛', '票星球', '秀动'];
 
-  // 通用标准场馆分区（白名单）
-  window.SEAT_ZONES_GENERIC = [
-    '内场VIP / 前区', '内场A区', '内场B区', '内场C区', '内场站区',
-    '一层看台（前区/正对）', '一层看台（两侧）', '二层看台', '三层看台', '包厢区'
-  ];
+  // 票档 / 区域：第 1 框大类 + 第 2 框区号（组合拼接）
+  const ZONE_MAINS = ['内场', '一层看台', '二层看台', '三层看台', '包厢区', '音乐节站区'];
+  const ZONE_SUBS = (function () {
+    const list = ['无细分区', 'VIP区',
+      'A区', 'B区', 'C区', 'D区', 'E区', 'F区',
+      'A1区', 'A2区', 'A3区', 'A4区',
+      'B1区', 'B2区', 'B3区', 'B4区',
+      'C1区', 'C2区', 'D1区', 'D2区'];
+    [100, 200, 300].forEach(base => {
+      for (let i = 1; i <= 25; i++) list.push(`${base + i}区`);
+    });
+    return list;
+  })();
 
-  // 场馆专属分区（按场馆关键词匹配，未命中时用通用分区）
-  const VENUE_ZONE_MAP = [
-    { match: ['凯迪拉克', '五棵松'], zones: ['内场VIP / 前区', '内场A区', '内场B区', '一层看台（前区/正对）', '一层看台（两侧）', '二层看台', '包厢区'] },
-    { match: ['北京展览馆', '北展'], zones: ['内场A区', '内场B区', '一层看台（正对）', '一层看台（两侧）', '二层看台'] },
-    { match: ['梅赛德斯', '世博'], zones: ['内场VIP / 前区', '内场A区', '内场B区', '内场C区', '一层看台（前区/正对）', '一层看台（两侧）', '二层看台', '包厢区'] },
-    { match: ['奥体中心', '西安奥体', '杭州奥体', '南京奥体'], zones: ['内场VIP / 前区', '内场A区', '内场B区', '内场C区', '一层看台（前区/正对）', '一层看台（两侧）', '二层看台', '三层看台', '包厢区'] },
-    { match: ['凤凰山', '深圳湾体育', '春茧'], zones: ['内场站区', '内场A区', '内场B区', '一层看台（前区/正对）', '一层看台（两侧）', '二层看台'] },
-    { match: ['livehouse', 'Livehouse', 'LIVEHOUSE', 'MAO', '疆进酒'], zones: ['内场站区', '前区近距离', '后区自由站'] }
-  ];
+  // 排数 / 座号：两个数字组合下拉
+  const ROW_NOS = (function () {
+    const list = ['站区/无排号'];
+    for (let i = 1; i <= 35; i++) list.push(`${i}排`);
+    return list;
+  })();
+  const SEAT_NOS = (function () {
+    const list = ['不填具体座号'];
+    for (let i = 1; i <= 50; i++) list.push(`${i}号`);
+    return list;
+  })();
 
-  const ROW_RANGES = ['1-3排（前排）', '4-8排（中前排）', '9-15排（中区）', '16-25排（后排）', '26排及以后', '随机号段 / 音乐节站区'];
-  const SEAT_DETAILS = ['不限号段', '中间号段', '靠过道号段'];
   const ZONE_FILTERS = [
-    { key: 'all', label: '全部区域' },
-    { key: 'infield', label: '内场', match: z => z.indexOf('内场') === 0 },
-    { key: 'l1', label: '一层看台', match: z => z.indexOf('一层') === 0 },
-    { key: 'l23', label: '二/三层看台', match: z => /^二|^三|包厢/.test(z) }
+    { key: 'all', label: '全部区域', match: null },
+    { key: 'infield', label: '内场', match: z => /^内场|音乐节站区/.test(z) },
+    { key: 'l1', label: '一层看台', match: z => /^一层/.test(z) },
+    { key: 'l23', label: '二/三层看台', match: z => /^二层|^三层|^包厢/.test(z) }
   ];
 
   const LOCAL_KEY = 'onerland_ticket_seats_local_v1';
   window.seatTableState = window.seatTableState || {};
-  window.seatVenueMap = window.seatVenueMap || {};
   window.ticketSeatFormOpen = window.ticketSeatFormOpen || {};
 
   function esc(v) {
@@ -40,35 +47,31 @@
 
   function readLocal() {
     try {
-      const raw = localStorage.getItem(LOCAL_KEY);
-      const obj = raw ? JSON.parse(raw) : {};
+      const obj = JSON.parse(localStorage.getItem(LOCAL_KEY) || '{}');
       return obj && typeof obj === 'object' ? obj : {};
     } catch (e) { return {}; }
   }
-
-  function writeLocal(obj) {
-    try { localStorage.setItem(LOCAL_KEY, JSON.stringify(obj)); } catch (e) {}
-  }
-
-  function getLocalOwn(eventId) {
-    const row = readLocal()[String(eventId)];
+  function writeLocal(obj) { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(obj)); } catch (e) {} }
+  function getLocalOwn(showId) {
+    const row = readLocal()[String(showId)];
     return row && typeof row === 'object' ? row : null;
   }
-
-  function saveLocalOwn(eventId, row) {
+  function saveLocalOwn(showId, row) {
     const all = readLocal();
-    all[String(eventId)] = row;
+    all[String(showId)] = row;
     writeLocal(all);
   }
-
-  function removeLocalOwn(eventId) {
+  function removeLocalOwn(showId) {
     const all = readLocal();
-    delete all[String(eventId)];
+    delete all[String(showId)];
     writeLocal(all);
   }
 
   function deviceId() {
     try { return typeof getDeviceId === 'function' ? String(getDeviceId()) : 'local-device'; } catch (e) { return 'local-device'; }
+  }
+  function adminKey() {
+    try { return typeof getSecurityAdminKey === 'function' ? String(getSecurityAdminKey() || '') : ''; } catch (e) { return ''; }
   }
 
   async function seatRpc(fnName, params) {
@@ -82,18 +85,47 @@
     return res.json().catch(() => null);
   }
 
-  function zonesForVenue(venue) {
-    const text = String(venue || '');
-    const hit = VENUE_ZONE_MAP.find(x => x.match.some(k => text.includes(k)));
-    return hit ? hit.zones.slice() : window.SEAT_ZONES_GENERIC.slice();
+  function composeZone(main, sub) {
+    if (!main) return '';
+    if (!sub || sub === '无细分区') return main;
+    return `${main} · ${sub}`;
+  }
+  function splitZone(zone) {
+    const s = String(zone || '').trim();
+    const idx = s.indexOf(' · ');
+    if (idx > 0) {
+      const main = s.slice(0, idx);
+      const sub = s.slice(idx + 3);
+      return { main: ZONE_MAINS.includes(main) ? main : ZONE_MAINS[0], sub: ZONE_SUBS.includes(sub) ? sub : '无细分区' };
+    }
+    if (ZONE_MAINS.includes(s)) return { main: s, sub: '无细分区' };
+    const hit = ZONE_MAINS.find(m => s.indexOf(m) === 0);
+    return { main: hit || ZONE_MAINS[0], sub: '无细分区' };
+  }
+  function composeSeat(row, num) {
+    const parts = [];
+    if (row && row !== '站区/无排号') parts.push(row);
+    if (num && num !== '不填具体座号') parts.push(num);
+    return parts.length ? parts.join(' ') : '站区/无排号';
+  }
+  function splitSeat(detail) {
+    const s = String(detail || '');
+    const rm = s.match(/(\d{1,2})排/);
+    const nm = s.match(/(\d{1,2})号/);
+    const row = rm ? `${rm[1]}排` : '站区/无排号';
+    const num = nm ? `${nm[1]}号` : '不填具体座号';
+    return {
+      row: ROW_NOS.includes(row) ? row : '站区/无排号',
+      num: SEAT_NOS.includes(num) ? num : '不填具体座号'
+    };
   }
 
   function normalizeRow(r, i) {
     if (!r) return null;
     return {
       id: String(r.id == null ? `row-${i}` : r.id),
-      platform: String(r.platform || '其他官方平台'),
-      seconds: Number(r.seconds == null ? r.pay_seconds : r.seconds) || 0,
+      platform: String(r.platform || '坤音商城'),
+      seconds: Number(r.pay_seconds == null ? r.seconds : r.pay_seconds) || 0,
       zone: String(r.zone || r.area || r.ticket_area || ''),
       seatDetail: String(r.seat_detail || r.seatDetail || r.seat || ''),
       deviceId: String(r.device_id || r.deviceId || ''),
@@ -101,30 +133,30 @@
     };
   }
 
-  function stateFor(eventId) {
-    const key = String(eventId);
+  function stateFor(showId) {
+    const key = String(showId);
     if (!window.seatTableState[key]) {
       window.seatTableState[key] = { rows: [], loading: false, degraded: false, filter: 'all', zoneFilter: 'all', sort: 'seconds', loaded: false };
     }
     return window.seatTableState[key];
   }
 
-  async function loadSeatRows(eventId, force) {
-    const st = stateFor(eventId);
+  async function loadSeatRows(showId, force) {
+    const st = stateFor(showId);
     if (st.loading) return;
     if (st.loaded && !force) return;
     st.loading = true;
-    renderSeatPanel(eventId);
+    renderSeatPanel(showId);
     let rows = [];
     let degraded = false;
     try {
-      const data = await seatRpc('get_show_ticket_seats', { p_event_id: String(eventId) });
+      const data = await seatRpc('get_show_ticket_seats', { p_show_id: String(showId) });
       const list = Array.isArray(data) ? data : (data && Array.isArray(data.rows) ? data.rows : []);
       rows = list.map(normalizeRow).filter(Boolean);
     } catch (e) {
       degraded = true;
     }
-    const own = getLocalOwn(eventId);
+    const own = getLocalOwn(showId);
     if (own) {
       const hasOwn = rows.some(r => r.deviceId && r.deviceId === deviceId());
       if (!hasOwn) rows.push(normalizeRow({ ...own, id: own.id || 'local-own', device_id: deviceId() }, 999));
@@ -133,15 +165,15 @@
     st.degraded = degraded;
     st.loading = false;
     st.loaded = true;
-    renderSeatPanel(eventId);
+    renderSeatPanel(showId);
   }
 
-  function visibleRows(eventId) {
-    const st = stateFor(eventId);
+  function visibleRows(showId) {
+    const st = stateFor(showId);
     let rows = st.rows.slice();
     if (st.filter !== 'all') rows = rows.filter(r => r.platform === st.filter);
     const zf = ZONE_FILTERS.find(z => z.key === st.zoneFilter);
-    if (zf && zf.match) rows = rows.filter(r => zf.match(r.zone || ''));
+    if (zf && zf.match) rows = rows.filter(r => zf.match(String(r.zone || '')));
     if (st.sort === 'created') {
       rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     } else {
@@ -160,35 +192,38 @@
     return map;
   }
 
+  function platformChips(st) {
+    const extra = [];
+    st.rows.forEach(r => { if (r.platform && !window.SEAT_PLATFORMS.includes(r.platform) && !extra.includes(r.platform)) extra.push(r.platform); });
+    return ['all'].concat(window.SEAT_PLATFORMS, extra);
+  }
+
   function seatOptionsHTML(list, selected) {
     return list.map(v => `<option value="${esc(v)}" ${v === selected ? 'selected' : ''}>${esc(v)}</option>`).join('');
   }
 
-  function renderSeatPanel(eventId, venue) {
-    const key = String(eventId);
+  function renderSeatPanel(showId) {
+    const key = String(showId);
     const host = document.querySelector(`[data-seat-table-host="${key}"]`);
     if (!host) return;
-    if (venue) window.seatVenueMap[key] = String(venue);
     const st = stateFor(key);
     const rows = visibleRows(key);
     const rank = fastRankMap(st.rows);
     const own = getLocalOwn(key);
-    const venues = zonesForVenue(window.seatVenueMap[key] || venue || '');
     const formOpen = Boolean(window.ticketSeatFormOpen[key]);
+    const ownZone = splitZone(own && own.zone);
+    const ownSeat = splitSeat(own && (own.seatDetail || own.seat));
 
     const toolbar = `
       <div class="seat-toolbar">
         <span class="text-[10px] font-semibold text-slate-500 shrink-0">平台</span>
-        ${['all'].concat(window.SEAT_PLATFORMS).map(p => {
-          const label = p === 'all' ? '全部' : p;
-          return `<button type="button" class="seat-chip ${st.filter === p ? 'is-active' : ''}" onclick="setSeatPlatformFilter('${key}', '${p}', event)">${label}</button>`;
-        }).join('')}
+        ${platformChips(st).map(p => `<button type="button" class="seat-chip ${st.filter === p ? 'is-active' : ''}" onclick="setSeatPlatformFilter('${key}', '${esc(p)}', event)">${p === 'all' ? '全部' : esc(p)}</button>`).join('')}
       </div>
       <div class="seat-toolbar seat-zone-toolbar">
         ${ZONE_FILTERS.map(z => `<button type="button" class="seat-chip ${st.zoneFilter === z.key ? 'is-active' : ''}" onclick="setSeatZoneFilter('${key}', '${z.key}', event)">${z.label}</button>`).join('')}
         <span class="w-px h-4 bg-slate-300 mx-0.5 shrink-0"></span>
-        <button type="button" class="seat-chip ${st.sort === 'seconds' ? 'is-active' : ''}" onclick="setSeatSort('${key}', 'seconds', event)">⏱️ 按秒数升序</button>
-        <button type="button" class="seat-chip ${st.sort === 'created' ? 'is-active' : ''}" onclick="setSeatSort('${key}', 'created', event)">🕒 最新提交</button>
+        <button type="button" class="seat-chip ${st.sort === 'seconds' ? 'is-active' : ''}" onclick="setSeatSort('${key}', 'seconds', event)">⏱️ 按付款秒数升序</button>
+        <button type="button" class="seat-chip ${st.sort === 'created' ? 'is-active' : ''}" onclick="setSeatSort('${key}', 'created', event)">🕒 按提交时间最新</button>
       </div>`;
 
     const body = st.loading
@@ -196,7 +231,7 @@
       : rows.length
         ? `<div class="seat-table-scroll">
             <table class="seat-table">
-              <thead><tr><th>购票平台</th><th>付款秒数</th><th>票档 / 区域</th><th>排数 / 号段</th></tr></thead>
+              <thead><tr><th>购票平台</th><th>付款秒数</th><th>票档 / 区域</th><th>具体排座位置</th></tr></thead>
               <tbody>
                 ${rows.map(r => {
                   const mine = (r.deviceId && r.deviceId === deviceId()) || String(r.id) === 'local-own';
@@ -204,7 +239,7 @@
                   const isAdmin = typeof AppState !== 'undefined' && AppState.isAdminPasswordVerified;
                   return `<tr>
                     <td>${esc(r.platform)}${mine ? ' <span class="text-[9px] text-slate-400">（我的）</span>' : ''}</td>
-                    <td><strong>${r.seconds}秒</strong>${rankNo ? `<span class="seat-fast-badge">⚡ 手速参考</span>` : ''}</td>
+                    <td><strong>${r.seconds}秒</strong>${rankNo && st.sort === 'seconds' ? '<span class="seat-fast-badge">⚡ 手速参考</span>' : ''}</td>
                     <td>${esc(r.zone || '—')}</td>
                     <td>
                       <span>${esc(r.seatDetail || '—')}</span>
@@ -221,7 +256,7 @@
     const form = `
       <div class="seat-form-toggle">
         <button type="button" class="seat-form-btn" onclick="toggleSeatForm('${key}', event)" aria-expanded="${formOpen ? 'true' : 'false'}">
-          ✍️ ${own ? '登记 / 修改我的出票座位' : '登记我的出票座位'} <span class="seat-form-chev">${formOpen ? '▴' : '▾'}</span>
+          ✍️ 登记 / 修改我的出票座位 <span class="seat-form-chev">${formOpen ? '▴' : '▾'}</span>
         </button>
       </div>
       <div class="seat-form ${formOpen ? '' : 'hidden'}" data-seat-form="${key}">
@@ -232,23 +267,25 @@
         <label class="seat-field">
           <span>付款秒数（0–600）</span>
           <input id="seat-seconds-${key}" type="number" min="0" max="600" step="1" inputmode="numeric"
-            value="${own ? esc(own.seconds) : ''}" placeholder="如 8" class="seat-select" />
+            value="${own ? esc(own.seconds) : ''}" placeholder="如 8" class="seat-select seat-intensity" />
         </label>
-        <label class="seat-field">
-          <span>票档 / 区域</span>
-          <select id="seat-zone-${key}" class="seat-select">${seatOptionsHTML(venues, own && own.zone)}</select>
-        </label>
-        <label class="seat-field">
-          <span>排数分段</span>
-          <select id="seat-rowrange-${key}" class="seat-select">${seatOptionsHTML(ROW_RANGES, own && own.seatDetail && own.seatDetail.split(' · ')[0])}</select>
-        </label>
-        <label class="seat-field">
-          <span>号段（可选）</span>
-          <select id="seat-detail-${key}" class="seat-select">${seatOptionsHTML(SEAT_DETAILS, own && own.seatDetail && own.seatDetail.split(' · ')[1] ? own.seatDetail.split(' · ')[1] : '不限号段')}</select>
-        </label>
+        <div class="seat-field">
+          <span>票档 / 区域（大类 + 区号）</span>
+          <div class="seat-combo">
+            <select id="seat-zone-main-${key}" class="seat-select">${seatOptionsHTML(ZONE_MAINS, ownZone.main)}</select>
+            <select id="seat-zone-sub-${key}" class="seat-select">${seatOptionsHTML(ZONE_SUBS, ownZone.sub)}</select>
+          </div>
+        </div>
+        <div class="seat-field">
+          <span>排数 / 座号</span>
+          <div class="seat-combo">
+            <select id="seat-row-${key}" class="seat-select">${seatOptionsHTML(ROW_NOS, ownSeat.row)}</select>
+            <select id="seat-number-${key}" class="seat-select">${seatOptionsHTML(SEAT_NOS, ownSeat.num)}</select>
+          </div>
+        </div>
         <div class="seat-form-actions">
           <span class="text-[10px] text-slate-400">同一设备每场限 1 条，可随时修改或撤回</span>
-          <button type="button" onclick="submitSeatRow('${key}', event)" class="seat-chip is-active">${own ? '💾 保存修改' : '➕ 提交登记'}</button>
+          <button type="button" onclick="submitSeatRow('${key}', event)" class="seat-chip is-active">💾 提交登记 / 保存修改</button>
         </div>
       </div>`;
 
@@ -262,90 +299,144 @@
       </div>`;
   }
 
-  function openTicketSeatPanel(eventId, title, venue) {
-    const key = String(eventId);
-    renderSeatPanel(key, venue);
+  function readForm(showId) {
+    const key = String(showId);
+    const platform = document.getElementById(`seat-platform-${key}`)?.value || '';
+    const secondsRaw = document.getElementById(`seat-seconds-${key}`)?.value || '';
+    const zoneMain = document.getElementById(`seat-zone-main-${key}`)?.value || '';
+    const zoneSub = document.getElementById(`seat-zone-sub-${key}`)?.value || '';
+    const rowNo = document.getElementById(`seat-row-${key}`)?.value || '';
+    const seatNo = document.getElementById(`seat-number-${key}`)?.value || '';
+    return {
+      platform,
+      secondsRaw: String(secondsRaw).trim(),
+      seconds: Number(String(secondsRaw).trim()),
+      zoneMain,
+      zoneSub,
+      rowNo,
+      seatNo,
+      zone: composeZone(zoneMain, zoneSub),
+      seatDetail: composeSeat(rowNo, seatNo)
+    };
+  }
+
+  function validateForm(f) {
+    if (!Number.isInteger(f.seconds) || f.seconds < 0 || f.seconds > 600) return '请填写 0–600 之间的整数秒数';
+    if (!window.SEAT_PLATFORMS.includes(f.platform)) return '请选择列表中的购票平台';
+    if (!ZONE_MAINS.includes(f.zoneMain)) return '请选择票档区域大类';
+    if (!ZONE_SUBS.includes(f.zoneSub)) return '请选择具体区号';
+    if (!ROW_NOS.includes(f.rowNo)) return '请选择排数';
+    if (!SEAT_NOS.includes(f.seatNo)) return '请选择座号';
+    return '';
+  }
+
+  // 提交前二次核对弹窗
+  function closeSeatConfirm() {
+    document.getElementById('seat-confirm-modal')?.remove();
+    window.__seatPending = null;
+  }
+
+  function openSeatConfirm(showId) {
+    const key = String(showId);
+    const f = readForm(key);
+    const err = validateForm(f);
+    if (err) return toastError(err);
+    window.__seatPending = { showId: key, data: f };
+    document.getElementById('seat-confirm-modal')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'seat-confirm-modal';
+    modal.className = 'seat-confirm-overlay';
+    modal.innerHTML = `
+      <div class="seat-confirm-card" role="dialog" aria-modal="true" aria-label="核对抢票信息">
+        <div class="seat-confirm-title">🔍 提交前请核对</div>
+        <div class="seat-confirm-list">
+          <div class="seat-confirm-row"><span>购票平台</span><strong>${esc(f.platform)}</strong></div>
+          <div class="seat-confirm-row"><span>付款秒数</span><strong>${f.seconds}秒</strong></div>
+          <div class="seat-confirm-row"><span>票档 / 区域</span><strong>${esc(f.zone)}</strong></div>
+          <div class="seat-confirm-row"><span>具体排座</span><strong>${esc(f.seatDetail)}</strong></div>
+        </div>
+        <p class="seat-confirm-warn">⚠️ 每台设备每场演出仅可登记 1 条出票数据，为保证全场抢票数据真实准确，请核对以上信息与实际票面一致后再提交。</p>
+        <div class="seat-confirm-actions">
+          <button type="button" class="seat-confirm-cancel" onclick="closeSeatConfirm()">↩️ 返回修改</button>
+          <button type="button" class="seat-confirm-ok" onclick="confirmSeatSubmit()">✅ 确认无误并提交</button>
+        </div>
+      </div>`;
+    modal.addEventListener('click', ev => { if (ev.target === modal) closeSeatConfirm(); });
+    document.body.appendChild(modal);
+  }
+
+  async function saveSeatRow(showId, f) {
+    const key = String(showId);
+    const localRow = { platform: f.platform, seconds: f.seconds, zone: f.zone, seat: f.seatDetail, seatDetail: f.seatDetail, updatedAt: new Date().toISOString(), id: (getLocalOwn(key) || {}).id || '' };
+    saveLocalOwn(key, localRow);
+    let synced = false;
+    try {
+      const res = await seatRpc('upsert_show_ticket_seat', {
+        p_show_id: key,
+        p_device_id: deviceId(),
+        p_platform: f.platform,
+        p_pay_seconds: f.seconds,
+        p_zone: f.zone,
+        p_seat_detail: f.seatDetail
+      });
+      const saved = normalizeRow(Array.isArray(res) ? res[0] : res, 0);
+      if (saved && saved.id) saveLocalOwn(key, { ...localRow, id: saved.id });
+      synced = true;
+    } catch (e) { synced = false; }
+    if (typeof showToast === 'function') showToast(synced ? '✅ 抢票记录已保存并同步' : '✅ 已保存到本机（云端暂时未同步）');
+    window.ticketSeatFormOpen[key] = false;
+    const st = stateFor(key);
+    st.loaded = false;
+    st.loading = false;
+    renderSeatPanel(key);
+    await loadSeatRows(key, true);
+  }
+
+  async function confirmSeatSubmit() {
+    const pending = window.__seatPending;
+    closeSeatConfirm();
+    if (!pending) return;
+    await saveSeatRow(pending.showId, pending.data);
+  }
+
+  function openTicketSeatPanel(showId) {
+    const key = String(showId);
+    renderSeatPanel(key);
     loadSeatRows(key, false);
   }
 
-  function toggleSeatForm(eventId, event) {
+  function toggleSeatForm(showId, event) {
     if (event && event.stopPropagation) event.stopPropagation();
-    const key = String(eventId);
+    const key = String(showId);
     window.ticketSeatFormOpen[key] = !window.ticketSeatFormOpen[key];
     renderSeatPanel(key);
   }
 
-  function setSeatPlatformFilter(eventId, platform, event) {
+  function setSeatPlatformFilter(showId, platform, event) {
     if (event && event.stopPropagation) event.stopPropagation();
-    stateFor(eventId).filter = platform || 'all';
-    renderSeatPanel(eventId);
+    stateFor(showId).filter = platform || 'all';
+    renderSeatPanel(showId);
   }
 
-  function setSeatZoneFilter(eventId, zoneKey, event) {
+  function setSeatZoneFilter(showId, zoneKey, event) {
     if (event && event.stopPropagation) event.stopPropagation();
-    stateFor(eventId).zoneFilter = zoneKey || 'all';
-    renderSeatPanel(eventId);
+    stateFor(showId).zoneFilter = zoneKey || 'all';
+    renderSeatPanel(showId);
   }
 
-  function setSeatSort(eventId, sort, event) {
+  function setSeatSort(showId, sort, event) {
     if (event && event.stopPropagation) event.stopPropagation();
-    stateFor(eventId).sort = sort === 'created' ? 'created' : 'seconds';
-    renderSeatPanel(eventId);
+    stateFor(showId).sort = sort === 'created' ? 'created' : 'seconds';
+    renderSeatPanel(showId);
   }
 
-  async function submitSeatRow(eventId, event) {
+  async function withdrawSeatRow(showId, event) {
     if (event && event.stopPropagation) event.stopPropagation();
-    const key = String(eventId);
-    const platform = document.getElementById(`seat-platform-${key}`)?.value || '';
-    const secondsRaw = document.getElementById(`seat-seconds-${key}`)?.value || '';
-    const zone = document.getElementById(`seat-zone-${key}`)?.value || '';
-    const rowRange = document.getElementById(`seat-rowrange-${key}`)?.value || '';
-    const detail = document.getElementById(`seat-detail-${key}`)?.value || '不限号段';
-
-    const seconds = Number(String(secondsRaw).trim());
-    if (!Number.isInteger(seconds) || seconds < 0 || seconds > 600) return toastError('请填写 0–600 之间的整数秒数');
-    if (!window.SEAT_PLATFORMS.includes(platform)) return toastError('请选择列表中的购票平台');
-    if (!zonesForVenue(window.seatVenueMap[key] || '').includes(zone)) {
-      return toastError('请选择列表中的票档 / 区域');
-    }
-    if (!ROW_RANGES.includes(rowRange)) return toastError('请选择列表中的排数分段');
-    if (!SEAT_DETAILS.includes(detail)) return toastError('请选择列表中的号段');
-
-    const seatDetail = `${rowRange} · ${detail}`;
-    const localRow = { platform, seconds, zone, seat: seatDetail, seatDetail, updatedAt: new Date().toISOString(), id: getLocalOwn(key)?.id || '' };
-    saveLocalOwn(key, localRow);
-    try {
-      const res = await seatRpc('upsert_show_ticket_seat', {
-        p_event_id: key,
-        p_device_id: deviceId(),
-        p_platform: platform,
-        p_seconds: seconds,
-        p_area: zone,
-        p_seat: seatDetail
-      });
-      const saved = normalizeRow(Array.isArray(res) ? res[0] : res, 0);
-      if (saved && saved.id) saveLocalOwn(key, { ...localRow, id: saved.id });
-      if (typeof showToast === 'function') showToast('✅ 抢票记录已保存并同步');
-    } catch (e) {
-      if (typeof showToast === 'function') showToast('✅ 已保存到本机（云端暂时未同步）');
-    }
-    window.ticketSeatFormOpen[key] = false;
-    renderSeatPanel(key);
-    const st = stateFor(key);
-    st.loaded = false;
-    st.loading = false;
-    await loadSeatRows(key, true);
-  }
-
-  async function withdrawSeatRow(eventId, event) {
-    if (event && event.stopPropagation) event.stopPropagation();
-    const key = String(eventId);
+    const key = String(showId);
     if (!getLocalOwn(key)) return;
     if (!confirm('确定撤回本机登记的这条抢票记录吗？')) return;
     removeLocalOwn(key);
-    try {
-      await seatRpc('withdraw_show_ticket_seat', { p_event_id: key, p_device_id: deviceId() });
-    } catch (e) {}
+    try { await seatRpc('delete_own_ticket_seat', { p_show_id: key, p_device_id: deviceId() }); } catch (e) {}
     const st = stateFor(key);
     st.rows = st.rows.filter(r => !(r.deviceId && r.deviceId === deviceId()) && r.id !== 'local-own');
     st.loaded = false;
@@ -353,13 +444,13 @@
     if (typeof showToast === 'function') showToast('已撤回本机记录');
   }
 
-  async function adminDeleteSeatRow(eventId, rowId, event) {
+  async function adminDeleteSeatRow(showId, rowId, event) {
     if (event && event.stopPropagation) event.stopPropagation();
     if (!(typeof AppState !== 'undefined' && AppState.isAdminPasswordVerified)) return;
     if (!confirm('确认删除这条抢票记录？')) return;
-    const key = String(eventId);
+    const key = String(showId);
     try {
-      await seatRpc('admin_delete_show_ticket_seat', { p_id: rowId });
+      await seatRpc('admin_delete_ticket_seat', { p_id: rowId, p_admin_key: adminKey() });
     } catch (e) {
       if (typeof toastError === 'function') toastError('删除失败，请稍后重试');
       return;
@@ -377,7 +468,10 @@
   window.setSeatPlatformFilter = setSeatPlatformFilter;
   window.setSeatZoneFilter = setSeatZoneFilter;
   window.setSeatSort = setSeatSort;
-  window.submitSeatRow = submitSeatRow;
+  window.submitSeatRow = openSeatConfirm;
+  window.openSeatConfirm = openSeatConfirm;
+  window.confirmSeatSubmit = confirmSeatSubmit;
+  window.closeSeatConfirm = closeSeatConfirm;
   window.withdrawSeatRow = withdrawSeatRow;
   window.adminDeleteSeatRow = adminDeleteSeatRow;
 })();
