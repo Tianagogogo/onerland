@@ -1931,7 +1931,7 @@ function renderTourCards() {
                 <button type="button" onclick="recordFootprintFromShow('${safeCity}', '${item.show_date}', '${cleanVenue}', '${item.artist}')" class="tour-action-btn tour-action-btn--mini ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已打卡' : '+ 足迹'}</button>
               </div>
             </div>
-            <p class="show-card-meta text-xs text-slate-500"><span>📍 ${item.venue}</span><span class="meta-sep"> ｜ </span><span>🗓️ ${item.show_date}</span></p>
+            <p class="show-card-meta text-xs text-slate-500"><span>📍 ${item.venue}</span><span class="meta-sep"> ｜ </span><button type="button" class="meta-date-ics" title="点击添加到日历提醒" onclick="event.stopPropagation(); exportShowICS('${String(item.cloudId == null ? '' : item.cloudId).replace(/["'<>]/g, '')}')">🗓️ ${item.show_date}</button></p>
             ${item.prices ? `<p class="text-[11px] text-slate-600">💰 ${item.prices}</p>` : ''}
             ${safeBooth ? `<p class="text-[11px] text-slate-500 truncate" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</p>` : ''}
             <div class="flex items-center gap-1.5 flex-wrap">
@@ -1947,17 +1947,6 @@ function renderTourCards() {
         <div class="tour-actions-row pt-2 border-t border-slate-200/70">
           <button type="button" data-footer-tab="traffic" data-tour-toggle="guide-drawer-${idx}" class="tour-action-btn" aria-expanded="false">🚇 交通</button>
           <button type="button" class="tour-action-btn" data-travel-btn data-city="${attrEsc(item.city || safeCity)}" data-venue="${attrEsc(cleanVenue || safeCity)}" data-date="${attrEsc(String(item.show_date || '').slice(0, 10))}" data-title="${attrEsc(safeCity)}" onclick="event.stopPropagation(); openTravelHelperFromButton(this)">🚄 出行比价</button>
-          <button type="button" data-footer-tab="venue" data-tour-toggle="vexp-tour-drawer-${idx}" class="tour-action-btn" aria-expanded="false">${isShowStillRunning(item.show_date) ? '🛡️ 安检体验' : '📊 场馆体验'}</button>
-          <button type="button" data-footer-tab="buddy" data-tour-toggle="buddy-drawer-${idx}" class="tour-action-btn" aria-expanded="false">🤝 找搭子</button>
-          <span class="tour-actions-divider" aria-hidden="true"></span>
-          <div class="relative">
-            <button type="button" data-footer-tab="calendar" data-cloud-id="${item.cloudId}" class="tour-action-btn" aria-expanded="false">📅 日历</button>
-            <div data-footer-panel="calendar" class="hidden absolute right-0 bottom-full mb-1.5 z-50 w-48 p-2 rounded-xl bg-white border border-slate-300 shadow-2xl text-[11px] text-slate-700" role="dialog">
-              <div class="font-semibold text-slate-900 mb-1">📅 已生成日历提醒</div>
-              <div class="text-slate-500 leading-relaxed">已下载 .ics 文件，双击即可导入系统日历；本卡片仅会亮起这一个按钮。</div>
-              <button type="button" class="tour-action-btn tour-action-btn--mini mt-1.5 w-full" data-footer-close>知道了</button>
-            </div>
-          </div>
           <div class="relative">
             <button type="button" data-footer-tab="map" data-map-trigger class="tour-action-btn" aria-expanded="false">📍 地图</button>
             <div data-show-map-menu data-footer-panel="map" data-map-venue="${encodeShowMapValue(cleanVenue || safeCity)}" data-map-city="${encodeShowMapValue(safeCity)}" class="hidden absolute right-0 bottom-full mb-1.5 z-50 w-44 p-1.5 rounded-xl bg-white border border-slate-300 shadow-2xl" role="menu">
@@ -1966,6 +1955,8 @@ function renderTourCards() {
               <button type="button" role="menuitem" data-footer-close onclick="launchShowMapApp('web', this)" class="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left text-xs text-slate-800 hover:bg-slate-100">🌐 网页版地图</button>
             </div>
           </div>
+          <button type="button" data-footer-tab="venue" data-tour-toggle="vexp-tour-drawer-${idx}" class="tour-action-btn" aria-expanded="false">${isShowStillRunning(item.show_date) ? '🛡️ 安检体验' : '📊 场馆体验'}</button>
+          <button type="button" data-footer-tab="buddy" data-tour-toggle="buddy-drawer-${idx}" class="tour-action-btn" aria-expanded="false">🤝 找搭子</button>
         </div>
 
         <div id="guide-drawer-${idx}" data-footer-panel="traffic" class="hidden p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-1.5 leading-relaxed">

@@ -115,9 +115,13 @@ function renderAnniversaryCard() {
   const microHtml = microList.length
     ? microList.map(ev => {
         const accent = getAnniversaryAccentColor(ev);
+        // 统一文案：距X N 天；标题若自带「距」字先剥离，避免出现两个「距」
+        const rawTitle = String(ev.title || '').trim();
+        const cleanTitle = rawTitle.replace(/^距\s*/, '');
+        const dayText = Number(ev.diffDays) === 0 ? '0 天（就是今天）' : `${ev.diffDays} 天`;
         return `<span class="anniv-day-item shrink-0">
-          <strong>${escapeAnnivText(ev.title)}</strong>
-          <span class="anniv-days" style="color:${accent}">${ev.diffDays === 0 ? '就是今天' : ev.diffDays + ' 天'}</span>
+          <strong>距${escapeAnnivText(cleanTitle)}</strong>
+          <span class="anniv-days" style="color:${accent}">${dayText}</span>
         </span>`;
       }).join('<span class="shrink-0 text-slate-300">·</span>')
     : '<span class="text-[11px] text-slate-400">暂无纪念日，点击右侧管理添加</span>';
@@ -557,7 +561,8 @@ function renderUpcomingMiniTimeline() {
               <span class="timeline-card-title font-bold text-sm text-slate-900 leading-snug break-words">${safeTitle}</span>
             </div>
             <div class="timeline-card-meta text-xs text-slate-500 mt-1">
-              <div class="timeline-meta-line timeline-meta-date">📅 ${item.date} ${weekday}</div>
+              <button type="button" class="timeline-meta-line timeline-meta-date meta-date-ics" title="点击添加到日历提醒"
+                onclick="event.stopPropagation(); handleHomeTimelineDateClick(${idx})">📅 ${item.date} ${weekday}</button>
               <div class="timeline-meta-line timeline-meta-venue" title="${String(item.venue || '场馆待定').replace(/["<>]/g, '')}">📍 ${item.venue || '场馆待定'}</div>
             </div>
             ${(item.slot || (item.scheduleImgs && item.scheduleImgs.length)) ? `<div class="timeline-slot-row">
@@ -568,17 +573,16 @@ function renderUpcomingMiniTimeline() {
         </div>
         <div class="timeline-card-actions flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-end flex-wrap pt-1.5 sm:pt-0 border-t border-slate-200/70 sm:border-0">
           ${item === pinned
-            ? `<span class="timeline-next-badge text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap">⚡ 下一场</span>`
+            ? `<span class="timeline-next-badge text-[10px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap">⚡ 下一场</span>`
             : `<span class="text-[10px] px-1.5 py-0.5 rounded ${isFuture ? 'bg-white border border-slate-300 text-slate-600' : 'bg-slate-100 text-slate-500'}">${isFuture ? '待开演' : '已落幕'}</span>`}
           <button type="button" onclick="switchMainTab('shows')" class="tour-action-btn tour-action-btn--mini">详情</button>
         </div>
         <div class="tl-quick-bar" data-tl-bar="${idx}">
           <button type="button" class="tl-quick-btn" data-tl-action="traffic" data-tl-idx="${idx}" aria-expanded="false">🚇 交通</button>
           <button type="button" class="tl-quick-btn" data-tl-action="travel" data-tl-idx="${idx}">🚄 出行比价</button>
+          <button type="button" class="tl-quick-btn" data-tl-action="map" data-tl-idx="${idx}" aria-expanded="false">📍 地图</button>
           <button type="button" class="tl-quick-btn" data-tl-action="security" data-tl-idx="${idx}" aria-expanded="false">🛡️ 安检体验</button>
           <button type="button" class="tl-quick-btn" data-tl-action="buddy" data-tl-idx="${idx}">🤝 找搭子</button>
-          <button type="button" class="tl-quick-btn" data-tl-action="calendar" data-tl-idx="${idx}">📅 日历</button>
-          <button type="button" class="tl-quick-btn" data-tl-action="map" data-tl-idx="${idx}" aria-expanded="false">📍 地图</button>
         </div>
       </div>
     `;
@@ -649,6 +653,21 @@ function toggleHomeTimelinePanel(card, action, html) {
     try { hydrateSecurityVoteBlocks(); } catch (e) { /* ignore */ }
   }
   if (action === 'map' && typeof bindShowMapMenuDismiss === 'function') bindShowMapMenuDismiss();
+}
+
+// 卡片正文的日期文本 = 日历提醒入口（与「档案」页完全一致，走同一个 exportShowICS）
+function handleHomeTimelineDateClick(idx) {
+  const rec = homeTimelineRecords[idx];
+  if (!rec) return;
+  if (rec.cloudId == null || rec.cloudId === '') {
+    return toastError('该场次暂无可用的精确时间，无法生成日历');
+  }
+  try {
+    exportShowICS(rec.cloudId);
+    showToast('已生成日历文件 .ics，双击即可导入系统日历');
+  } catch (e) {
+    toastError(`日历生成失败：${e.message}`);
+  }
 }
 
 function handleHomeTimelineAction(action, idx, btn) {

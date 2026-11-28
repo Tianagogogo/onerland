@@ -150,21 +150,27 @@ body {
   font-size: 11px;
 }
 
-/* 卡片底部 5 键单行：左侧功能组 / 右侧日历·地图组 */
+/* 卡片底部操作栏：交通三连（交通/出行比价/地图）+ 安检 + 找搭子，flex 排列不挤压 */
 .tour-actions-row {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) 1px repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
 
 .tour-actions-row .tour-action-btn {
-  width: 100%;
-  min-width: 0;
-  padding: 0 4px;
-  font-size: 11px;
-  overflow: hidden;
+  width: auto;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 0 10px;
+  font-size: 12px;
+  overflow: visible;
   text-overflow: clip;
+}
+
+@media (max-width: 400px) {
+  .tour-actions-row .tour-action-btn { padding: 0 8px; font-size: 11.5px; }
 }
 
 .tour-actions-divider {
@@ -874,6 +880,15 @@ select::-moz-focus-inner { border: 0; }
   100% { background-position: 240% 50%; }
 }
 .timeline-next-badge {
+  /* 几何轮廓与「待开演」徽标对齐：微圆角矩形、同高同内边距同字号 */
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  padding: 2px 6px;
+  height: auto;
+  font-size: 10px;
+  line-height: 1.3;
+  /* 保留冷调银白金属质感：渐变底 + 细银描边 + 深色文字 */
   color: #1e293b;
   background: linear-gradient(135deg, #ffffff 0%, #eef2f6 45%, #dbe3ec 100%);
   border: 1px solid #cbd5e1;
@@ -1170,6 +1185,8 @@ select::-moz-focus-inner { border: 0; }
 .tl-quick-btn {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
+  flex-shrink: 0;
   gap: 3px;
   height: 24px;
   padding: 0 8px;
@@ -1545,3 +1562,29 @@ body.travel-modal-open { overflow: hidden; }
   .global-toast-host { top: 10px; max-width: 94vw; }
   .global-toast { font-size: 11.5px; padding: 7px 12px; }
 }
+
+/* ================= 卡片正文日期文本 = 日历提醒入口 ================= */
+.meta-date-ics {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+.meta-date-ics:hover,
+.meta-date-ics:focus-visible {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(226, 232, 240, 0.9) 100%);
+  color: #0f172a;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.55), 0 1px 4px rgba(100, 116, 139, 0.16);
+}
+.meta-date-ics:active { box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.75); }
+.timeline-meta-date.meta-date-ics { max-width: 100%; }
