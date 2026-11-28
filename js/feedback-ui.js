@@ -17,8 +17,8 @@ let feedbackState = { category: 'bug', submitting: false, inboxLoading: false, i
 
 // 管理员两项预设回复（与后端白名单保持完全一致，改文案需同步 SQL 白名单）
 const FEEDBACK_REPLY_PRESETS = [
-  { key: 'done', icon: '✅', text: '已实现，感谢你的反馈' },
-  { key: 'later', icon: '🙏', text: '现阶段无法实现，感谢你的反馈' }
+  { key: 'done', icon: '✅', text: '已实现，感谢你的反馈🌸' },
+  { key: 'later', icon: '🙏', text: '现阶段无法实现，感谢你的反馈🌸' }
 ];
 // 本机提交过的反馈凭证（仅存本机，用于回看处理进度与站长回复）
 const FEEDBACK_TOKENS_KEY = 'onerland_feedback_tokens_v1';
