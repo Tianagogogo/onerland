@@ -125,6 +125,14 @@ function switchMainTab(tabId) {
   if (tabId === 'home' && typeof renderHomeDashboard === 'function') renderHomeDashboard();
   if (tabId === 'shows' && typeof renderTourCards === 'function') renderTourCards();
   if (tabId === 'footprint' && typeof renderFootprintPage === 'function') renderFootprintPage();
+  if (tabId === 'footprint' && typeof mountFeatureTip === 'function') {
+    setTimeout(() => {
+      mountFeatureTip('footprints_tab', document.getElementById('view-footprint-page'));
+      const canvas = document.getElementById('souvenir-ticket-canvas');
+      const ticketCard = canvas && canvas.closest('.chronicle-card');
+      if (ticketCard) mountFeatureTip('ticket_generator', ticketCard);
+    }, 90);
+  }
   if (tabId === 'footprint' && typeof checkFandomConflict === 'function') {
     setTimeout(() => { try { checkFandomConflict(); } catch (e) { /* ignore */ } }, 120);
   }
@@ -1790,6 +1798,11 @@ function setFooterTab(tab, trigger, event) {
   clearFooterTabForCard(card, tab);
   const panel = card.querySelector(`[data-footer-panel="${tab}"]`);
   if (panel) panel.classList.remove('hidden');
+  if (panel && typeof mountFeatureTip === 'function') {
+    if (tab === 'seats') mountFeatureTip('ticket_stats', panel);
+    if (tab === 'buddy') mountFeatureTip('buddy_match', panel);
+    if (tab === 'venue') mountFeatureTip('security_check', panel);
+  }
   trigger.classList.add('is-active');
   trigger.setAttribute('aria-expanded', 'true');
   window.activeFooterTab[cardKey] = tab;

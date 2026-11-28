@@ -6,7 +6,7 @@
   <title>ONERLAND · 时光典藏与观演实用工具站</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <link rel="stylesheet" href="./css/theme.css?v=20261128_batch2" />
+  <link rel="stylesheet" href="./css/theme.css?v=20261128_smart_onboarding" />
   <link rel="manifest" href="./manifest.json" />
   <link rel="apple-touch-icon" sizes="180x180" href="./assets/icons/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png" />
@@ -44,6 +44,7 @@
       <div class="flex items-center gap-2">
         <button type="button" id="user-auth-btn" onclick="openUserAuthModal()" class="px-3 py-1.5 rounded-lg liquid-silver-btn text-xs font-medium">👤 登录</button>
         <button type="button" onclick="loadTourData()" class="px-3 py-1.5 rounded-lg liquid-silver-btn text-xs font-medium">刷新同步</button>
+        <button type="button" id="top-guide-btn" onclick="openFeedbackModal()" class="nav-guide-btn" title="30 秒上手路线图 / 分类指南 / 留言反馈">❓ 指南</button>
       </div>
     </div>
   </header>
@@ -463,21 +464,22 @@
     </div>
   </div>
 
-  <script src="./js/config.js?v=20261128_batch2"></script>
-  <script src="./js/poster-local.js?v=20261128_batch2"></script>
-  <script src="./js/store.js?v=20261128_batch2"></script>
-  <script src="./js/home-ui.js?v=20261128_batch2"></script>
-  <script src="./js/shows-ui.js?v=20261128_batch2"></script>
-  <script src="./js/ticket-seat-ui.js?v=20261128_batch2"></script>
-  <script src="./js/parser.js?v=20261128_batch2"></script>
-  <script src="./js/china-map-data.js?v=20261128_batch2"></script>
-  <script src="./js/footprint-ui.js?v=20261128_batch2"></script>
-  <script src="./js/admin-ui.js?v=20261128_batch2"></script>
-  <script src="./js/auth-ui.js?v=20261128_batch2"></script>
-  <script src="./js/travel-helper.js?v=20261128_batch2"></script>
-  <script src="./js/fandom-sync.js?v=20261128_batch2"></script>
-  <script src="./js/feedback-ui.js?v=20261128_batch2"></script>
-  <script src="./js/install-hint.js?v=20261128_batch2"></script>
+  <script src="./js/config.js?v=20261128_smart_onboarding"></script>
+  <script src="./js/poster-local.js?v=20261128_smart_onboarding"></script>
+  <script src="./js/store.js?v=20261128_smart_onboarding"></script>
+  <script src="./js/home-ui.js?v=20261128_smart_onboarding"></script>
+  <script src="./js/shows-ui.js?v=20261128_smart_onboarding"></script>
+  <script src="./js/ticket-seat-ui.js?v=20261128_smart_onboarding"></script>
+  <script src="./js/parser.js?v=20261128_smart_onboarding"></script>
+  <script src="./js/china-map-data.js?v=20261128_smart_onboarding"></script>
+  <script src="./js/footprint-ui.js?v=20261128_smart_onboarding"></script>
+  <script src="./js/admin-ui.js?v=20261128_smart_onboarding"></script>
+  <script src="./js/auth-ui.js?v=20261128_smart_onboarding"></script>
+  <script src="./js/travel-helper.js?v=20261128_smart_onboarding"></script>
+  <script src="./js/fandom-sync.js?v=20261128_smart_onboarding"></script>
+  <script src="./js/feedback-ui.js?v=20261128_smart_onboarding"></script>
+  <script src="./js/install-hint.js?v=20261128_smart_onboarding"></script>
+  <script src="./js/onboarding-ui.js?v=20261128_smart_onboarding"></script>
   <script>
     if ('serviceWorker' in navigator) {
       // 刷新一次后清除标记，保证后续版本更新仍能自动刷新（10 秒后再放开，避免刷新循环）

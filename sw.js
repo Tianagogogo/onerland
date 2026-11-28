@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onerland-pwa-v101';
+const CACHE_NAME = 'onerland-pwa-v102';
 const IMAGE_CACHE_NAME = 'onerland-images-v3';
 const STATIC_ASSETS = [
   './',
@@ -19,6 +19,7 @@ const STATIC_ASSETS = [
   './js/ticket-seat-ui.js',
   './js/china-map-data.js',
   './js/install-hint.js',
+  './js/onboarding-ui.js',
   './manifest.json'
 ];
 
