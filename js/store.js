@@ -1841,6 +1841,59 @@ function getShowDateRange(raw) {
   return { startDate, endDate };
 }
 
+// 健壮解析演出结束日：支持 2026-11-20 / 2026-11-20 ~ 11-21 / 2026/11/20-21 等写法
+function getShowEndDay(rawDate) {
+  const text = String(rawDate == null ? '' : rawDate).replace(/[／.]/g, '/').replace(/\//g, '-');
+  const full = [];
+  const reFull = /(\d{4})-(\d{1,2})-(\d{1,2})/g;
+  let m;
+  while ((m = reFull.exec(text)) !== null) {
+    full.push({ y: Number(m[1]), mo: Number(m[2]), d: Number(m[3]) });
+  }
+  if (full.length) {
+    const baseYear = full[0].y;
+    // 区间尾段省略年份：2026-11-20 ~ 11-21
+    const tail = text.replace(reFull, ' ');
+    const reShort = /(?<!\d)(\d{1,2})-(\d{1,2})(?!\d)/g;
+    while ((m = reShort.exec(tail)) !== null) {
+      const mo = Number(m[1]);
+      const d = Number(m[2]);
+      if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) full.push({ y: baseYear, mo, d });
+    }
+    // 只补日期数字：2026/11/20-21
+    const lastFull = full[0];
+    const reDayOnly = /(?:^|[^0-9])-(\d{1,2})(?![0-9])/g;
+    while ((m = reDayOnly.exec(tail)) !== null) {
+      const dOnly = Number(m[1]);
+      if (dOnly >= 1 && dOnly <= 31) full.push({ y: baseYear, mo: lastFull.mo, d: dOnly });
+    }
+  }
+  if (!full.length) return null;
+  const stamps = full.map(o => {
+    const dt = new Date(o.y, o.mo - 1, o.d);
+    dt.setHours(0, 0, 0, 0);
+    return isNaN(dt.getTime()) ? null : dt.getTime();
+  }).filter(v => v != null);
+  if (!stamps.length) return null;
+  return new Date(Math.max.apply(null, stamps));
+}
+
+// 全站唯一的「是否已落幕」判定：结束日早于本地今天零点即已落幕
+function isShowEnded(show) {
+  if (!show) return false;
+  const statusRaw = String(
+    show.status || (show.showState && show.showState.status) || ''
+  ).toLowerCase();
+  if (/(ended|已落幕|已结束|已收官|past|finished)/.test(statusRaw)) return true;
+  const endDay = getShowEndDay(
+    show.end_date || show.endDate || show.show_date || show.showDate || show.date || ''
+  );
+  if (!endDay) return false;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  return endDay.getTime() < todayStart.getTime();
+}
+
 function getLocalTodayIso(now = new Date()) {
   const d = now instanceof Date ? now : new Date(now);
   if (isNaN(d.getTime())) return '';
@@ -1907,6 +1960,8 @@ function saveSecurityExperience(showKey, patch = {}) {
 window.getShowDateRange = getShowDateRange;
 window.getLocalTodayIso = getLocalTodayIso;
 window.isShowStillRunning = isShowStillRunning;
+window.isShowEnded = isShowEnded;
+window.getShowEndDay = getShowEndDay;
 window.getSecurityExperience = getSecurityExperience;
 window.saveSecurityExperience = saveSecurityExperience;
 window.getSecurityExperienceMap = getSecurityExperienceMap;

@@ -1173,11 +1173,13 @@ function openSeriesModal(themeKey) {
     ? isFestivalShow(item)
     : isSameSeries(item, isArchive, themeKey);
 
-  const upcoming = AppState.cloudTickets.filter(item => matchFn(item, false)).map(u => ({
-    status: '待开演', title: u.city, date: u.show_date, cloudId: u.cloudId, venue: u.venue, posterUrl: u.posterUrl, artist: u.artist
-  }));
-  const past = AppState.cloudArchives.filter(item => matchFn(item, true)).map(p => ({
-    status: '已落幕', title: p.title, date: p.showDate, showTime: p.showTime, cloudId: p.cloudId, venue: p.venue, posterUrl: p.posterUrl, artist: p.artist
+  const upcoming = AppState.cloudTickets
+    .filter(item => matchFn(item, false) && !(typeof isShowEnded === 'function' && isShowEnded(item)))
+    .map(u => ({
+      status: '待开演', title: u.city, date: u.show_date, cloudId: u.cloudId, venue: u.venue, posterUrl: u.posterUrl, artist: u.artist
+    }));
+  const past = getArchiveSourceList().filter(item => matchFn(item, true)).map(p => ({
+    status: '已落幕', title: p.title || p.city, date: p.showDate, showTime: p.showTime, cloudId: p.cloudId, venue: p.venue, posterUrl: p.posterUrl, artist: p.artist
   }));
   const stops = [...upcoming, ...past].sort(compareShowChronology);
 
@@ -1910,6 +1912,7 @@ function renderTourCards() {
       };
     })
     .filter(item => item.showState.status !== SHOW_STATUS.ENDED)
+    .filter(item => !(typeof isShowEnded === 'function' && isShowEnded(item)))
     .sort((a, b) => {
       // 待开票优先（有抢票紧迫感），其次按演出时间由近到远
       const aSale = a.showState.status === SHOW_STATUS.UPCOMING_SALE ? 0 : 1;
@@ -2218,11 +2221,42 @@ function getArchiveYear(item) {
   return match ? match[0] : '';
 }
 
+// 往日演出回顾数据源：ARCHIVE 记录 + 已落幕的演出记录（统一用 isShowEnded 判定）
+// 修复：线上已显示「已落幕」但只存在 tickets 里的场次（如 2026-11-20 西安站）此前不会进档案
+function getArchiveSourceList() {
+  const archives = Array.isArray(AppState.cloudArchives) ? AppState.cloudArchives : [];
+  const tickets = Array.isArray(AppState.cloudTickets) ? AppState.cloudTickets : [];
+  const endedTickets = tickets
+    .filter(t => typeof isShowEnded === 'function' ? isShowEnded(t) : false)
+    .map(t => ({
+      ...t,
+      title: t.city || t.title || '',
+      showDate: String(t.show_date || t.showDate || t.date || '').slice(0, 10),
+      showTime: t.show_time || t.showTime || '',
+      city: t.city || '',
+      status: '已落幕',
+      archivedFromTicket: true
+    }));
+  const seen = new Set();
+  return archives.concat(endedTickets).filter(item => {
+    const datePart = String(item.showDate || item.show_date || item.date || '').slice(0, 10);
+    const venueKey = typeof buildShowKey === 'function'
+      ? buildShowKey(item.venue || '', item.title || '')
+      : `${item.venue || ''}|${item.title || ''}`;
+    const key = `${venueKey}|${datePart}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function updateArchiveFilterOptions() {
   const yearSel = document.getElementById('archive-year-filter');
+  const archiveSource = getArchiveSourceList();
+
   if (yearSel) {
     const current = yearSel.value || AppState.activeArchiveYear || 'ALL';
-    const years = [...new Set(AppState.cloudArchives.map(getArchiveYear).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+    const years = [...new Set(archiveSource.map(getArchiveYear).filter(Boolean))].sort((a, b) => b.localeCompare(a));
     yearSel.innerHTML = `<option value="all">全部年份</option>` + years.map(y => `<option value="${y}">${y} 年</option>`).join('');
     yearSel.value = years.includes(current) ? current : 'all';
   }
@@ -2231,7 +2265,7 @@ function updateArchiveFilterOptions() {
   if (citySel) {
     const current = citySel.value || AppState.activeArchiveCity || 'ALL';
     const cityMap = new Map();
-    AppState.cloudArchives.forEach(a => {
+    archiveSource.forEach(a => {
       const city = getArchiveCity(a);
       const entry = cityMap.get(city) || { label: city, count: 0 };
       entry.count += 1;
@@ -2283,7 +2317,7 @@ function renderArchiveTimeline() {
     : AppState.activeArchiveType;
 
   // 往日演出统一按演出日期时间正序排列，同日多场按开场时间、记录 ID 次级排序。
-  const filtered = filterVisibleShowRecords(AppState.cloudArchives)
+  const filtered = filterVisibleShowRecords(getArchiveSourceList())
     .filter(a => {
       if (archiveType !== 'ALL' && a.subType !== archiveType) return false;
       if (year !== 'ALL' && getArchiveYear(a) !== year) return false;
@@ -2332,7 +2366,7 @@ function renderArchiveTimeline() {
               <div class="archive-title-row flex items-center gap-1.5 flex-wrap">
                 <span class="text-[10px] px-2 py-0.5 rounded text-white font-semibold" style="background:${badge}">${item.artist}</span>
                 <span class="archive-strip-title font-bold text-sm text-slate-900 leading-snug">${safeTitle}</span>
-                ${(typeof isShowUpcomingOrToday === 'function' && isShowUpcomingOrToday(item.showDate))
+                ${(typeof isShowEnded === 'function' ? !isShowEnded(item) : (typeof isShowUpcomingOrToday === 'function' && isShowUpcomingOrToday(item.showDate)))
                   ? (() => {
                       const pk = planShowKeyOf(item.cloudId, item.venue, safeTitle, item.showDate).replace(/['"<>]/g, '');
                       const on = isShowPlanned(pk);
@@ -2352,9 +2386,9 @@ function renderArchiveTimeline() {
             <button type="button" class="tour-action-btn tour-action-btn--mini" data-travel-btn data-city="${attrEsc(getArchiveCity(item) || '')}" data-venue="${attrEsc(item.venue || '')}" data-date="${attrEsc(String(item.showDate || '').slice(0, 10))}" data-title="${attrEsc(safeTitle)}" onclick="event.stopPropagation(); openTravelHelperFromButton(this)">🚄 出行比价</button>
             <button type="button" data-tour-toggle="vexp-arc-drawer-${idx}" class="tour-action-btn tour-action-btn--mini">📊 场馆体验<span class="hidden sm:inline text-[10px] opacity-70 ml-1">${venueStats.total}${venueStats.unlocked ? '' : '/5'}</span></button>
             ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="archive" data-edit-title="${safeTitle.replace(/"/g, '&quot;')}" data-edit-date="${String(item.showDate || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini edit-soft-btn">✏️ 编辑</button>` : ''}
-            ${(typeof isShowUpcomingOrToday === 'function' && isShowUpcomingOrToday(item.showDate))
+            ${(typeof isShowEnded === 'function' ? !isShowEnded(item) : (typeof isShowUpcomingOrToday === 'function' && isShowUpcomingOrToday(item.showDate)))
               ? ''
-              : `<button type="button" onclick="recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="tour-action-btn tour-action-btn--mini ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已打卡' : '+ 足迹'}</button>`}
+              : `<button type="button" onclick="recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="tour-action-btn tour-action-btn--mini ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已点亮足迹' : '+ 足迹'}</button>`}
           </div>
         </div>
 
