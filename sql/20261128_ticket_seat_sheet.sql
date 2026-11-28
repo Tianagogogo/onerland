@@ -35,12 +35,25 @@ begin
     where table_schema = 'public' and table_name = 'show_ticket_seats' and column_name = 'event_id'
   ) then
     execute 'alter table public.show_ticket_seats alter column event_id drop not null';
-    execute $sql$
-      update public.show_ticket_seats
-         set show_id = coalesce(nullif(show_id, ''), event_id),
-             pay_seconds = case when coalesce(pay_seconds, 0) = 0 then coalesce(seconds, 0) else pay_seconds end
-       where show_id is null or show_id = ''
-    $sql$;
+
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'show_ticket_seats' and column_name = 'seconds'
+    ) then
+      execute $sql$
+        update public.show_ticket_seats
+           set show_id = coalesce(nullif(show_id, ''), event_id),
+               pay_seconds = case when coalesce(pay_seconds, 0) = 0 then coalesce(seconds, 0) else pay_seconds end
+         where show_id is null or show_id = ''
+      $sql$;
+    else
+      execute $sql$
+        update public.show_ticket_seats
+           set show_id = coalesce(nullif(show_id, ''), event_id)
+         where show_id is null or show_id = ''
+      $sql$;
+    end if;
+
     execute 'alter table public.show_ticket_seats alter column event_id drop default';
   end if;
 
