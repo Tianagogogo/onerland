@@ -784,6 +784,14 @@ function pickSeatMapUrl(meta, row) {
     || r.seatUrl || r.seat_url || r.seatMapUrl || r.seatMap || r.seat_map || '';
 }
 
+function pickSlotText(meta, row) {
+  const m = meta || {};
+  const r = row || {};
+  return m.slot || m.time_slot || m.schedule_time || m.stage_time || m.performance_time
+    || r.slot || r.time_slot || r.schedule_time || r.stage_time || r.performance_time
+    || '';
+}
+
 function pickTransportText(meta, row) {
   const m = meta || {};
   const r = row || {};
@@ -883,7 +891,7 @@ async function loadTourData() {
             prices: meta.prices || '',
             hasSeatMap: Boolean(pickSeatMapUrl(meta, row)),
             seatUrl: pickSeatMapUrl(meta, row),
-            slot: meta.slot || '',
+            slot: pickSlotText(meta, row),
             merchBooth: meta.merchBooth || '',
             scheduleImgs: Array.isArray(meta.scheduleImgs) ? meta.scheduleImgs : [],
             viewImgs: Array.isArray(meta.viewImgs) ? meta.viewImgs : [],
@@ -925,7 +933,7 @@ async function loadTourData() {
           seatUrl: pickSeatMapUrl(meta, row),
           prices: meta.prices || '',
           transport: pickTransportText(meta, row),
-          slot: meta.slot || slotFromTitle || '',
+          slot: pickSlotText(meta, row) || slotFromTitle || '',
           merchBooth: meta.merchBooth || '',
           scheduleImgs: Array.isArray(meta.scheduleImgs) ? meta.scheduleImgs : [],
           theme: meta.theme == null ? '' : String(meta.theme),

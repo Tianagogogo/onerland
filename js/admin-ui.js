@@ -243,6 +243,7 @@ async function submitAdminQuickPost() {
           seatUrl,
           transport: transportText,
           slot: slotText,
+          time_slot: slotText,
           merchBooth,
           scheduleImgs: adminScheduleImgs,
           theme: normalizeSeriesKey(titleOrPlat)
@@ -271,6 +272,7 @@ async function submitAdminQuickPost() {
           seatUrl: seatUrl || existing?.seatUrl || '',
           transport: transportText || existing?.transport || '',
           slot: slotText,
+          time_slot: slotText,
           merchBooth,
           scheduleImgs: adminScheduleImgs,
           viewImgs: existing?.viewImgs || [],

@@ -834,13 +834,13 @@ select::-moz-focus-inner { border: 0; }
 /* ================= 首页微时间轴：置顶「最近即将开演」卡片 ================= */
 .timeline-card-next {
   position: relative;
-  border: 1.5px solid rgba(59, 130, 246, 0.35) !important;
+  border: 1.5px solid #cbd5e1 !important;
   background:
-    linear-gradient(140deg, rgba(255,255,255,0.98) 0%, rgba(241,245,249,0.96) 46%, rgba(226,236,248,0.94) 100%) !important;
+    linear-gradient(135deg, #ffffff 0%, #f8fafc 42%, #eef2f6 68%, #e2e8f0 100%) !important;
   box-shadow:
-    0 0 0 1px rgba(255,255,255,0.9) inset,
-    0 6px 22px rgba(59, 130, 246, 0.16),
-    0 0 18px rgba(148, 163, 184, 0.28) !important;
+    0 0 0 1px rgba(255,255,255,0.95) inset,
+    0 8px 24px rgba(100, 116, 139, 0.18),
+    0 0 20px rgba(203, 213, 225, 0.55) !important;
 }
 .timeline-card-next::before {
   content: '';
@@ -848,18 +848,19 @@ select::-moz-focus-inner { border: 0; }
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  background: linear-gradient(115deg, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0) 38%, rgba(191,219,254,0.35) 60%, rgba(255,255,255,0) 82%);
-  background-size: 220% 100%;
-  animation: timelineSheen 4.5s ease-in-out infinite;
+  background: linear-gradient(115deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.9) 22%, rgba(226,232,240,0.55) 42%, rgba(255,255,255,0.95) 58%, rgba(255,255,255,0) 82%);
+  background-size: 240% 100%;
+  animation: timelineSheen 4.8s ease-in-out infinite;
 }
 @keyframes timelineSheen {
   0% { background-position: 0% 50%; }
-  100% { background-position: 220% 50%; }
+  100% { background-position: 240% 50%; }
 }
 .timeline-next-badge {
-  color: #ffffff;
-  background: linear-gradient(135deg, #64748b 0%, #3b82f6 55%, #93c5fd 100%);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
+  color: #1e293b;
+  background: linear-gradient(135deg, #ffffff 0%, #eef2f6 45%, #dbe3ec 100%);
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.95) inset, 0 2px 8px rgba(100,116,139,0.18);
 }
 @media (prefers-reduced-motion: reduce) {
   .timeline-card-next::before { animation: none; }

@@ -446,7 +446,7 @@ function buildHomeTimelineList() {
     venue: item.venue || '',
     date: String(item.show_date || '').slice(0, 10),
     posterUrl: item.posterUrl || item.poster_url || item.poster || item.cover || item.cover_url || item.image || '',
-    slot: item.slot || item.timeSlot || item.time_slot || '',
+    slot: item.slot || item.timeSlot || item.time_slot || item.schedule_time || item.stage_time || item.performance_time || '',
     cloudId: item.cloudId
   }));
 
@@ -461,7 +461,7 @@ function buildHomeTimelineList() {
     venue: item.venue || '',
     date: String(item.showDate || '').slice(0, 10),
     posterUrl: item.posterUrl || item.poster_url || item.poster || item.cover || item.cover_url || item.image || '',
-    slot: item.slot || item.timeSlot || item.time_slot || '',
+    slot: item.slot || item.timeSlot || item.time_slot || item.schedule_time || item.stage_time || item.performance_time || '',
     cloudId: item.cloudId,
     isArchive: true
   }));
@@ -531,7 +531,7 @@ function renderUpcomingMiniTimeline() {
               <span class="text-[10px] px-1.5 py-0.5 rounded text-white font-semibold shrink-0" style="background:${badge}">${displayArtist}</span>
               <span class="timeline-card-title font-bold text-sm text-slate-900 leading-snug break-words">${safeTitle}</span>
             </div>
-            <p class="timeline-card-meta text-xs text-slate-500 mt-0.5 leading-relaxed break-words">🗓️ ${item.date} ${weekday} · 📍 ${item.venue || '场馆待定'}${item.slot ? ` · <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-900 text-white text-[10px] font-semibold">⏰ ${String(item.slot).replace(/[<>\"']/g, '')}</span>` : ''}</p>
+            <p class="timeline-card-meta text-xs text-slate-500 mt-0.5 leading-relaxed break-words">🗓️ ${item.date} ${weekday} · 📍 ${item.venue || '场馆待定'}${item.slot ? ` · <span class="timeline-slot-badge inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-700 text-[10px] font-semibold whitespace-nowrap">⏰ ${String(item.slot).replace(/[<>\"']/g, '')}</span>` : ''}</p>
           </div>
         </div>
         <div class="timeline-card-actions flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-end flex-wrap pt-1.5 sm:pt-0 border-t border-slate-200/70 sm:border-0">
