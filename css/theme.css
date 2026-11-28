@@ -379,6 +379,25 @@ select::-moz-focus-inner { border: 0; }
   animation: none;
   background: linear-gradient(145deg, #F8FAFC 0%, #E7ECF3 46%, #CDD6E2 100%);
 }
+.poster-square-box.is-poster-fallback[data-fallback-label]::after { content: none; }
+.poster-fallback-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #64748B;
+  background: linear-gradient(150deg, #FBFCFE 0%, #EDF1F7 42%, #D7DFEA 100%);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
+  overflow: hidden;
+  word-break: break-word;
+}
 .poster-square-box.is-poster-fallback::after {
   content: 'ONER';
   position: absolute;

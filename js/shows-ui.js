@@ -1397,6 +1397,7 @@ function renderBuddyEntryCard(cloudId, b, canManage) {
         </div>
         ${actionHtml}
       </div>
+      ${b.note ? `<p class="mt-1.5 text-[11px] leading-relaxed text-slate-600 break-words">💬 ${String(b.note).replace(/[<>]/g, '')}</p>` : ''}
       ${adminDeleteBtn ? `<div class="pt-1.5 flex justify-end">${adminDeleteBtn}</div>` : ''}
       ${canManage ? renderBuddyOwnerRequests(b) : ''}
     </div>
@@ -1564,6 +1565,18 @@ function copyBuddyContact(value, event) {
   tmp.remove();
 }
 
+// 公开备注防泄露：11 位手机号 / 微信等敏感词 / 外链一律拦截
+function findBuddyPublicNoteLeak(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return '';
+  const compact = raw.replace(/[\s\-_.]/g, '');
+  if (/(?:\+?86)?1[3-9]\d{9}/.test(compact)) return '手机号';
+  if (/\d{4,}[\s\-]?\d{4,}/.test(raw) && /\d{7,}/.test(compact)) return '连续数字';
+  if (/(微信|weixin|wei\s*xin|v\s*信|威信|vx|wx|w\s*x|加v|扣扣|qq|v\s*:\s*|微信号)/i.test(raw)) return '联系方式字样';
+  if (/(https?:\/\/|www\.|@[a-z0-9_]{2,})/i.test(raw)) return '网址或账号';
+  return '';
+}
+
 async function saveLocalBuddyIntent(cloudId, showTitle, event) {
   if (event && event.stopPropagation) event.stopPropagation();
 
@@ -1587,6 +1600,16 @@ async function saveLocalBuddyIntent(cloudId, showTitle, event) {
     contact = `${platform}：${accountId}`;
   }
 
+  const noteEl = document.getElementById(`buddy-note-${cloudId}`);
+  const publicNote = (noteEl ? noteEl.value : '').trim().replace(/\s+/g, ' ').slice(0, 60);
+  if (publicNote) {
+    const leak = findBuddyPublicNoteLeak(publicNote);
+    if (leak) {
+      alert('检测到备注中可能包含联系方式，为保护隐私，请将微信号填在下方专属加密栏中（仅双方同意后解锁），切勿写在公开备注里。');
+      return;
+    }
+  }
+
   const pref = getFanPrefState();
   const theme = getBuddyTheme(pref);
   const memberTags = pref.biasType === 'solo' || pref.biasType === 'cp'
@@ -1602,6 +1625,7 @@ async function saveLocalBuddyIntent(cloudId, showTitle, event) {
     memberTags,
     biasLabel,
     tags: [...tags],
+    note: publicNote,
     contact,
     theme,
     createdAt: new Date().toLocaleDateString()
@@ -2054,6 +2078,14 @@ function renderTourCards() {
                   `;
                 }).join('')}
               </div>
+            </div>
+
+            <div class="space-y-1 pt-1 border-t border-slate-100">
+              <span class="text-[11px] font-semibold text-slate-700">公开同行宣言（选填，全站可见）：</span>
+              <input id="buddy-note-${item.cloudId}" type="text" maxlength="60" autocomplete="off"
+                placeholder="如：想找人一起蹲入口排队 / 求拼车回市区（勿写联系方式）"
+                class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-[12px]" />
+              <p class="buddy-safety-hint">🔒 手机号、微信号、QQ 等联系方式请填下方加密栏，公开备注会自动拦截</p>
             </div>
 
             <div class="space-y-1 pt-1 border-t border-slate-100" data-enter-scope>

@@ -6,7 +6,7 @@ function renderAdminScheduleThumbs() {
   box.innerHTML = adminScheduleImgs.length
     ? adminScheduleImgs.map((src, i) => `
         <div class="relative w-14 h-16 rounded-lg overflow-hidden border border-slate-300 bg-white">
-          <img src="${src}" onclick="openLightbox(this.src, '时间表 #${i + 1}')" class="w-full h-full object-cover cursor-zoom-in" loading="lazy" decoding="async" />
+          <img src="${src}" onclick="openLightbox(this.src, '时间表 #${i + 1}')" class="w-full h-full object-cover cursor-zoom-in" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.style.display='none'" />
           <button type="button" onclick="adminScheduleImgs.splice(${i}, 1); renderAdminScheduleThumbs();" class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-slate-900/80 text-white text-[10px]">✕</button>
         </div>
       `).join('')
@@ -375,7 +375,7 @@ async function loadProofReviewQueue(status = 'pending') {
 
     const thumb = p.signed_url
       ? `<a href="${p.signed_url}" target="_blank" rel="noopener" class="shrink-0">
-           <img src="${p.signed_url}" alt="脱敏票根" class="w-14 h-14 object-cover rounded border border-slate-200" />
+           <img src="${p.signed_url}" alt="脱敏票根" class="w-14 h-14 object-cover rounded border border-slate-200" referrerpolicy="no-referrer" onerror="this.style.display='none'" />
          </a>`
       : `<div class="w-14 h-14 rounded border border-dashed border-slate-300 flex items-center justify-center text-[10px] text-slate-400 shrink-0 text-center leading-tight">无图<br>或链接失效</div>`;
 

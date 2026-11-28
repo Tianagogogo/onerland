@@ -627,7 +627,20 @@ function degradePosterImage(img) {
   if (!img || img.dataset.degraded === '1') return;
   img.dataset.degraded = '1';
   const box = img.closest ? img.closest('.poster-square-box') : null;
-  if (box) box.classList.add('is-poster-fallback');
+  if (box) {
+    box.classList.add('is-poster-fallback');
+    // 用演出标题生成冷银白渐变文字封面，绝不出现浏览器裂图图标
+    const raw = String(img.getAttribute('alt') || img.getAttribute('title') || '').trim();
+    const label = raw.replace(/\s*[·|].*$/, '').replace(/[<>]/g, '').slice(0, 14) || 'ONER';
+    if (!box.querySelector('.poster-fallback-label')) {
+      const span = document.createElement('span');
+      span.className = 'poster-fallback-label';
+      span.textContent = label;
+      if (raw) span.title = raw;
+      box.appendChild(span);
+    }
+    box.dataset.fallbackLabel = '1';
+  }
   img.style.display = 'none';
 }
 
@@ -1358,6 +1371,7 @@ function normalizeBuddyRow(row) {
     fandomType,
     memberTags,
     tags: toArray(row.need_tags),
+    note: row.public_note || row.note || '',
     contact: row.contact_info || '',
     theme: row.theme || '#64748b',
     status: row.status || BUDDY_STATUS_OPEN,
@@ -1394,15 +1408,26 @@ async function publishBuddyIntent(eventId, entry) {
     fandom_type: entry.fandomType || entry.biasLabel || '团粉',
     member_tags: toArray(entry.memberTags || []),
     need_tags: toArray(entry.tags || []),
+    public_note: (entry.note || '').slice(0, 60) || null,
     contact_info: (entry.contact || '').slice(0, 30) || null,
     status: BUDDY_STATUS_OPEN
   };
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${BUDDY_TABLE}`, {
+    let res = await fetch(`${SUPABASE_URL}/rest/v1/${BUDDY_TABLE}`, {
       method: 'POST',
       headers: buddyHeaders(),
       body: JSON.stringify(payload)
     });
+    // 云端还没加 public_note 列时，静默降级：备注只留在本机，绝不因此发不出去
+    if (!res.ok && res.status === 400) {
+      const fallback = { ...payload };
+      delete fallback.public_note;
+      res = await fetch(`${SUPABASE_URL}/rest/v1/${BUDDY_TABLE}`, {
+        method: 'POST',
+        headers: buddyHeaders(),
+        body: JSON.stringify(fallback)
+      });
+    }
     if (!res.ok) return { ok: false, reason: `HTTP ${res.status}` };
     let rows = null;
     try { rows = await res.json(); } catch (e) { rows = null; }
@@ -2616,4 +2641,90 @@ if (typeof document !== 'undefined') {
   } else {
     syncGlobalFanTheme();
   }
+}
+
+// ================= 📤 本机数据一键导出 / 📥 恢复（全部 onerland_ 前缀键） =================
+function collectOnerlandLocalData() {
+  const data = {};
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key || key.indexOf('onerland_') !== 0) continue;
+      data[key] = localStorage.getItem(key);
+    }
+  } catch (e) { /* 隐私模式可能不可读 */ }
+  return data;
+}
+
+function setLocalBackupHint(text) {
+  const el = document.getElementById('local-backup-hint');
+  if (el) el.textContent = text || '';
+}
+
+function exportLocalBackup() {
+  const data = collectOnerlandLocalData();
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+  const count = Object.keys(data).length;
+  const payload = {
+    app: 'onerland',
+    schema: 1,
+    exportedAt: d.toISOString(),
+    count,
+    data
+  };
+  const fileName = `onerland-backup-${stamp}.json`;
+  try {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    if (typeof showToast === 'function') showToast(`已导出 ${count} 项本机数据`);
+    setLocalBackupHint(`✅ 已导出 ${count} 项 · ${fileName}`);
+  } catch (e) {
+    alert('导出失败：' + (e && e.message ? e.message : '未知错误'));
+  }
+}
+
+function triggerLocalBackupImport() {
+  const input = document.getElementById('local-backup-input');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+function importLocalBackupFromFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let payload = null;
+    try { payload = JSON.parse(String(reader.result || '')); } catch (e) { payload = null; }
+    if (!payload || payload.app !== 'onerland' || !payload.data || typeof payload.data !== 'object') {
+      alert('❌ 备份文件格式不正确，请选择由 ONERLAND 导出的 .json 备份');
+      return;
+    }
+    const entries = Object.entries(payload.data).filter(([k, v]) => k.indexOf('onerland_') === 0 && typeof v === 'string');
+    if (!entries.length) {
+      alert('❌ 备份文件里没有可恢复的数据');
+      return;
+    }
+    if (!confirm(`将合并恢复 ${entries.length} 项本机数据（同名键以备份为准，其它本机设置保留）。继续吗？`)) return;
+    try {
+      entries.forEach(([k, v]) => localStorage.setItem(k, v));
+    } catch (e) {
+      alert('❌ 写入本机存储失败：' + (e && e.message ? e.message : '未知错误'));
+      return;
+    }
+    setLocalBackupHint(`✅ 已恢复 ${entries.length} 项数据，即将刷新…`);
+    alert('✅ 数据已成功恢复');
+    setTimeout(() => location.reload(), 500);
+  };
+  reader.onerror = () => alert('❌ 读取备份文件失败，请重试');
+  reader.readAsText(file);
 }
