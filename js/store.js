@@ -1709,6 +1709,103 @@ const SECURITY_VOTE_TAGS = [
 ];
 const securityVoteCache = new Map();
 
+// ================= 跨浏览器硬件指纹（同一部手机在微信/ Safari/无痕下保持一致） =================
+let cachedDeviceSignature = '';
+function getDeviceSignature() {
+  if (cachedDeviceSignature) return cachedDeviceSignature;
+  const pick = v => (v == null ? '' : String(v));
+  let gpu = '';
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (gl) {
+      const info = gl.getExtension('WEBGL_debug_renderer_info');
+      if (info) {
+        gpu = `${pick(gl.getParameter(info.UNMASKED_VENDOR_WEBGL))}|${pick(gl.getParameter(info.UNMASKED_RENDERER_WEBGL))}`;
+      } else {
+        gpu = `${pick(gl.getParameter(gl.VENDOR))}|${pick(gl.getParameter(gl.RENDERER))}`;
+      }
+      const lose = gl.getExtension('WEBGL_lose_context');
+      if (lose) lose.loseContext();
+    }
+  } catch (e) { gpu = ''; }
+
+  let tz = '';
+  try {
+    tz = new Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  } catch (e) { tz = ''; }
+
+  const dpr = window.devicePixelRatio || 1;
+  const sw = Math.round((screen.width || 0) * dpr);
+  const sh = Math.round((screen.height || 0) * dpr);
+  // 只取硬件与系统环境，刻意剔除 UA / 浏览器内核标识，保证跨浏览器稳定
+  const parts = [
+    `r${sw}x${sh}`,
+    `d${screen.colorDepth || 0}`,
+    `p${pick(navigator.platform)}`,
+    `c${pick(navigator.hardwareConcurrency)}`,
+    `m${pick(navigator.deviceMemory || '')}`,
+    `o${pick(navigator.maxTouchPoints)}`,
+    `t${pick(navigator.userAgentData ? (navigator.userAgentData.platform || '') : '')}`,
+    `z${tz}`,
+    `g${gpu}`,
+    `l${pick(navigator.language || '')}`
+  ];
+  const raw = parts.join('|');
+  // FNV-1a 64bit 风格的双 32 位散列，输出 32 位十六进制
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < raw.length; i += 1) {
+    const code = raw.charCodeAt(i);
+    h1 ^= code;
+    h1 = Math.imul(h1, 0x01000193) >>> 0;
+    h2 = (h2 + code * (i + 7)) >>> 0;
+    h2 = Math.imul(h2 ^ (h2 >>> 13), 0x5bd1e995) >>> 0;
+  }
+  cachedDeviceSignature = (h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0'));
+  return cachedDeviceSignature;
+}
+
+function getSecurityHwHash() {
+  return getDeviceSignature();
+}
+
+async function sbRpc(fnName, params) {
+  if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) throw new Error('缺少 Supabase 配置');
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
+    method: 'POST',
+    headers: { ...SB_HEADERS, 'Content-Type': 'application/json' },
+    body: JSON.stringify(params || {})
+  });
+  if (!res.ok) throw new Error(`RPC ${fnName} HTTP ${res.status}`);
+  return res.json().catch(() => null);
+}
+
+function buildSecurityStatsFromRpc(data, hwHash) {
+  const payload = data && typeof data === 'object' ? data : {};
+  const levels = payload.levels || payload.level_counts || {};
+  const tags = payload.tags || payload.tag_counts || {};
+  const levelCount = {};
+  SECURITY_LEVELS.forEach(l => { levelCount[l] = Number(levels[l] || 0); });
+  const tagCount = {};
+  SECURITY_VOTE_TAGS.forEach(t => { tagCount[t] = Number(tags[t] || 0); });
+  const total = Number(payload.total || Object.values(levelCount).reduce((a, b) => a + b, 0));
+  const myLevel = payload.my_level || '';
+  const myTags = Array.isArray(payload.my_tags) ? payload.my_tags.filter(t => SECURITY_VOTE_TAGS.includes(t)) : [];
+  return {
+    total,
+    levelCount,
+    levelPct: SECURITY_LEVELS.reduce((acc, l) => {
+      acc[l] = total ? Math.round((levelCount[l] / total) * 100) : 0;
+      return acc;
+    }, {}),
+    tagCount,
+    myVote: myLevel ? { level: myLevel, tags: myTags, hw: hwHash } : null,
+    degraded: false
+  };
+}
+
+
 function getMySecurityVotes() {
   try {
     const raw = JSON.parse(localStorage.getItem(SECURITY_VOTE_LOCAL_KEY) || '{}');
@@ -1765,6 +1862,22 @@ async function fetchSecurityVoteStats(showKey) {
     empty.degraded = true;
     return empty;
   }
+  const hwHash = getSecurityHwHash();
+  try {
+    // 首选 RPC：由数据库按 IP + 硬件指纹去重后聚合，并回传本机已选标签
+    const rpcData = await sbRpc('get_security_votes', { p_show_id: key, p_hw_hash: hwHash });
+    if (rpcData && typeof rpcData === 'object') {
+      const stats = buildSecurityStatsFromRpc(rpcData, hwHash);
+      if (stats.myVote) {
+        setMySecurityVote(key, { level: stats.myVote.level, tags: stats.myVote.tags, at: new Date().toLocaleString('zh-CN') });
+      }
+      securityVoteCache.set(key, stats);
+      return stats;
+    }
+    throw new Error('RPC 返回为空');
+  } catch (rpcErr) {
+    // RPC 未部署时回退旧的 REST 读法
+  }
   try {
     const url = `${SUPABASE_URL}/rest/v1/${SECURITY_VOTE_TABLE}?show_key=eq.${encodeURIComponent(key)}&select=level,tags`;
     const res = await fetch(url, { headers: SB_HEADERS, cache: 'no-store' });
@@ -1782,39 +1895,96 @@ async function fetchSecurityVoteStats(showKey) {
 
 async function submitSecurityVote(showKey, venue, level, tags) {
   const key = String(showKey || '');
-  if (!key || !level) return { ok: false, error: '缺少场次或等级' };
+  if (!key) return { ok: false, error: '缺少场次' };
   const cleanTags = (Array.isArray(tags) ? tags : []).filter(t => SECURITY_VOTE_TAGS.includes(t));
   const mine = getMySecurityVote(key);
-  const payload = { show_key: key, venue: String(venue || ''), level, tags: cleanTags };
-  try {
-    let res;
-    if (mine && mine.rowId) {
-      res = await fetch(`${SUPABASE_URL}/rest/v1/${SECURITY_VOTE_TABLE}?id=eq.${encodeURIComponent(mine.rowId)}`, {
-        method: 'PATCH',
-        headers: { ...SB_HEADERS, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
-        body: JSON.stringify(payload)
+  const hwHash = getSecurityHwHash();
+  const at = new Date().toLocaleString('zh-CN');
+
+  // level 传空字符串表示「取消我这票」
+  if (!level) {
+    try {
+      await sbRpc('submit_security_vote', {
+        p_show_id: key,
+        p_tag: '',
+        p_hw_hash: hwHash,
+        p_venue: String(venue || ''),
+        p_tags: []
       });
-    } else {
-      res = await fetch(`${SUPABASE_URL}/rest/v1/${SECURITY_VOTE_TABLE}`, {
-        method: 'POST',
-        headers: { ...SB_HEADERS, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
-        body: JSON.stringify([payload])
-      });
+      const all = getMySecurityVotes();
+      delete all[key];
+      localStorage.setItem(SECURITY_VOTE_LOCAL_KEY, JSON.stringify(all));
+      securityVoteCache.delete(key);
+      return { ok: true, cancelled: true };
+    } catch (e) {
+      const all = getMySecurityVotes();
+      delete all[key];
+      localStorage.setItem(SECURITY_VOTE_LOCAL_KEY, JSON.stringify(all));
+      securityVoteCache.delete(key);
+      return { ok: false, error: String(e && e.message || e) };
     }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const rows = await res.json().catch(() => []);
-    const rowId = Array.isArray(rows) && rows[0] ? rows[0].id : (mine && mine.rowId);
-    setMySecurityVote(key, { level, tags: cleanTags, rowId, at: new Date().toLocaleString('zh-CN') });
+  }
+
+  try {
+    // 数据库层用 md5(出口 IP + 硬件指纹) 作为 voter_key，UNIQUE(show_id, voter_key) 保证一人一票
+    await sbRpc('submit_security_vote', {
+      p_show_id: key,
+      p_tag: level,
+      p_hw_hash: hwHash,
+      p_venue: String(venue || ''),
+      p_tags: cleanTags
+    });
+    setMySecurityVote(key, { level, tags: cleanTags, hw: hwHash, at });
     securityVoteCache.delete(key);
     return { ok: true };
   } catch (e) {
-    // 云端表缺失或网络异常：保留本机投票，不阻断页面
-    setMySecurityVote(key, { level, tags: cleanTags, rowId: mine && mine.rowId, at: new Date().toLocaleString('zh-CN') });
-    return { ok: false, error: String(e && e.message || e) };
+    // RPC 未部署时回退旧 REST 写法，保证老数据仍可写
+    const payload = { show_key: key, venue: String(venue || ''), level, tags: cleanTags };
+    try {
+      let res;
+      if (mine && mine.rowId) {
+        res = await fetch(`${SUPABASE_URL}/rest/v1/${SECURITY_VOTE_TABLE}?id=eq.${encodeURIComponent(mine.rowId)}`, {
+          method: 'PATCH',
+          headers: { ...SB_HEADERS, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        res = await fetch(`${SUPABASE_URL}/rest/v1/${SECURITY_VOTE_TABLE}`, {
+          method: 'POST',
+          headers: { ...SB_HEADERS, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+          body: JSON.stringify([payload])
+        });
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const rows = await res.json().catch(() => []);
+      const rowId = Array.isArray(rows) && rows[0] ? rows[0].id : (mine && mine.rowId);
+      setMySecurityVote(key, { level, tags: cleanTags, rowId, hw: hwHash, at });
+      securityVoteCache.delete(key);
+      return { ok: true };
+    } catch (e2) {
+      setMySecurityVote(key, { level, tags: cleanTags, rowId: mine && mine.rowId, hw: hwHash, at });
+      return { ok: false, error: String(e2 && e2.message || e2) };
+    }
   }
 }
 
+// 同浏览器多标签页：localStorage 变化即刷新另一标签页的安检票状态（毫秒级）
+if (!window.__securityVoteStorageBound) {
+  window.__securityVoteStorageBound = true;
+  window.addEventListener('storage', event => {
+    if (event.key !== SECURITY_VOTE_LOCAL_KEY) return;
+    securityVoteCache.clear();
+    if (typeof hydrateSecurityVoteBlocks === 'function') {
+      document.querySelectorAll('[data-security-vote]').forEach(host => { host.dataset.ready = '0'; });
+      try { hydrateSecurityVoteBlocks(); } catch (e) { /* ignore */ }
+    }
+  });
+}
+
 window.SECURITY_VOTE_TAGS = SECURITY_VOTE_TAGS;
+window.getDeviceSignature = getDeviceSignature;
+window.getSecurityHwHash = getSecurityHwHash;
+window.sbRpc = sbRpc;
 window.getMySecurityVote = getMySecurityVote;
 window.fetchSecurityVoteStats = fetchSecurityVoteStats;
 window.submitSecurityVote = submitSecurityVote;

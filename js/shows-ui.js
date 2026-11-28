@@ -657,20 +657,13 @@ function refreshFootprintAfterSecurity(showKey) {
 }
 
 // ================= 安检体验：云端公共投票（匿名聚合，无自由文本） =================
-const SECURITY_VOTE_SQL_HINT = `-- 在 Supabase SQL Editor 执行一次即可开启云端共享（缺表时前端自动降级为仅本机）
-create table if not exists public.security_votes (
-  id bigserial primary key,
-  show_key text not null,
-  venue text default '',
-  level text not null,
-  tags jsonb default '[]'::jsonb,
-  created_at timestamptz default now()
-);
-alter table public.security_votes enable row level security;
-create policy "security_votes read" on public.security_votes for select using (true);
-create policy "security_votes insert" on public.security_votes for insert with check (true);
-create policy "security_votes update" on public.security_votes for update using (true) with check (true);
-create index if not exists security_votes_show_key_idx on public.security_votes (show_key);`;
+const SECURITY_VOTE_SQL_HINT = `-- 在 Supabase SQL Editor 执行一次 sql/security_votes_rpc.sql 即可开启云端共享
+-- 表：public.show_security_votes（UNIQUE (show_id, voter_key) 一人一票）
+-- RPC：submit_security_vote(p_show_id, p_tag, p_hw_hash, p_venue, p_tags)
+--      get_security_votes(p_show_id, p_hw_hash)
+-- voter_key = md5(出口 IP || ':' || 硬件指纹)，微信/Safari/无痕共用同一票
+grant execute on function public.submit_security_vote(text, text, text, text, text[]) to anon;
+grant execute on function public.get_security_votes(text, text) to anon;`;
 
 function escapeVoteText(v) {
   return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -767,9 +760,10 @@ function renderSecurityVoteBlock(host, stats) {
 async function castSecurityVoteLevel(showKey, venue, level, event) {
   if (event && event.stopPropagation) event.stopPropagation();
   const mine = getMySecurityVote(showKey) || {};
-  const res = await submitSecurityVote(showKey, venue, level, mine.tags || []);
-  // 本机镜像一份等级，散场后归档到「场馆体验」与足迹
-  if (typeof saveSecurityExperience === 'function') saveSecurityExperience(showKey, { level });
+  // 再次点击同一档 = 取消我这票（数据库按 voter_key 删除，不会残留人数）
+  const cancelling = mine.level === level;
+  const res = await submitSecurityVote(showKey, venue, cancelling ? '' : level, cancelling ? [] : (mine.tags || []));
+  if (typeof saveSecurityExperience === 'function') saveSecurityExperience(showKey, { level: cancelling ? '' : level });
   await refreshSecurityVoteHosts(showKey, res);
 }
 
