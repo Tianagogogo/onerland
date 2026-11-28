@@ -91,9 +91,12 @@ function renderAnniversaryCard() {
   const meetDays = isNaN(start) ? 0 : Math.max(1, Math.floor((Date.now() - start.getTime()) / 86400000));
 
   // 颜色实时跟随所选关联对象：单人=成员色，多选=所选成员顺滑渐变，含 ONER=全团红
-  const accent = typeof getAnniversaryTargetAccent === 'function'
-    ? getAnniversaryTargetAccent(targets)
-    : { bg: 'var(--fan-theme)', solid: 'var(--fan-theme-solid)' };
+  // 统一走站内粉籍配色：团粉=ONER 红，唯粉=成员应援色，双担=双色渐变
+  const accent = typeof getFanIdentityAccent === 'function'
+    ? getFanIdentityAccent(ann.fanIdentity, targets)
+    : (typeof getAnniversaryTargetAccent === 'function'
+      ? getAnniversaryTargetAccent(targets)
+      : { bg: 'var(--fan-theme)', solid: 'var(--fan-theme-solid)' });
 
   const nextMeet = getNextMeetCountdown(targets);
   const meetText = nextMeet
@@ -170,35 +173,45 @@ function openAnniversaryTargetPicker(event) {
   if (event && event.stopPropagation) event.stopPropagation();
   closeAnniversaryTargetPicker();
   const ann = AppState.anniversary;
-  const current = Array.isArray(ann.targets) && ann.targets.length ? String(ann.targets[0]) : 'ONER';
+  const options = (typeof getFanIdentityOptions === 'function' ? getFanIdentityOptions() : []);
+  const targets = Array.isArray(ann.targets) && ann.targets.length ? ann.targets : ['ONER'];
+  // 当前粉籍：优先存下来的 identity；老数据按对象名推断
+  const current = ann.fanIdentity || (targets[0] === 'ONER' ? 'group' : `solo:${targets[0]}`);
   const btn = event && event.currentTarget;
   const rect = btn && btn.getBoundingClientRect ? btn.getBoundingClientRect() : { left: 20, bottom: 120, top: 100 };
   const menu = document.createElement('div');
   menu.id = 'anniv-target-picker';
-  menu.className = 'fixed z-[9998] min-w-[168px] p-1.5 rounded-xl bg-white/95 border border-slate-200 shadow-xl backdrop-blur text-xs';
-  menu.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - 190))}px`;
-  menu.style.top = `${Math.min(rect.bottom + 8, window.innerHeight - 190)}px`;
-  const options = ['ONER', '岳岳', '木子洋', '灵超'].map(name => {
-    const on = name === current;
-    return `<button type="button" data-target="${name}" class="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 ${on ? 'font-bold text-slate-900' : 'text-slate-600'}">
-      <span>${on ? '✓ ' : ''}${name}</span><span class="w-2.5 h-2.5 rounded-full" style="background:${getAnniversaryTargetColor(name)}"></span>
+  menu.className = 'fixed z-[9998] min-w-[190px] p-1.5 rounded-xl bg-white/95 border border-slate-200 shadow-xl backdrop-blur text-xs';
+  menu.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - 215))}px`;
+  menu.style.top = `${Math.min(rect.bottom + 8, window.innerHeight - 320)}px`;
+  const optionHtml = options.map(opt => {
+    const on = opt.id === current;
+    const dot = opt.accent.includes('gradient')
+      ? `background:${opt.accent}`
+      : `background:${opt.accent}`;
+    return `<button type="button" data-identity="${opt.id}" class="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 ${on ? 'font-bold text-slate-900' : 'text-slate-600'}">
+      <span>${on ? '✓ ' : ''}${opt.label}</span><span class="w-2.5 h-2.5 rounded-full shrink-0" style="${dot}"></span>
     </button>`;
   }).join('');
-  menu.innerHTML = `${options}
+  menu.innerHTML = `${optionHtml}
     <div class="my-1 h-px bg-slate-200"></div>
-    <button type="button" data-target-custom="1" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-600">✏️ 自定义对象名…</button>`;
+    <button type="button" data-identity-custom="1" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-600">✏️ 自定义对象名…</button>`;
   document.body.appendChild(menu);
   menu.addEventListener('click', ev => {
-    const pick = ev.target.closest('[data-target]');
+    const pick = ev.target.closest('[data-identity]');
     if (pick) {
-      saveAnniversaryState({ targets: [pick.dataset.target] });
+      const opt = options.find(o => o.id === pick.dataset.identity);
+      if (opt) {
+        // 只显示对象名（团粉→ONER，唯粉(灵超)→灵超，双担→岳岳 & 木子洋），不带括号
+        saveAnniversaryState({ fanIdentity: opt.id, targets: [opt.target] });
+      }
       closeAnniversaryTargetPicker();
       return;
     }
-    if (ev.target.closest('[data-target-custom]')) {
-      const name = (prompt('输入要关联的对象名称', current) || '').trim().slice(0, 12);
+    if (ev.target.closest('[data-identity-custom]')) {
+      const name = (prompt('输入要关联的对象名称', targets[0] || 'ONER') || '').trim().slice(0, 12);
       closeAnniversaryTargetPicker();
-      if (name) saveAnniversaryState({ targets: [name] });
+      if (name) saveAnniversaryState({ fanIdentity: 'custom', targets: [name] });
     }
   });
   setTimeout(() => document.addEventListener('click', closeAnniversaryTargetPicker, { once: true }), 0);

@@ -226,6 +226,36 @@ function getAnniversaryTargetColor(member) {
   return hex;
 }
 
+// ================= 站内统一粉籍身份（与找搭子/身份标签共用同一套命名与应援色） =================
+function getFanIdentityOptions() {
+  return [
+    { id: 'group', label: '团粉', target: 'ONER', members: [], accent: ARTIST_COLORS['ONER'].bg, solid: ARTIST_COLORS['ONER'].hex },
+    { id: 'solo:岳岳', label: '唯粉(岳岳)', target: '岳岳', members: ['岳岳'], accent: getMemberHex('岳岳'), solid: getMemberHex('岳岳') },
+    { id: 'solo:木子洋', label: '唯粉(木子洋)', target: '木子洋', members: ['木子洋'], accent: getMemberHex('木子洋'), solid: getMemberHex('木子洋') },
+    { id: 'solo:灵超', label: '唯粉(灵超)', target: '灵超', members: ['灵超'], accent: getMemberHex('灵超'), solid: getMemberHex('灵超') },
+    { id: 'cp:岳岳+木子洋', label: '双担(岳岳·木子洋)', target: '岳岳 & 木子洋', members: ['岳岳', '木子洋'], accent: buildCpGradient('岳岳', '木子洋'), solid: getMemberHex('岳岳') },
+    { id: 'cp:岳岳+灵超', label: '双担(岳岳·灵超)', target: '岳岳 & 灵超', members: ['岳岳', '灵超'], accent: buildCpGradient('岳岳', '灵超'), solid: getMemberHex('岳岳') },
+    { id: 'cp:木子洋+灵超', label: '双担(木子洋·灵超)', target: '木子洋 & 灵超', members: ['木子洋', '灵超'], accent: buildCpGradient('木子洋', '灵超'), solid: getMemberHex('木子洋') }
+  ];
+}
+
+function getFanIdentityOption(id) {
+  return getFanIdentityOptions().find(opt => opt.id === id) || null;
+}
+
+// 纪念日卡片配色：优先按所选粉籍身份取色，找不到再回退对象色
+function getFanIdentityAccent(identityId, fallbackTargets) {
+  const opt = getFanIdentityOption(identityId);
+  if (opt) return { bg: opt.accent, solid: opt.solid };
+  const targets = Array.isArray(fallbackTargets) && fallbackTargets.length ? fallbackTargets : ['ONER'];
+  if (typeof getAnniversaryTargetAccent === 'function') return getAnniversaryTargetAccent(targets);
+  return { bg: ARTIST_COLORS['ONER'].bg, solid: ARTIST_COLORS['ONER'].hex };
+}
+
+window.getFanIdentityOptions = getFanIdentityOptions;
+window.getFanIdentityOption = getFanIdentityOption;
+window.getFanIdentityAccent = getFanIdentityAccent;
+
 window.getAnniversaryAccentColor = getAnniversaryAccentColor;
 window.getAnniversaryTargetColor = getAnniversaryTargetColor;
 
