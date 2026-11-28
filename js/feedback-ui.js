@@ -23,7 +23,6 @@ const HELP_GUIDE_ITEMS = [
     icon: '🏠',
     title: '首页',
     subtitle: '时光提醒、纪念日与近期微时间轴',
-    defaultOpen: true,
     points: [
       { t: '✨ 自定义时光提醒', d: '点击顶部「昵称 / 对象 / 动作词」可随时修改文案；切换主推对象（ONER / 岳岳 / 木子洋 / 灵超）后，会同步联动足迹页的默认粉籍与应援色主题。' },
       { t: '⏳ 见面与演出倒计时', d: '为未来演出点亮 `🎫 计划前往` 后，副标题自动切换为「距与 X 下次见面还有 X 天」；未点亮时客观显示「距 X 下一场演出还有 X 天」。' },
@@ -37,7 +36,6 @@ const HELP_GUIDE_ITEMS = [
     icon: '🏛️',
     title: '档案',
     subtitle: '全量演出检索、专题聚合与参演指南',
-    defaultOpen: false,
     points: [
       { t: '🔍 多维筛选与专题聚合', d: '支持按艺人 / 成员筛选，也可按巡演专题（「极尽声色」、ChillParty、无限未来、「燃点」）或「音乐节合集」一键聚合查看全部历史与待开演场次。' },
       { t: '🎫 计划前往与历史打卡', d: '未来场次可标记 `🎫 计划前往`（联动首页见面倒计时）；已落幕场次点击 `+ 足迹` 计入线下见面总场次。' },
@@ -51,7 +49,6 @@ const HELP_GUIDE_ITEMS = [
     icon: '🎫',
     title: '足迹',
     subtitle: '个人观演统计、粉籍同步与搭子纪念日',
-    defaultOpen: false,
     points: [
       { t: '📊 线下见面总览与时间轴', d: '自动汇总你点亮的所有历史观演场次，完整记录每一场线下奔赴的日期、城市与场馆。' },
       { t: '🎨 粉籍与应援色联动', d: '默认与首页「时光提醒」选择的人物及应援色保持一致，也支持在足迹页内独立切换粉籍；当两端设置不一致时，系统会弹出提醒供一键统一。' },
@@ -63,7 +60,6 @@ const HELP_GUIDE_ITEMS = [
     icon: '🔒',
     title: '身份与隐私',
     subtitle: '数据安全与留言反馈',
-    defaultOpen: false,
     points: [
       { t: '👤 免注册本地存储', d: '全站无需注册账号，昵称、足迹、计划前往、私人安检笔记及搭子备注均保存在当前浏览器的本地存储（`localStorage`）中；清理浏览器缓存或更换设备前请留意保留数据。' },
       { t: '💬 隐私留言反馈', d: '任何使用问题、功能建议或演出场次纠错都可通过下方表单提交；所有反馈内容仅管理员解锁后可见，访客之间互不可见。' }
@@ -76,7 +72,8 @@ function renderHelpGuide() {
   if (!box) return;
   const fmt = (text) => escapeFeedbackText(text).replace(/`([^`]+)`/g, '<code class="help-guide-code">$1</code>');
   box.innerHTML = HELP_GUIDE_ITEMS.map((item, idx) => {
-    const open = item.defaultOpen || idx === 0;
+    // 默认全部折叠：访客点标题后再展开对应分类
+    const open = false;
     const points = (item.points || []).map(pt => {
       if (pt && typeof pt === 'object') {
         return `<li><strong class="help-guide-pt-title">${fmt(pt.t || '')}</strong><span class="help-guide-pt-sep">：</span><span class="help-guide-pt-desc">${fmt(pt.d || '')}</span></li>`;
