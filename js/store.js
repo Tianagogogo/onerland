@@ -1686,73 +1686,26 @@ function getAnniversaryTargetAccent(targets) {
 
 window.getAnniversaryTargetAccent = getAnniversaryTargetAccent;
 
-// ================= 0.3 安检体验云端全员共享投票 =================
-// 建表 SQL（若云端尚无该表，前端会自动降级为仅本机模式）：
-// create table if not exists public.security_votes (
-//   id bigserial primary key,
-//   show_key text not null,
-//   venue text default '',
-//   level text not null,
-//   tags jsonb default '[]'::jsonb,
-//   created_at timestamptz default now()
-// );
-// alter table public.security_votes enable row level security;
-// create policy "security_votes read" on public.security_votes for select using (true);
-// create policy "security_votes insert" on public.security_votes for insert with check (true);
-// create policy "security_votes update" on public.security_votes for update using (true) with check (true);
-// create index if not exists security_votes_show_key_idx on public.security_votes (show_key);
-const SECURITY_VOTE_TABLE = 'security_votes';
-const SECURITY_VOTE_LOCAL_KEY = 'onerland_security_vote_mine_v1';
-const SECURITY_VOTE_TAGS = [
-  '禁带灯牌/发光物', '禁带专业相机', '禁带水杯/饮料', '充电宝需合规标识',
-  '场外有存包处', '开包翻查极细', '刷证人脸秒过', '排队超过30分钟'
+// ================= 0.3 安检体验：标签投票（首页 + 档案双端同源） =================
+// 数据表 public.show_security_votes(id, show_id, visitor_id, tag, created_at)
+// UNIQUE (show_id, visitor_id, tag) —— 并发点击也不会重复计票
+const SECURITY_VOTE_TABLE = 'show_security_votes';
+const SECURITY_TAGS_LOCAL_KEY = 'onerland_security_tags_mine_v2';
+const SECURITY_VOTE_TAGS = ['安检严格', '安检宽松', '查相机/长焦', '翻包细致', '过检很快'];
+const SECURITY_TAG_META = [
+  { tag: '安检严格', emoji: '🔴' },
+  { tag: '安检宽松', emoji: '🟢' },
+  { tag: '查相机/长焦', emoji: '📷' },
+  { tag: '翻包细致', emoji: '👜' },
+  { tag: '过检很快', emoji: '⚡' }
 ];
 const securityVoteCache = new Map();
+let securityVenueColumnOk = true;
 
-// ================= 跨浏览器硬件指纹（同一部手机在微信/ Safari/无痕下保持一致） =================
+// ---------- 稳定访客指纹：硬件特征 + Canvas 指纹 + UA 哈希 ----------
 let cachedDeviceSignature = '';
-function getDeviceSignature() {
-  if (cachedDeviceSignature) return cachedDeviceSignature;
-  const pick = v => (v == null ? '' : String(v));
-  let gpu = '';
-  try {
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-    if (gl) {
-      const info = gl.getExtension('WEBGL_debug_renderer_info');
-      if (info) {
-        gpu = `${pick(gl.getParameter(info.UNMASKED_VENDOR_WEBGL))}|${pick(gl.getParameter(info.UNMASKED_RENDERER_WEBGL))}`;
-      } else {
-        gpu = `${pick(gl.getParameter(gl.VENDOR))}|${pick(gl.getParameter(gl.RENDERER))}`;
-      }
-      const lose = gl.getExtension('WEBGL_lose_context');
-      if (lose) lose.loseContext();
-    }
-  } catch (e) { gpu = ''; }
-
-  let tz = '';
-  try {
-    tz = new Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-  } catch (e) { tz = ''; }
-
-  const dpr = window.devicePixelRatio || 1;
-  const sw = Math.round((screen.width || 0) * dpr);
-  const sh = Math.round((screen.height || 0) * dpr);
-  // 只取硬件与系统环境，刻意剔除 UA / 浏览器内核标识，保证跨浏览器稳定
-  const parts = [
-    `r${sw}x${sh}`,
-    `d${screen.colorDepth || 0}`,
-    `p${pick(navigator.platform)}`,
-    `c${pick(navigator.hardwareConcurrency)}`,
-    `m${pick(navigator.deviceMemory || '')}`,
-    `o${pick(navigator.maxTouchPoints)}`,
-    `t${pick(navigator.userAgentData ? (navigator.userAgentData.platform || '') : '')}`,
-    `z${tz}`,
-    `g${gpu}`,
-    `l${pick(navigator.language || '')}`
-  ];
-  const raw = parts.join('|');
-  // FNV-1a 64bit 风格的双 32 位散列，输出 32 位十六进制
+function hashStringToHex(input) {
+  const raw = String(input || '');
   let h1 = 0x811c9dc5;
   let h2 = 0x01000193;
   for (let i = 0; i < raw.length; i += 1) {
@@ -1762,7 +1715,74 @@ function getDeviceSignature() {
     h2 = (h2 + code * (i + 7)) >>> 0;
     h2 = Math.imul(h2 ^ (h2 >>> 13), 0x5bd1e995) >>> 0;
   }
-  cachedDeviceSignature = (h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0'));
+  return h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0');
+}
+
+function getCanvasFingerprint() {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 220;
+    canvas.height = 60;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+    ctx.textBaseline = 'top';
+    ctx.font = '16px "PingFang SC", "Noto Sans SC", sans-serif';
+    ctx.fillStyle = '#f1f5f9';
+    ctx.fillRect(0, 0, 220, 60);
+    ctx.fillStyle = '#1e293b';
+    ctx.fillText('ONERLAND·安检体验·2026', 4, 6);
+    ctx.fillStyle = 'rgba(59,130,246,0.55)';
+    ctx.beginPath();
+    ctx.arc(170, 40, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(148,163,184,0.7)';
+    ctx.beginPath();
+    ctx.moveTo(0, 52);
+    ctx.quadraticCurveTo(110, 18, 220, 48);
+    ctx.stroke();
+    return canvas.toDataURL();
+  } catch (e) {
+    return '';
+  }
+}
+
+function getDeviceSignature() {
+  if (cachedDeviceSignature) return cachedDeviceSignature;
+  const pick = v => (v == null ? '' : String(v));
+  let gpu = '';
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (gl) {
+      const info = gl.getExtension('WEBGL_debug_renderer_info');
+      gpu = info
+        ? `${pick(gl.getParameter(info.UNMASKED_VENDOR_WEBGL))}|${pick(gl.getParameter(info.UNMASKED_RENDERER_WEBGL))}`
+        : `${pick(gl.getParameter(gl.VENDOR))}|${pick(gl.getParameter(gl.RENDERER))}`;
+      const lose = gl.getExtension('WEBGL_lose_context');
+      if (lose) lose.loseContext();
+    }
+  } catch (e) { gpu = ''; }
+
+  let tz = '';
+  try { tz = new Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { tz = ''; }
+
+  const dpr = window.devicePixelRatio || 1;
+  const sw = Math.round((screen.width || 0) * dpr);
+  const sh = Math.round((screen.height || 0) * dpr);
+  // 不含浏览器内核标识：同一部手机在微信/Safari/无痕下一致
+  const parts = [
+    `r${sw}x${sh}`,
+    `d${screen.colorDepth || 0}`,
+    `p${pick(navigator.platform)}`,
+    `c${pick(navigator.hardwareConcurrency)}`,
+    `m${pick(navigator.deviceMemory || '')}`,
+    `o${pick(navigator.maxTouchPoints)}`,
+    `z${tz}`,
+    `g${gpu}`,
+    `l${pick(navigator.language || '')}`,
+    `cv${hashStringToHex(getCanvasFingerprint())}`
+  ];
+  cachedDeviceSignature = hashStringToHex(parts.join('|'));
   return cachedDeviceSignature;
 }
 
@@ -1770,225 +1790,205 @@ function getSecurityHwHash() {
   return getDeviceSignature();
 }
 
-async function sbRpc(fnName, params) {
-  if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) throw new Error('缺少 Supabase 配置');
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
-    method: 'POST',
-    headers: { ...SB_HEADERS, 'Content-Type': 'application/json' },
-    body: JSON.stringify(params || {})
-  });
-  if (!res.ok) throw new Error(`RPC ${fnName} HTTP ${res.status}`);
-  return res.json().catch(() => null);
-}
-
-function buildSecurityStatsFromRpc(data, hwHash) {
-  const payload = data && typeof data === 'object' ? data : {};
-  const levels = payload.levels || payload.level_counts || {};
-  const tags = payload.tags || payload.tag_counts || {};
-  const levelCount = {};
-  SECURITY_LEVELS.forEach(l => { levelCount[l] = Number(levels[l] || 0); });
-  const tagCount = {};
-  SECURITY_VOTE_TAGS.forEach(t => { tagCount[t] = Number(tags[t] || 0); });
-  const total = Number(payload.total || Object.values(levelCount).reduce((a, b) => a + b, 0));
-  const myLevel = payload.my_level || '';
-  const myTags = Array.isArray(payload.my_tags) ? payload.my_tags.filter(t => SECURITY_VOTE_TAGS.includes(t)) : [];
-  return {
-    total,
-    levelCount,
-    levelPct: SECURITY_LEVELS.reduce((acc, l) => {
-      acc[l] = total ? Math.round((levelCount[l] / total) * 100) : 0;
-      return acc;
-    }, {}),
-    tagCount,
-    myVote: myLevel ? { level: myLevel, tags: myTags, hw: hwHash } : null,
-    degraded: false
-  };
-}
-
-
-function getMySecurityVotes() {
+function getVisitorId() {
   try {
-    const raw = JSON.parse(localStorage.getItem(SECURITY_VOTE_LOCAL_KEY) || '{}');
+    const cached = localStorage.getItem('onerland_visitor_id_v1');
+    if (cached && cached.length >= 8) return cached;
+    const id = `v-${getDeviceSignature()}`;
+    localStorage.setItem('onerland_visitor_id_v1', id);
+    return id;
+  } catch (e) {
+    return `v-${getDeviceSignature()}`;
+  }
+}
+
+// ---------- 本机已选标签（多标签页 storage 同步） ----------
+function getMySecurityTagsMap() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SECURITY_TAGS_LOCAL_KEY) || '{}');
     return raw && typeof raw === 'object' ? raw : {};
   } catch (e) {
     return {};
   }
 }
 
-function getMySecurityVote(showKey) {
-  const rec = getMySecurityVotes()[String(showKey || '')];
-  return rec && typeof rec === 'object' ? rec : null;
+function getMySecurityTags(showId) {
+  const list = getMySecurityTagsMap()[String(showId || '')];
+  return Array.isArray(list) ? list.filter(t => SECURITY_VOTE_TAGS.includes(t)) : [];
 }
 
-function setMySecurityVote(showKey, payload) {
-  const all = getMySecurityVotes();
-  all[String(showKey || '')] = payload;
-  localStorage.setItem(SECURITY_VOTE_LOCAL_KEY, JSON.stringify(all));
+function setMySecurityTags(showId, tags) {
+  const all = getMySecurityTagsMap();
+  const key = String(showId || '');
+  const clean = (Array.isArray(tags) ? tags : []).filter(t => SECURITY_VOTE_TAGS.includes(t));
+  if (clean.length) all[key] = clean;
+  else delete all[key];
+  try {
+    localStorage.setItem(SECURITY_TAGS_LOCAL_KEY, JSON.stringify(all));
+  } catch (e) { /* 忽略隐私模式写入失败 */ }
 }
 
-function aggregateSecurityVotes(rows, myVote) {
-  const safeRows = Array.isArray(rows) ? rows : [];
-  const levelCount = {};
-  SECURITY_LEVELS.forEach(l => { levelCount[l] = 0; });
-  const tagCount = {};
-  SECURITY_VOTE_TAGS.forEach(t => { tagCount[t] = 0; });
-  safeRows.forEach(r => {
-    const lv = String(r && r.level || '');
-    if (levelCount[lv] != null) levelCount[lv] += 1;
-    const tags = Array.isArray(r && r.tags) ? r.tags : [];
-    tags.forEach(t => { if (tagCount[t] != null) tagCount[t] += 1; });
+function aggregateSecurityTags(rows, myTags, venueRows) {
+  const counts = {};
+  const venueCounts = {};
+  SECURITY_VOTE_TAGS.forEach(t => { counts[t] = 0; venueCounts[t] = 0; });
+  (Array.isArray(rows) ? rows : []).forEach(r => {
+    const tag = String(r && r.tag || '');
+    if (counts[tag] != null) counts[tag] += 1;
   });
-  const total = safeRows.length;
+  (Array.isArray(venueRows) ? venueRows : []).forEach(r => {
+    const tag = String(r && r.tag || '');
+    if (venueCounts[tag] != null) venueCounts[tag] += 1;
+  });
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
   return {
+    counts,
+    venueCounts,
+    venueTotal: Object.values(venueCounts).reduce((a, b) => a + b, 0),
     total,
-    levelCount,
-    levelPct: SECURITY_LEVELS.reduce((acc, l) => {
-      acc[l] = total ? Math.round((levelCount[l] / total) * 100) : 0;
-      return acc;
-    }, {}),
-    tagCount,
-    myVote: myVote || null,
+    myTags: Array.isArray(myTags) ? myTags : getMySecurityTags(''),
     degraded: false
   };
 }
 
-async function fetchSecurityVoteStats(showKey) {
-  const key = String(showKey || '');
-  if (!key) return { total: 0, degraded: false, levelCount: {}, levelPct: {}, tagCount: {}, myVote: null };
-  const myVote = getMySecurityVote(key);
-  if (securityVoteCache.has(key)) return { ...securityVoteCache.get(key), myVote };
-  if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) {
-    const empty = aggregateSecurityVotes([], myVote);
-    empty.degraded = true;
-    return empty;
+async function fetchSecurityTagStats(showId, venue) {
+  const key = String(showId || '');
+  const empty = () => ({ counts: SECURITY_VOTE_TAGS.reduce((a, t) => ({ ...a, [t]: 0 }), {}),
+    venueCounts: SECURITY_VOTE_TAGS.reduce((a, t) => ({ ...a, [t]: 0 }), {}),
+    venueTotal: 0, total: 0, myTags: getMySecurityTags(key), degraded: true });
+  if (!key) return empty();
+  if (securityVoteCache.has(key)) {
+    const cached = securityVoteCache.get(key);
+    return { ...cached, myTags: getMySecurityTags(key) };
   }
-  const hwHash = getSecurityHwHash();
+  if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) return empty();
   try {
-    // 首选 RPC：由数据库按 IP + 硬件指纹去重后聚合，并回传本机已选标签
-    const rpcData = await sbRpc('get_security_votes', { p_show_id: key, p_hw_hash: hwHash });
-    if (rpcData && typeof rpcData === 'object') {
-      const stats = buildSecurityStatsFromRpc(rpcData, hwHash);
-      if (stats.myVote) {
-        setMySecurityVote(key, { level: stats.myVote.level, tags: stats.myVote.tags, at: new Date().toLocaleString('zh-CN') });
-      }
-      securityVoteCache.set(key, stats);
-      return stats;
-    }
-    throw new Error('RPC 返回为空');
-  } catch (rpcErr) {
-    // RPC 未部署时回退旧的 REST 读法
-  }
-  try {
-    const url = `${SUPABASE_URL}/rest/v1/${SECURITY_VOTE_TABLE}?show_key=eq.${encodeURIComponent(key)}&select=level,tags`;
+    const url = `${SUPABASE_URL}/rest/v1/${SECURITY_VOTE_TABLE}?show_id=eq.${encodeURIComponent(key)}&select=tag,visitor_id`;
     const res = await fetch(url, { headers: SB_HEADERS, cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const rows = await res.json();
-    const stats = aggregateSecurityVotes(rows, myVote);
+    const mine = Array.isArray(rows)
+      ? rows.filter(r => String(r.visitor_id || '') === getVisitorId()).map(r => String(r.tag || ''))
+      : [];
+    if (mine.length) setMySecurityTags(key, mine);
+    let venueRows = [];
+    if (venue) {
+      try {
+        const vurl = `${SUPABASE_URL}/rest/v1/${SECURITY_VOTE_TABLE}?venue=eq.${encodeURIComponent(venue)}&select=tag`;
+        const vres = await fetch(vurl, { headers: SB_HEADERS, cache: 'no-store' });
+        if (vres.ok) venueRows = await vres.json();
+      } catch (e) { venueRows = []; }
+    }
+    const stats = aggregateSecurityTags(rows, mine.length ? mine : getMySecurityTags(key), venueRows);
     securityVoteCache.set(key, stats);
     return stats;
   } catch (e) {
-    const stats = aggregateSecurityVotes([], myVote);
-    stats.degraded = true;
-    return stats;
+    return empty();
   }
 }
 
-async function submitSecurityVote(showKey, venue, level, tags) {
-  const key = String(showKey || '');
-  if (!key) return { ok: false, error: '缺少场次' };
-  const cleanTags = (Array.isArray(tags) ? tags : []).filter(t => SECURITY_VOTE_TAGS.includes(t));
-  const mine = getMySecurityVote(key);
-  const hwHash = getSecurityHwHash();
-  const at = new Date().toLocaleString('zh-CN');
-
-  // level 传空字符串表示「取消我这票」
-  if (!level) {
-    try {
-      await sbRpc('submit_security_vote', {
-        p_show_id: key,
-        p_tag: '',
-        p_hw_hash: hwHash,
-        p_venue: String(venue || ''),
-        p_tags: []
-      });
-      const all = getMySecurityVotes();
-      delete all[key];
-      localStorage.setItem(SECURITY_VOTE_LOCAL_KEY, JSON.stringify(all));
-      securityVoteCache.delete(key);
-      return { ok: true, cancelled: true };
-    } catch (e) {
-      const all = getMySecurityVotes();
-      delete all[key];
-      localStorage.setItem(SECURITY_VOTE_LOCAL_KEY, JSON.stringify(all));
-      securityVoteCache.delete(key);
-      return { ok: false, error: String(e && e.message || e) };
-    }
-  }
-
-  try {
-    // 数据库层用 md5(出口 IP + 硬件指纹) 作为 voter_key，UNIQUE(show_id, voter_key) 保证一人一票
-    await sbRpc('submit_security_vote', {
-      p_show_id: key,
-      p_tag: level,
-      p_hw_hash: hwHash,
-      p_venue: String(venue || ''),
-      p_tags: cleanTags
-    });
-    setMySecurityVote(key, { level, tags: cleanTags, hw: hwHash, at });
-    securityVoteCache.delete(key);
-    return { ok: true };
-  } catch (e) {
-    // RPC 未部署时回退旧 REST 写法，保证老数据仍可写
-    const payload = { show_key: key, venue: String(venue || ''), level, tags: cleanTags };
-    try {
-      let res;
-      if (mine && mine.rowId) {
-        res = await fetch(`${SUPABASE_URL}/rest/v1/${SECURITY_VOTE_TABLE}?id=eq.${encodeURIComponent(mine.rowId)}`, {
-          method: 'PATCH',
-          headers: { ...SB_HEADERS, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
-          body: JSON.stringify(payload)
-        });
-      } else {
-        res = await fetch(`${SUPABASE_URL}/rest/v1/${SECURITY_VOTE_TABLE}`, {
-          method: 'POST',
-          headers: { ...SB_HEADERS, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
-          body: JSON.stringify([payload])
-        });
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const rows = await res.json().catch(() => []);
-      const rowId = Array.isArray(rows) && rows[0] ? rows[0].id : (mine && mine.rowId);
-      setMySecurityVote(key, { level, tags: cleanTags, rowId, hw: hwHash, at });
-      securityVoteCache.delete(key);
-      return { ok: true };
-    } catch (e2) {
-      setMySecurityVote(key, { level, tags: cleanTags, rowId: mine && mine.rowId, hw: hwHash, at });
-      return { ok: false, error: String(e2 && e2.message || e2) };
-    }
-  }
+// 兼容旧调用名：level 版页面已升级为标签版
+async function fetchSecurityVoteStats(showKey, venue) {
+  const stats = await fetchSecurityTagStats(showKey, venue);
+  return { ...stats, myVote: stats.myTags.length ? { tags: stats.myTags } : null };
 }
 
-// 同浏览器多标签页：localStorage 变化即刷新另一标签页的安检票状态（毫秒级）
-if (!window.__securityVoteStorageBound) {
-  window.__securityVoteStorageBound = true;
-  window.addEventListener('storage', event => {
-    if (event.key !== SECURITY_VOTE_LOCAL_KEY) return;
-    securityVoteCache.clear();
-    if (typeof hydrateSecurityVoteBlocks === 'function') {
-      document.querySelectorAll('[data-security-vote]').forEach(host => { host.dataset.ready = '0'; });
-      try { hydrateSecurityVoteBlocks(); } catch (e) { /* ignore */ }
-    }
+async function securityVoteRequest(path, options) {
+  return fetch(`${SUPABASE_URL}/rest/v1/${SECURITY_VOTE_TABLE}${path}`, {
+    ...options,
+    headers: { ...SB_HEADERS, 'Content-Type': 'application/json', ...(options && options.headers) }
   });
 }
 
+async function toggleSecurityTag(showId, venue, tag) {
+  const key = String(showId || '');
+  if (!key || !SECURITY_VOTE_TAGS.includes(tag)) return { ok: false, error: '参数不合法' };
+  const mine = getMySecurityTags(key);
+  const active = mine.includes(tag);
+  const nextTags = active ? mine.filter(t => t !== tag) : [...mine, tag];
+  // 先本地乐观更新，保证多标签页即时一致
+  setMySecurityTags(key, nextTags);
+  securityVoteCache.clear();
+  if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) return { ok: false, error: '未配置云端' };
+
+  const visitorId = getVisitorId();
+  try {
+    if (active) {
+      const path = `?show_id=eq.${encodeURIComponent(key)}&visitor_id=eq.${encodeURIComponent(visitorId)}&tag=eq.${encodeURIComponent(tag)}`;
+      const res = await securityVoteRequest(path, { method: 'DELETE', headers: { 'Prefer': 'return=minimal' } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } else {
+      const payload = { show_id: key, visitor_id: visitorId, tag };
+      if (venue && securityVenueColumnOk) payload.venue = String(venue);
+      const insert = body => securityVoteRequest('', {
+        method: 'POST',
+        headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([body])
+      });
+      let res = await insert(payload);
+      if (!res.ok && payload.venue) {
+        // 表里没有 venue 列时自动降级，只写最小列
+        securityVenueColumnOk = false;
+        const fallback = { show_id: key, visitor_id: visitorId, tag };
+        res = await insert(fallback);
+      }
+      if (!res.ok && res.status !== 409) throw new Error(`HTTP ${res.status}`);
+    }
+    return { ok: true, tags: nextTags };
+  } catch (e) {
+    return { ok: false, tags: nextTags, error: String(e && e.message || e) };
+  }
+}
+
+// 兼容旧调用名：等级投票映射为标签投票（严格/宽松）
+async function submitSecurityVote(showKey, venue, level, tags) {
+  const key = String(showKey || '');
+  if (!key) return { ok: false, error: '缺少场次' };
+  if (!level) {
+    const mine = getMySecurityTags(key);
+    for (const t of mine) await toggleSecurityTag(key, venue, t);
+    setMySecurityTags(key, []);
+    return { ok: true, cancel: true };
+  }
+  const mapped = level === '宽松放行' ? '安检宽松' : '安检严格';
+  const res = await toggleSecurityTag(key, venue, mapped);
+  return res.ok ? { ok: true } : res;
+}
+
+// 同浏览器多标签页：一个窗口投票，其余窗口毫秒级对齐
+function syncSecurityTagsAcrossTabs() {
+  securityVoteCache.clear();
+  document.querySelectorAll('[data-security-vote]').forEach(host => { host.dataset.ready = '0'; });
+  if (typeof refreshAllSecurityVoteHosts === 'function') {
+    try { refreshAllSecurityVoteHosts(); } catch (e) { /* ignore */ }
+  } else if (typeof hydrateSecurityVoteBlocks === 'function') {
+    try { hydrateSecurityVoteBlocks(); } catch (e) { /* ignore */ }
+  }
+}
+
+if (!window.__securityTagsStorageBound) {
+  window.__securityTagsStorageBound = true;
+  window.addEventListener('storage', event => {
+    if (event.key !== SECURITY_TAGS_LOCAL_KEY && event.key !== 'onerland_visitor_id_v1') return;
+    syncSecurityTagsAcrossTabs();
+  });
+  window.addEventListener('focus', () => {
+    if (document.visibilityState === 'visible') syncSecurityTagsAcrossTabs();
+  });
+}
+
+window.SECURITY_LEVELS = SECURITY_LEVELS;
 window.SECURITY_VOTE_TAGS = SECURITY_VOTE_TAGS;
-window.getDeviceSignature = getDeviceSignature;
-window.getSecurityHwHash = getSecurityHwHash;
-window.sbRpc = sbRpc;
-window.getMySecurityVote = getMySecurityVote;
+window.SECURITY_TAG_META = SECURITY_TAG_META;
+window.getMySecurityTags = getMySecurityTags;
+window.setMySecurityTags = setMySecurityTags;
+window.fetchSecurityTagStats = fetchSecurityTagStats;
+window.toggleSecurityTag = toggleSecurityTag;
 window.fetchSecurityVoteStats = fetchSecurityVoteStats;
 window.submitSecurityVote = submitSecurityVote;
-window.aggregateSecurityVotes = aggregateSecurityVotes;
+window.getVisitorId = getVisitorId;
+window.getDeviceSignature = getDeviceSignature;
+window.getSecurityHwHash = getSecurityHwHash;
 
 // ================= 足迹归档（演出 + 场馆体验共用，同场次覆盖更新） =================
 function buildShowKey(venueName, showTitle) {

@@ -657,13 +657,21 @@ function refreshFootprintAfterSecurity(showKey) {
 }
 
 // ================= 安检体验：云端公共投票（匿名聚合，无自由文本） =================
-const SECURITY_VOTE_SQL_HINT = `-- 在 Supabase SQL Editor 执行一次 sql/security_votes_rpc.sql 即可开启云端共享
--- 表：public.show_security_votes（UNIQUE (show_id, voter_key) 一人一票）
--- RPC：submit_security_vote(p_show_id, p_tag, p_hw_hash, p_venue, p_tags)
---      get_security_votes(p_show_id, p_hw_hash)
--- voter_key = md5(出口 IP || ':' || 硬件指纹)，微信/Safari/无痕共用同一票
-grant execute on function public.submit_security_vote(text, text, text, text, text[]) to anon;
-grant execute on function public.get_security_votes(text, text) to anon;`;
+const SECURITY_VOTE_SQL_HINT = `-- 在 Supabase SQL Editor 执行一次 sql/security_votes.sql 即可开启云端共享
+create table if not exists public.show_security_votes (
+  id bigserial primary key,
+  show_id text not null,
+  visitor_id text not null,
+  tag text not null,
+  venue text default '',
+  created_at timestamptz default now()
+);
+create unique index if not exists show_security_votes_unique_idx
+  on public.show_security_votes (show_id, visitor_id, tag);
+alter table public.show_security_votes enable row level security;
+create policy "sv read" on public.show_security_votes for select using (true);
+create policy "sv insert" on public.show_security_votes for insert with check (true);
+create policy "sv delete" on public.show_security_votes for delete using (true);`;
 
 function escapeVoteText(v) {
   return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -678,122 +686,115 @@ async function hydrateSecurityVoteBlocks() {
     host.dataset.hydrating = '1';
     let stats;
     try {
-      stats = await fetchSecurityVoteStats(key);
+      stats = await fetchSecurityTagStats(key, host.dataset.venue || '');
     } catch (e) {
-      stats = { total: 0, degraded: true };
+      stats = null;
     }
     host.dataset.hydrating = '0';
     if (!document.body.contains(host)) continue;
-    renderSecurityVoteBlock(host, stats);
+    renderSecurityVoteBlock(host, stats || { counts: {}, myTags: getMySecurityTags(key), degraded: true });
   }
 }
 
+// 简约标签投票面板：一行一个胶囊，带实时人数；选中即高亮描边
 function renderSecurityVoteBlock(host, stats) {
   const key = host.dataset.showKey;
   const venue = host.dataset.venue || '';
-  const myVote = (stats && stats.myVote) || getMySecurityVote(key) || {};
+  const counts = (stats && stats.counts) || {};
+  const venueCounts = (stats && stats.venueCounts) || {};
+  const myTags = (stats && Array.isArray(stats.myTags) && stats.myTags.length)
+    ? stats.myTags
+    : (typeof getMySecurityTags === 'function' ? getMySecurityTags(key) : []);
   const safeKey = escapeVoteText(key);
   const safeVenue = escapeVoteText(venue);
-  const total = stats && stats.total ? stats.total : 0;
-  const pct = (stats && stats.levelPct) || {};
-  const tagCount = (stats && stats.tagCount) || {};
-  const accent = getComputedStyle(document.documentElement).getPropertyValue('--fan-theme-solid').trim() || '#0F172A';
+  const total = (stats && stats.total) || 0;
+  const venueTotal = (stats && stats.venueTotal) || 0;
+  const meta = (window.SECURITY_TAG_META && window.SECURITY_TAG_META.length)
+    ? window.SECURITY_TAG_META
+    : (window.SECURITY_VOTE_TAGS || []).map(t => ({ tag: t, emoji: '•' }));
 
-  const levelRows = SECURITY_LEVELS.map(level => {
-    const value = total ? (pct[level] || 0) : 0;
-    const active = myVote.level === level;
+  const chips = meta.map(({ tag, emoji }) => {
+    const on = myTags.includes(tag);
+    const n = counts[tag] || 0;
     return `
       <button type="button" data-vote-inner
-        onclick="castSecurityVoteLevel('${safeKey}', '${safeVenue}', '${escapeVoteText(level)}', event)"
-        class="w-full text-left p-2 rounded-lg border transition-colors ${active ? 'border-slate-400 bg-white' : 'border-slate-200 bg-slate-50 hover:bg-white'}">
-        <div class="flex items-center justify-between gap-2 text-[11px]">
-          <span class="font-medium text-slate-800">${active ? '✓ ' : ''}${level}</span>
-          <span class="font-mono text-slate-600">${value}% · ${(stats.levelCount && stats.levelCount[level]) || 0} 人</span>
-        </div>
-        <div class="mt-1 h-1.5 rounded-full bg-slate-200 overflow-hidden">
-          <div class="h-full rounded-full" style="width:${value}%;background:${active ? accent : '#94A3B8'}"></div>
-        </div>
+        onclick="toggleSecurityVoteTag('${safeKey}', '${safeVenue}', '${escapeVoteText(tag)}', event)"
+        class="security-tag-chip ${on ? 'is-active' : ''}" aria-pressed="${on}">
+        <span class="security-tag-label">${on ? '✓ ' : ''}${emoji} ${tag}</span>
+        <span class="security-tag-count">${n}</span>
       </button>
     `;
   }).join('');
 
-  const tagChips = (window.SECURITY_VOTE_TAGS || []).map(tag => {
-    const on = Array.isArray(myVote.tags) && myVote.tags.includes(tag);
-    const count = tagCount[tag] || 0;
-    return `
-      <button type="button" data-vote-inner
-        onclick="castSecurityVoteTag('${safeKey}', '${safeVenue}', '${escapeVoteText(tag)}', event)"
-        class="tour-action-btn tour-action-btn--mini ${on ? 'is-active' : ''}" aria-pressed="${on}">
-        ${on ? '✓ ' : ''}${tag}${count ? ` · ${count}` : ''}
-      </button>
-    `;
-  }).join('');
+  const venueRef = (!total && venueTotal) ? `
+    <div class="security-venue-ref">🏟️ 同场馆历史场次参考：${meta
+      .filter(({ tag }) => (venueCounts[tag] || 0) > 0)
+      .map(({ tag, emoji }) => `${emoji}${tag} ${venueCounts[tag]}`)
+      .join(' · ')}</div>
+  ` : '';
 
   const degradedHtml = stats && stats.degraded ? `
-    <div class="p-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800 space-y-1">
-      <div class="font-semibold">⚠️ 云端公共投票暂不可用，已自动降级为「仅本机备忘」模式。</div>
-      <details class="text-[10px]">
-        <summary class="cursor-pointer">查看建表 SQL（开启全员共享）</summary>
-        <pre class="mt-1 p-2 rounded bg-white/70 border border-amber-200 overflow-x-auto text-[10px] leading-relaxed whitespace-pre">${escapeVoteText(SECURITY_VOTE_SQL_HINT)}</pre>
-      </details>
-    </div>
+    <details class="security-sql-hint">
+      <summary>⚠️ 云端投票暂不可用（点开查看建表 SQL）</summary>
+      <pre>${escapeVoteText(SECURITY_VOTE_SQL_HINT)}</pre>
+    </details>
   ` : '';
 
   host.dataset.ready = '1';
   host.innerHTML = `
-    <div class="p-2.5 rounded-lg bg-white border border-slate-200 space-y-2">
-      <div class="flex items-center justify-between flex-wrap gap-1">
-        <span class="text-[11px] font-semibold text-slate-700">🌐 云端公共安检投票（匿名 · 全员实时可见）</span>
-        <span class="text-[10px] text-slate-500">已有 <strong class="text-slate-800">${total}</strong> 人确认</span>
+    <div class="security-vote-panel">
+      <div class="security-vote-head">
+        <span class="security-vote-title">🛡️ 安检体验 · 一键标签投票</span>
+        <span class="security-vote-total">本场 <strong>${total}</strong> 票</span>
       </div>
-      <div class="space-y-1.5">${levelRows}</div>
-      <div>
-        <div class="text-[11px] text-slate-500 mb-1">🚫 合规提醒标签（可多选，实时统计）：</div>
-        <div class="flex flex-wrap gap-1.5 security-tag-row">${tagChips}</div>
-      </div>
-      <div class="text-[10px] text-slate-400">仅统计票数，不上传任何自由文本、账号或截图；同一浏览器可随时修改自己的一票。</div>
+      <div class="security-tag-grid">${chips}</div>
+      ${venueRef}
+      <div class="security-vote-foot">匿名统计，不上传账号与图片；再次点击可取消，同一设备始终只算 1 票。</div>
       ${degradedHtml}
     </div>
   `;
 }
 
-async function castSecurityVoteLevel(showKey, venue, level, event) {
-  if (event && event.stopPropagation) event.stopPropagation();
-  const mine = getMySecurityVote(showKey) || {};
-  // 再次点击同一档 = 取消我这票（数据库按 voter_key 删除，不会残留人数）
-  const cancelling = mine.level === level;
-  const res = await submitSecurityVote(showKey, venue, cancelling ? '' : level, cancelling ? [] : (mine.tags || []));
-  if (typeof saveSecurityExperience === 'function') saveSecurityExperience(showKey, { level: cancelling ? '' : level });
-  await refreshSecurityVoteHosts(showKey, res);
-}
-
-async function castSecurityVoteTag(showKey, venue, tag, event) {
-  if (event && event.stopPropagation) event.stopPropagation();
-  const mine = getMySecurityVote(showKey) || {};
-  if (!mine.level) {
-    alert('请先选择一档安检严格程度，再勾选合规标签。');
-    return;
-  }
-  const tags = Array.isArray(mine.tags) ? [...mine.tags] : [];
-  const idx = tags.indexOf(tag);
-  if (idx >= 0) tags.splice(idx, 1);
-  else tags.push(tag);
-  const res = await submitSecurityVote(showKey, venue, mine.level, tags);
-  await refreshSecurityVoteHosts(showKey, res);
-}
-
-async function refreshSecurityVoteHosts(showKey, res) {
-  const stats = await fetchSecurityVoteStats(showKey);
-  const escapedKey = (typeof CSS !== 'undefined' && CSS && typeof CSS.escape === 'function') ? CSS.escape(showKey) : String(showKey).replace(/["\\]/g, '\\$&');
-  const hosts = Array.from(document.querySelectorAll(`[data-security-vote][data-show-key="${escapedKey}"]`));
-  hosts.forEach(host => {
+async function refreshAllSecurityVoteHosts(showKey) {
+  const hosts = showKey
+    ? Array.from(document.querySelectorAll('[data-security-vote]')).filter(h => h.dataset.showKey === showKey)
+    : Array.from(document.querySelectorAll('[data-security-vote]'));
+  for (const host of hosts) {
     host.dataset.ready = '0';
-    renderSecurityVoteBlock(host, stats);
-  });
-  if (res && res.ok === false && res.error) {
-    console.warn('security_votes 云端写入失败（已保留本机票）:', res.error);
+    let stats;
+    try {
+      stats = await fetchSecurityTagStats(host.dataset.showKey, host.dataset.venue || '');
+    } catch (e) {
+      stats = null;
+    }
+    renderSecurityVoteBlock(host, stats || { counts: {}, myTags: [], degraded: true });
   }
 }
+
+async function toggleSecurityVoteTag(showKey, venue, tag, event) {
+  if (event && event.stopPropagation) event.stopPropagation();
+  const res = await toggleSecurityTag(showKey, venue, tag);
+  await refreshAllSecurityVoteHosts(showKey);
+  if (res && res.ok === false && res.error) {
+    console.warn('安检标签投票云端写入失败（已保留本机状态）:', res.error);
+  }
+}
+
+// 兼容旧的回调名（旧 DOM 缓存 / 历史内联 onclick）
+function castSecurityVoteLevel(showKey, venue, level, event) {
+  if (event && event.stopPropagation) event.stopPropagation();
+  const mapped = level === '宽松放行' ? '安检宽松' : '安检严格';
+  return toggleSecurityVoteTag(showKey, venue, mapped, event);
+}
+
+function castSecurityVoteTag(showKey, venue, tag, event) {
+  return toggleSecurityVoteTag(showKey, venue, tag, event);
+}
+
+window.toggleSecurityVoteTag = toggleSecurityVoteTag;
+window.castSecurityVoteLevel = castSecurityVoteLevel;
+window.castSecurityVoteTag = castSecurityVoteTag;
+window.refreshAllSecurityVoteHosts = refreshAllSecurityVoteHosts;
 
 function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTitle, rerenderScope, meta = {}) {
   const cleanVenue = normalizeVenueKey(venueName) || '未命名场馆';
