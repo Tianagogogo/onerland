@@ -222,7 +222,7 @@ body {
   box-shadow: 0 1px 6px rgba(15, 23, 42, 0.12);
 }
 
-/* ===== 纯白悬浮胶囊分段器（首页 / 档案 / 足迹） ===== */
+/* ===== 纯白悬浮胶囊分段器（首页 / 档案 / 应援 / 足迹） ===== */
 .nav-segment {
   display: inline-flex;
   align-items: center;
@@ -236,7 +236,7 @@ body {
 
 .nav-segment--block {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
   width: 100%;
 }
