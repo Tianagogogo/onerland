@@ -2305,3 +2305,58 @@ body.travel-modal-open { overflow: hidden; }
   font-size: 10px;
   color: #94a3b8;
 }
+
+/* ================= ❓ 使用帮助：四大分类手风琴（加粗小标题 + 说明） ================= */
+.help-guide-summary { flex-wrap: nowrap; }
+.help-guide-sub {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: 2px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.help-guide-points {
+  padding: 7px 10px 8px 12px;
+  margin: 0 8px 8px;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #fbfcfe 0%, #f2f6fa 100%);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  list-style: none;
+  line-height: 1.6;
+}
+.help-guide-points li {
+  position: relative;
+  padding-left: 10px;
+  margin-bottom: 5px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #52627a;
+  word-break: break-word;
+}
+.help-guide-points li:last-child { margin-bottom: 0; }
+.help-guide-points li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: #94a3b8;
+  font-weight: 700;
+}
+.help-guide-pt-title {
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 11px;
+}
+.help-guide-pt-sep { color: #94a3b8; }
+.help-guide-pt-desc { color: #52627a; }
+
+@media (max-width: 640px) {
+  .help-guide-sub { display: none; }
+  .help-guide-points { margin: 0 6px 6px; padding: 6px 8px 7px 10px; }
+  .help-guide-points li { font-size: 10.5px; line-height: 1.62; }
+  .help-guide-pt-title { font-size: 10.5px; }
+}

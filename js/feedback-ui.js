@@ -15,72 +15,58 @@ const FEEDBACK_MAX_LEN = 500;
 
 let feedbackState = { category: 'bug', submitting: false, inboxLoading: false, items: [] };
 
-// ❓ 使用帮助配置：日后增删改功能说明只改这里即可
+// ❓ 使用帮助配置：按「首页 / 档案 / 足迹 / 身份与隐私」四大板块组织，日后增删改只改这里
+// points 支持两种写法：字符串，或 { t: '加粗小标题', d: '详细说明' }
 const HELP_GUIDE_ITEMS = [
   {
-    id: 'anniversary',
-    icon: '✨',
-    title: '时光提醒与纪念日',
+    id: 'home',
+    icon: '🏠',
+    title: '首页',
+    subtitle: '时光提醒、纪念日与近期微时间轴',
     defaultOpen: true,
     points: [
-      '点击顶部「昵称 / 对象 / 动作词」即可自定义显示文案与关联对象。',
-      '为未来场次点亮 `🎫 计划前往` 后，顶部倒计时自动改为「距下次见面还有 X 天」（不计入已观演场次）。',
-      '支持管理内置官方纪念日、新增自定义纪念日，并生成纪念票根留作收藏。'
+      { t: '✨ 自定义时光提醒', d: '点击顶部「昵称 / 对象 / 动作词」可随时修改文案；切换主推对象（ONER / 岳岳 / 木子洋 / 灵超）后，会同步联动足迹页的默认粉籍与应援色主题。' },
+      { t: '⏳ 见面与演出倒计时', d: '为未来演出点亮 `🎫 计划前往` 后，副标题自动切换为「距与 X 下次见面还有 X 天」；未点亮时客观显示「距 X 下一场演出还有 X 天」。' },
+      { t: '🎂 关键纪念日管理', d: '底部可查看官方内置纪念日（支持单独删除或一键恢复全部），也可新增年度循环的自定义纪念日，统一显示「距 xxxxxx X 天」。' },
+      { t: '🎫 纪念票根生成器', d: '一键生成带场次、座位与专属应援色的纪念票根图片，并支持同步写入纪念日列表。' },
+      { t: '📅 近期演出微时间轴', d: '按距现实时间由近到远排列近期场次；直接点击卡片上的演出日期文字即可下载 `.ics` 导入手机 / 电脑日历，底部集成「交通、出行比价、地图、安检体验、找搭子」五个快捷入口。' }
     ]
   },
   {
-    id: 'calendar-travel',
-    icon: '📅',
-    title: '演出日历与出行比价',
-    defaultOpen: true,
-    points: [
-      '点击卡片上的演出日期，可一键把该场演出导入手机 / 电脑日历并设提醒。',
-      '点击 `🚄 出行比价`：先选出发城市与往返日期，再直达机票、高铁、场馆路线与周边酒店查询。',
-      '手机自带浏览器打开可自动拉起对应 App；微信内请点右上角「在默认浏览器打开」。'
-    ]
-  },
-  {
-    id: 'security',
-    icon: '🛡️',
-    title: '演出安检体验与私人笔记',
+    id: 'shows',
+    icon: '🏛️',
+    title: '档案',
+    subtitle: '全量演出检索、专题聚合与参演指南',
     defaultOpen: false,
     points: [
-      '无需上传票根即可参与安检标签投票（安检严格 / 安检宽松 / 查相机长焦 / 翻包细致 / 过检很快）。',
-      '同一设备始终只算 1 票，再点一次可取消；换浏览器或设备会自动合并去重。',
-      '下方「我的私人安检笔记」仅存本机、不公开，散场次日起自动归档到「场馆体验」与「我的足迹」。'
-    ]
-  },
-  {
-    id: 'buddy',
-    icon: '🤝',
-    title: '找搭子与双向同意解锁',
-    defaultOpen: false,
-    points: [
-      '在任意场次发布「找搭子」意向（昵称 + 简短备注，联系方式可填但不公开）。',
-      '双方互相点击申请并确认同意后，才会展示彼此联系方式，避免被陌生人直接查看。',
-      '严禁填写手机号、身份证号或转账链接；线下见面请核对票根并注意安全。'
+      { t: '🔍 多维筛选与专题聚合', d: '支持按艺人 / 成员筛选，也可按巡演专题（「极尽声色」、ChillParty、无限未来、「燃点」）或「音乐节合集」一键聚合查看全部历史与待开演场次。' },
+      { t: '🎫 计划前往与历史打卡', d: '未来场次可标记 `🎫 计划前往`（联动首页见面倒计时）；已落幕场次点击 `+ 足迹` 计入线下见面总场次。' },
+      { t: '💺 座位图与视野参考', d: '场馆卡片提供「查看座位图」与「视野 live ↗」外链跳转，方便选座前查看不同区域看主舞台的真实视角。' },
+      { t: '🚄 出行比价与同城导航', d: '点击 `🚄 出行比价` 可选出发城市（本地记忆）与往返日期，展开「机票 / 高铁 / 同城交通 / 酒店」四大分类直达正规平台（手机浏览器打开可唤醒对应 App），并支持一键复制行程关键词。' },
+      { t: '🛡️ 安检体验与 🤝 找搭子', d: '免票根即可参与安检严格度与长焦 / 翻包标签投票（同设备限 1 票，再点可取消），并记录仅本机可见的私人安检笔记；找搭子须双方互相申请并确认同意后才会解锁展示联系方式。' }
     ]
   },
   {
     id: 'footprint',
     icon: '🎫',
-    title: '我的足迹与搭子纪念日',
+    title: '足迹',
+    subtitle: '个人观演统计、粉籍同步与搭子纪念日',
     defaultOpen: false,
     points: [
-      '历史场次点击 `+ 足迹` 即可点亮并累计「已点亮线下 X 面」见面次数。',
-      '足迹里可记录本机「🤝 同行搭子昵称」，并支持从已互换联系方式的搭子中一键点选填入。',
-      '填写搭子后可点 `🎂 生成搭子纪念日`，自动同步到首页「✨ 时光提醒」的倒计时栏。'
+      { t: '📊 线下见面总览与时间轴', d: '自动汇总你点亮的所有历史观演场次，完整记录每一场线下奔赴的日期、城市与场馆。' },
+      { t: '🎨 粉籍与应援色联动', d: '默认与首页「时光提醒」选择的人物及应援色保持一致，也支持在足迹页内独立切换粉籍；当两端设置不一致时，系统会弹出提醒供一键统一。' },
+      { t: '🤝 同行搭子与 🎂 生成搭子纪念日', d: '添加或编辑足迹时可关联本机同场搭子昵称（仅存本机，不上传任何隐私联系方式）；已关联搭子的足迹支持一键 `🎂 生成搭子纪念日`，自动同步至首页时光提醒底部的倒计时。' }
     ]
   },
   {
-    id: 'local-data',
+    id: 'privacy',
     icon: '🔒',
-    title: '免注册与本机数据存储',
+    title: '身份与隐私',
+    subtitle: '数据安全与留言反馈',
     defaultOpen: false,
     points: [
-      '全站免注册即可浏览与使用；个人足迹、计划前往、私人笔记、搭子备注、纪念日设置都只存在当前浏览器。',
-      '清理浏览器缓存 / 数据、换浏览器或换设备后，这些记录不会自动带过去，请提前备份（导出备份）。',
-      '安检投票、找搭子等公共数据会匿名上云；私人笔记与搭子备注绝不上传。'
+      { t: '👤 免注册本地存储', d: '全站无需注册账号，昵称、足迹、计划前往、私人安检笔记及搭子备注均保存在当前浏览器的本地存储（`localStorage`）中；清理浏览器缓存或更换设备前请留意保留数据。' },
+      { t: '💬 隐私留言反馈', d: '任何使用问题、功能建议或演出场次纠错都可通过下方表单提交；所有反馈内容仅管理员解锁后可见，访客之间互不可见。' }
     ]
   }
 ];
@@ -88,18 +74,27 @@ const HELP_GUIDE_ITEMS = [
 function renderHelpGuide() {
   const box = document.getElementById('feedback-help-guide');
   if (!box) return;
+  const fmt = (text) => escapeFeedbackText(text).replace(/`([^`]+)`/g, '<code class="help-guide-code">$1</code>');
   box.innerHTML = HELP_GUIDE_ITEMS.map((item, idx) => {
-    const open = item.defaultOpen || idx < 2;
-    const pts = (item.points || []).map(t => `<li>${escapeFeedbackText(t).replace(/`([^`]+)`/g, '<code class="help-guide-code">$1</code>')}</li>`).join('');
+    const open = item.defaultOpen || idx === 0;
+    const points = (item.points || []).map(pt => {
+      if (pt && typeof pt === 'object') {
+        return `<li><strong class="help-guide-pt-title">${fmt(pt.t || '')}</strong><span class="help-guide-pt-sep">：</span><span class="help-guide-pt-desc">${fmt(pt.d || '')}</span></li>`;
+      }
+      return `<li><span class="help-guide-pt-desc">${fmt(pt || '')}</span></li>`;
+    }).join('');
     return `
       <details class="help-guide-item"${open ? ' open' : ''}>
-        <summary class="help-guide-summary"><span class="help-guide-icon">${escapeFeedbackText(item.icon)}</span><span class="help-guide-title">${escapeFeedbackText(item.title)}</span></summary>
-        <ul class="help-guide-points">${pts}</ul>
+        <summary class="help-guide-summary">
+          <span class="help-guide-icon">${escapeFeedbackText(item.icon)}</span>
+          <span class="help-guide-title">${escapeFeedbackText(item.title)}</span>
+          ${item.subtitle ? `<span class="help-guide-sub">${escapeFeedbackText(item.subtitle)}</span>` : ''}
+        </summary>
+        <ul class="help-guide-points">${points}</ul>
       </details>
     `;
   }).join('');
 }
-
 
 function feedbackCategoryLabel(id) {
   const hit = FEEDBACK_CATEGORIES.find(c => c.id === id);
