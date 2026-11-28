@@ -526,12 +526,16 @@ function renderUpcomingMiniTimeline() {
           <div class="w-12 poster-square-box shrink-0">
             ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" ${posterImgAttrs(item.posterUrl, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
           </div>
-          <div class="min-w-0">
-            <div class="flex items-center gap-1.5">
+          <div class="timeline-card-body min-w-0 flex-1">
+            <div class="timeline-title-row flex items-center gap-1.5">
               <span class="text-[10px] px-1.5 py-0.5 rounded text-white font-semibold shrink-0" style="background:${badge}">${displayArtist}</span>
               <span class="timeline-card-title font-bold text-sm text-slate-900 leading-snug break-words">${safeTitle}</span>
             </div>
-            <p class="timeline-card-meta text-xs text-slate-500 mt-0.5 leading-relaxed break-words">🗓️ ${item.date} ${weekday} · 📍 ${item.venue || '场馆待定'}${item.slot ? ` · <span class="timeline-slot-badge inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-700 text-[10px] font-semibold whitespace-nowrap">⏰ ${String(item.slot).replace(/[<>\"']/g, '')}</span>` : ''}</p>
+            <div class="timeline-card-meta text-xs text-slate-500 mt-1 leading-relaxed">
+              <span class="timeline-meta-date">🗓️ ${item.date} ${weekday}</span>
+              <span class="timeline-meta-venue" title="${String(item.venue || '场馆待定').replace(/["<>]/g, '')}">📍 ${item.venue || '场馆待定'}</span>
+            </div>
+            ${item.slot ? `<div class="timeline-slot-row"><span class="timeline-slot-badge">⏰ ${String(item.slot).replace(/[<>"']/g, '')}</span></div>` : ''}
           </div>
         </div>
         <div class="timeline-card-actions flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-end flex-wrap pt-1.5 sm:pt-0 border-t border-slate-200/70 sm:border-0">
