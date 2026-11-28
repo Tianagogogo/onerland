@@ -1134,12 +1134,21 @@ function normalizeBuddyRequest(row) {
 }
 
 // 申请者：提交互换申请（pending）
-async function sendBuddyRequest(buddy, note, contact) {
+// 关键修复：buddy_id 可能是 bigint 自增或 UUID 字符串；event_id 缺失会触发 not-null 400；
+// 同时把 Supabase 返回的 message/details/hint 原样带回，便于定位具体字段。
+async function sendBuddyRequest(buddy, note, contact, context) {
   const me = getDeviceId();
   if (String(buddy.deviceId || buddy.ownerId || '') === String(me)) return { ok: false, reason: 'self' };
+  const eventId = String((context && context.eventId) || buddy.eventId || buddy.cloudId || '').trim();
+  const rawId = buddy.id == null ? '' : String(buddy.id).trim();
+  if (!rawId || /^tmp-/.test(rawId)) {
+    return { ok: false, reason: '该搭子信息尚未同步到云端，请刷新后重试' };
+  }
+  // 纯数字 ID 转成 Number（匹配 bigint 列），UUID 保持字符串
+  const buddyId = /^\d+$/.test(rawId) ? Number(rawId) : rawId;
   const payload = {
-    buddy_id: buddy.id,
-    event_id: buddy.eventId || buddy.cloudId,
+    buddy_id: buddyId,
+    event_id: eventId,
     requester_device_id: me,
     requester_nickname: getGuestNickname() || null,
     note: (note || '').slice(0, 60) || null,
@@ -1147,13 +1156,22 @@ async function sendBuddyRequest(buddy, note, contact) {
     owner_device_id: String(buddy.deviceId || buddy.ownerId || ''),
     status: 'pending'
   };
+  Object.keys(payload).forEach(k => { if (payload[k] === undefined) delete payload[k]; });
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${BUDDY_REQUESTS_TABLE}`, {
       method: 'POST',
       headers: buddyHeaders(),
       body: JSON.stringify(payload)
     });
-    if (!res.ok) return { ok: false, reason: `HTTP ${res.status}` };
+    if (!res.ok) {
+      let detail = '';
+      let row = null;
+      try { row = await res.json(); } catch (e) { row = null; }
+      if (row && typeof row === 'object') {
+        detail = [row.message, row.details, row.hint, row.code].filter(Boolean).join(' | ');
+      }
+      return { ok: false, reason: `HTTP ${res.status}`, detail, sent: payload };
+    }
     let rows = null;
     try { rows = await res.json(); } catch (e) { rows = null; }
     const req = Array.isArray(rows) && rows[0] ? normalizeBuddyRequest(rows[0]) : normalizeBuddyRequest(payload);

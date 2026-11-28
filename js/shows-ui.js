@@ -1454,10 +1454,12 @@ async function submitBuddyRequestFromModal() {
   if (!check.ok) return alert(check.reason);
   const contact = `${platform}：${accountId}`;
 
-  const res = await sendBuddyRequest(entry, note, contact);
+  const res = await sendBuddyRequest(entry, note, contact, { eventId: target.eventId });
   if (!res.ok) {
     if (res.reason === 'self') return alert('这是你自己发布的搭子信息');
-    return alert(`申请提交失败（${res.reason}），请稍后再试`);
+    const detailLine = res.detail ? `\n具体原因：${res.detail}` : '';
+    console.warn('[buddy_requests] 提交失败', res.detail || res.reason, res.sent);
+    return alert(`申请提交失败（${res.reason}）${detailLine}\n请检查 supabase 表字段后重试`);
   }
   markBuddyCooldown(cooldownKey);
   document.getElementById('buddy-request-modal')?.classList.add('hidden');
