@@ -192,6 +192,7 @@ function renderAnniversaryCard() {
         </div>
         <div class="flex items-center gap-1.5 shrink-0 flex-wrap">
           <button type="button" onclick="switchMainTab('footprint')" class="tour-action-btn tour-action-btn--mini">🎫 生成纪念票根</button>
+          <button type="button" onclick="openChantDictModal()" class="tour-action-btn tour-action-btn--mini">📣 应援词典</button>
         </div>
       </div>
 
@@ -624,7 +625,7 @@ function renderUpcomingMiniTimeline() {
                 ${isUpcomingShow
                   ? `<button type="button" class="plan-chip tl-plan-action ${plannedShow ? 'is-active' : ''}" aria-pressed="${plannedShow ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); handleHomeTimelinePlan(${idx}, this)">${plannedShow ? '✓ 计划前往' : '🎫 计划前往'}</button>`
                   : ''}
-                <button type="button" onclick="switchMainTab('shows')" class="tour-action-btn tl-detail-btn">📄 详情</button>
+                <button type="button" onclick="openHomeTimelineDetail(${idx})" class="tour-action-btn tl-detail-btn">📄 详情</button>
               </div>
             </div>
             <div class="timeline-card-title font-bold text-sm text-slate-900 leading-snug break-words">${safeTitle}</div>
@@ -760,6 +761,33 @@ function handleHomeTimelineDateClick(idx) {
   } catch (e) {
     toastError(`日历生成失败：${e.message}`);
   }
+}
+
+// 📄 详情浮窗：集中展示场次信息，并保留「📣 查看应援词」双入口
+function openHomeTimelineDetail(idx) {
+  const rec = homeTimelineRecords[idx];
+  if (!rec) return;
+  const esc = v => String(v == null ? '' : v).replace(/[<>]/g, '');
+  const title = esc(rec.city || rec.title || '');
+  const venue = esc(rec.venue || '');
+  const date = esc(rec.date || '');
+  if (typeof openShowFeatureModal !== 'function') return;
+  closeHomeTimelinePanels();
+  openShowFeatureModal({
+    title: `📄 演出详情${title ? ` · ${title}` : ''}`,
+    sub: [date, venue].filter(Boolean).join(' · '),
+    html: `
+      <div class="feature-text tl-detail-body">
+        <p><strong>🗓️ 演出时间：</strong>${date || '待公布'}${rec.slot ? ` ${esc(rec.slot)}` : ''}</p>
+        <p><strong>📍 演出场馆：</strong>${venue || '待公布'}</p>
+        ${title ? `<p><strong>🎤 演出名称：</strong>${title}</p>` : ''}
+      </div>
+      <div class="tl-detail-actions">
+        <button type="button" class="tour-action-btn tour-action-btn--mini" onclick="closeShowFeatureModal(); openChantDictModal()">📣 查看应援词</button>
+        <button type="button" class="tour-action-btn tour-action-btn--mini" onclick="closeShowFeatureModal(); switchMainTab('shows')">🏛️ 在档案查看完整场次 ↗</button>
+      </div>
+    `
+  });
 }
 
 function handleHomeTimelineAction(action, idx, btn) {

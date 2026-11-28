@@ -126,6 +126,11 @@ function syncAuthState() {
 
   // 🍜 同款打卡：解锁 / 锁定后立即刷新待审核队列（弹窗开着也能即时出现）
   try { if (typeof refreshCheckinAdminState === 'function') refreshCheckinAdminState(); } catch (e) { /* ignore */ }
+  // 📣 应援词典：解锁 / 锁定后立即刷新管理按钮（浮窗开着也能即时出现或收起）
+  try {
+    const chantModal = document.getElementById('chant-dict-modal');
+    if (chantModal && !chantModal.classList.contains('hidden') && typeof renderChantPage === 'function') renderChantPage();
+  } catch (e) { /* ignore */ }
 }
 
 function saveGuestNicknameFromModal() {

@@ -22,6 +22,9 @@ const ALLOWED_ACTIONS = new Set([
   'updateTicket',
   'deleteTicket',
   'reviewProof',
+  'createChant',
+  'updateChant',
+  'deleteChant',
 ]);
 
 const REVIEW_STATUSES = new Set(['pending', 'approved', 'rejected']);
@@ -169,6 +172,25 @@ async function handleVerifyPassword(env, password) {
   return json({ ok: true, token: issued.token, expires_at: issued.expiresAt });
 }
 
+const CHANT_CATEGORIES = new Set(['ONER团歌', '岳岳', '木子洋', '灵超']);
+
+function sanitizeChantPayload(payload) {
+  const p = payload || {};
+  const title = String(p.title || '').trim().slice(0, 60);
+  const category = String(p.category || '').trim();
+  const content = String(p.content || '').trim().slice(0, 12000);
+  if (!title || !content || !CHANT_CATEGORIES.has(category)) {
+    return null;
+  }
+  return {
+    title,
+    category,
+    album: String(p.album || '').trim().slice(0, 80) || null,
+    video_url: String(p.video_url || '').trim().slice(0, 400) || null,
+    content,
+  };
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -294,6 +316,29 @@ export async function onRequest(context) {
     case 'deleteTicket':
       if (!id) return json({ error: 'missing id' }, 400);
       url = `${env.SUPABASE_URL}/rest/v1/tickets?id=eq.${encodeURIComponent(id)}`;
+      method = 'DELETE';
+      data = undefined;
+      break;
+
+    // 📣 应援词典：云端应援词库（匿名只读，写操作仅管理员）
+    case 'createChant':
+      url = `${env.SUPABASE_URL}/rest/v1/fan_chants`;
+      method = 'POST';
+      data = sanitizeChantPayload(payload);
+      if (!data) return json({ error: 'invalid chant payload' }, 400);
+      break;
+
+    case 'updateChant':
+      if (!id) return json({ error: 'missing id' }, 400);
+      url = `${env.SUPABASE_URL}/rest/v1/fan_chants?id=eq.${encodeURIComponent(id)}`;
+      method = 'PATCH';
+      data = sanitizeChantPayload(payload);
+      if (!data) return json({ error: 'invalid chant payload' }, 400);
+      break;
+
+    case 'deleteChant':
+      if (!id) return json({ error: 'missing id' }, 400);
+      url = `${env.SUPABASE_URL}/rest/v1/fan_chants?id=eq.${encodeURIComponent(id)}`;
       method = 'DELETE';
       data = undefined;
       break;
