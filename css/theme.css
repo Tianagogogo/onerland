@@ -4007,18 +4007,6 @@ input.seat-select { background-image: none; }
   padding: 0 14px;
 }
 
-/* ================= 🏛️ 档案卡：计划前往 / 足迹 桌面端回到右侧功能行 ================= */
-.archive-inline-actions {
-  display: none;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-@media (min-width: 769px) {
-  .archive-inline-actions { display: inline-flex; }
-  .archive-top-actions--mobile { display: none !important; }
-}
-
 /* ================= 🎟️ 纪念票根存图弹窗（Safari 长按存图 / 系统分享） ================= */
 .ticket-save-overlay {
   position: fixed;
@@ -4482,47 +4470,6 @@ body.feature-modal-open { overflow: hidden; }
 }
 
 .feature-dup-heading { display: none !important; }
-
-/* ================= 🎫 档案卡桌面端：计划前往 / 足迹 与同行功能按钮完全同规格 ================= */
-@media (min-width: 769px) {
-  .archive-inline-actions .plan-chip,
-  .archive-inline-actions .plan-chip.footprint-chip {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    height: 30px;
-    min-height: 30px;
-    padding: 0 9px;
-    margin: 0;
-    border: 1px solid rgba(148, 163, 184, 0.55);
-    border-radius: 8px;
-    background: linear-gradient(180deg, #ffffff 0%, #f4f7fa 34%, #e2e8f0 72%, #f1f5f9 100%);
-    color: #1e293b;
-    font-size: 11px;
-    font-weight: 500;
-    line-height: 1;
-    white-space: nowrap;
-    flex: 0 0 auto;
-    vertical-align: middle;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.98),
-      inset 0 -1px 0 rgba(148, 163, 184, 0.22),
-      0 1px 2px rgba(15, 23, 42, 0.06);
-  }
-  .archive-inline-actions .plan-chip:hover,
-  .archive-inline-actions .plan-chip.footprint-chip:hover {
-    border-color: rgba(148, 163, 184, 0.7);
-    color: #0f172a;
-    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 30%, #cfd8e3 78%, #e8eef5 100%);
-  }
-  .archive-inline-actions .plan-chip.is-active {
-    border-color: rgba(148, 163, 184, 0.8);
-    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-    color: #0f172a;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
-  }
-}
 
 /* ================= 📅 近期演出微时间轴：计划前往 / 详情 统一操作胶囊 ================= */
 #home-upcoming-timeline .timeline-title-row .timeline-card-actions .plan-chip.tl-plan-action,
@@ -4992,5 +4939,55 @@ body.feature-modal-open { overflow: hidden; }
     border-top: 0.3mm solid #d1d5db;
     font-size: 8.5pt;
     color: #9ca3af;
+  }
+}
+
+/* ================= 🏛️ 档案卡右上角打卡胶囊：与近期演出微时间轴完全同规格 ================= */
+.archive-strip .archive-title-row .archive-top-actions {
+  margin-left: auto;
+}
+.archive-strip .archive-title-row .archive-top-actions .plan-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 26px;
+  min-height: 26px;
+  max-height: 26px;
+  padding: 0 9px;
+  margin: 0;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f7fa 34%, #e2e8f0 72%, #f1f5f9 100%);
+  color: #1e293b;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.98),
+    inset 0 -1px 0 rgba(148, 163, 184, 0.22),
+    0 1px 2px rgba(15, 23, 42, 0.06);
+}
+.archive-strip .archive-title-row .archive-top-actions .plan-chip:hover {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 30%, #cfd8e3 78%, #e8eef5 100%);
+  border-color: rgba(148, 163, 184, 0.7);
+  color: #0f172a;
+}
+.archive-strip .archive-title-row .archive-top-actions .plan-chip.is-active {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  color: #0f172a;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+@media (max-width: 400px) {
+  .archive-strip .archive-title-row .archive-top-actions .plan-chip {
+    height: 24px;
+    min-height: 24px;
+    max-height: 24px;
+    padding: 0 7px;
+    font-size: 10.5px;
   }
 }

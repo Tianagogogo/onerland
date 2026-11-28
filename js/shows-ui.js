@@ -2646,14 +2646,14 @@ function renderArchiveTimeline() {
     return `
       <div class="show-card archive-strip p-4 rounded-2xl metal-card space-y-3">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div class="flex items-center gap-3.5 min-w-0 w-full">
+          <div class="flex items-center gap-3.5 min-w-0 w-full sm:w-auto sm:flex-1">
             <div class="w-16 poster-square-box shrink-0">
               ${(() => { const ps = (typeof posterSrcFor === 'function') ? posterSrcFor(item, item.posterUrl) : item.posterUrl; return ps ? `<img src="${ps}" alt="${safeTitle}" data-cap="${safeTitle} · 往日海报" ${(typeof posterAttrsFor === 'function') ? posterAttrsFor(item, item.posterUrl, idx) : posterImgAttrs(ps, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" onclick="event.stopPropagation(); openPosterLightbox(this.dataset.hdSrc || this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : ((typeof posterPlaceholderHtml === 'function') ? posterPlaceholderHtml(safeTitle) : `<div class="w-full h-full flex items-center justify-center text-xs text-slate-400">ONER</div>`); })()}
             </div>
-            <div class="min-w-0 space-y-1 archive-strip-body">
+            <div class="min-w-0 flex-1 space-y-1 archive-strip-body">
               <div class="archive-title-row">
                 <span class="text-[10px] px-2 py-0.5 rounded text-white font-semibold shrink-0" style="background:${badge}">${item.artist}</span>
-                <div class="archive-top-actions archive-top-actions--mobile">
+                <div class="archive-top-actions">
                   ${planChipHtml}
                   ${footprintChipHtml}
                 </div>
@@ -2668,7 +2668,6 @@ function renderArchiveTimeline() {
           </div>
           <div class="flex items-center gap-1.5 flex-wrap justify-start sm:justify-end w-full sm:w-auto sm:shrink-0">
             ${hasSeries ? `<button type="button" data-theme="${safeJumpTheme}" onclick="openSeriesModal(this.dataset.theme)" class="tour-action-btn tour-action-btn--mini font-medium">${isFest ? '🎪 音乐节合集' : `🏛️ 专题页${seriesCount > 1 ? ` (${seriesCount}场)` : ''}`} ↗</button>` : ''}
-            <span class="archive-inline-actions">${planChipHtml}${footprintChipHtml}</span>
             <button type="button" class="tour-action-btn tour-action-btn--mini" data-travel-btn data-city="${attrEsc(getArchiveCity(item) || '')}" data-venue="${attrEsc(item.venue || '')}" data-date="${attrEsc(String(item.showDate || '').slice(0, 10))}" data-title="${attrEsc(safeTitle)}" onclick="event.stopPropagation(); openTravelHelperFromButton(this)">🚄 出行比价</button>
             <button type="button" class="tour-action-btn tour-action-btn--mini" data-checkin-btn data-city="${attrEsc(getArchiveCity(item) || '')}" data-venue="${attrEsc(item.venue || '')}" data-date="${attrEsc(String(item.showDate || '').slice(0, 10))}" data-title="${attrEsc(safeTitle)}" onclick="event.stopPropagation(); openCheckinFromButton(this)">🍜 同款打卡</button>
             <button type="button" data-tour-toggle="vexp-arc-drawer-${idx}" class="tour-action-btn tour-action-btn--mini">📊 场馆体验<span class="hidden sm:inline text-[10px] opacity-70 ml-1">${venueStats.total}${venueStats.unlocked ? '' : '/5'}</span></button>
