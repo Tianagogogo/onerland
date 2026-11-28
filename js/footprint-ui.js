@@ -433,9 +433,9 @@ function renderFootprintMapAndList() {
   box.innerHTML = `
     ${renderChinaProvinceMap(list)}
     <div class="p-4 sm:p-5 rounded-2xl metal-card space-y-3">
-      <div class="flex items-center justify-between">
-        <h3 class="text-sm font-bold text-slate-900">🎫 我的观演足迹档案（已点亮 ${list.length} 场）</h3>
-        <span class="text-[11px] text-slate-400">仅保存在本机 · 不做他人排名对比</span>
+      <div class="footprint-archive-head">
+        <h3 class="footprint-archive-title">🎫 我的观演足迹档案（已点亮 ${list.length} 场）</h3>
+        <span class="footprint-archive-note">仅保存在本机 · 不做他人排名对比</span>
       </div>
 
       <div class="space-y-1.5 max-h-72 overflow-y-auto no-scrollbar">

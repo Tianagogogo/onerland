@@ -3398,6 +3398,42 @@ body.phd-open { overflow: hidden; }
 
 /* ================= 足迹：中国省份点亮地图 ================= */
 #footprint-china-map-card path:hover { filter: brightness(0.97); }
+
+/* 足迹档案标题栏：主标题 / 隐私说明上下分层，避免手机端被右侧文字挤断 */
+.footprint-archive-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+.footprint-archive-title {
+  display: block;
+  width: 100%;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+}
+.footprint-archive-note {
+  display: block;
+  width: 100%;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #64748b;
+  white-space: normal;
+  word-break: break-word;
+}
+@media (max-width: 640px) {
+  .footprint-archive-title {
+    font-size: clamp(12px, 3.7vw, 14px);
+    letter-spacing: -0.01em;
+  }
+}
 .fp-province-chip {
   height: 24px;
   padding: 0 9px;
