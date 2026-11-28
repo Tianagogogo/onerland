@@ -6,7 +6,7 @@
   <title>ONERLAND · 时光典藏与观演实用工具站</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <link rel="stylesheet" href="./css/theme.css?v=20261128_mobile_header_align" />
+  <link rel="stylesheet" href="./css/theme.css?v=20261128_batch1" />
 </head>
 <body class="text-slate-800 min-h-screen antialiased selection:bg-slate-300 selection:text-slate-950">
   <!-- 全屏开屏过渡：银白液态金属 -->
@@ -66,14 +66,16 @@
       <div class="space-y-3">
         <div class="flex items-center justify-between flex-wrap gap-2">
           <h2 class="text-base font-bold text-slate-900">🏛️ 往日演出回顾档案</h2>
-          <div class="flex items-center gap-2 text-xs flex-wrap">
+          <div class="archive-filter-bar flex items-center gap-2 text-xs flex-wrap">
             <div class="seg-group">
               <button type="button" onclick="setArchiveTypeFilter('ALL')" id="arc-filter-ALL" class="seg-btn is-active">全部</button>
               <button type="button" onclick="setArchiveTypeFilter('tour')" id="arc-filter-tour" class="seg-btn">巡演</button>
               <button type="button" onclick="setArchiveTypeFilter('festival')" id="arc-filter-festival" class="seg-btn">音乐节</button>
             </div>
-            <select id="archive-year-filter" onchange="renderArchiveTimeline()" class="select-clean"><option value="all">全部年份</option></select>
-            <select id="archive-city-filter" onchange="renderArchiveTimeline()" class="select-clean max-w-[9rem]"><option value="all">全部城市</option></select>
+            <div class="archive-filter-selects">
+              <select id="archive-year-filter" onchange="renderArchiveTimeline()" class="select-clean"><option value="all">全部年份</option></select>
+              <select id="archive-city-filter" onchange="renderArchiveTimeline()" class="select-clean"><option value="all">全部城市</option></select>
+            </div>
           </div>
         </div>
         <div id="archive-timeline-list" class="space-y-3"></div>
@@ -452,18 +454,19 @@
     </div>
   </div>
 
-  <script src="./js/config.js?v=20261128_mobile_header_align"></script>
-  <script src="./js/poster-local.js?v=20261128_mobile_header_align"></script>
-  <script src="./js/store.js?v=20261128_mobile_header_align"></script>
-  <script src="./js/home-ui.js?v=20261128_mobile_header_align"></script>
-  <script src="./js/shows-ui.js?v=20261128_mobile_header_align"></script>
-  <script src="./js/parser.js?v=20261128_mobile_header_align"></script>
-  <script src="./js/footprint-ui.js?v=20261128_mobile_header_align"></script>
-  <script src="./js/admin-ui.js?v=20261128_mobile_header_align"></script>
-  <script src="./js/auth-ui.js?v=20261128_mobile_header_align"></script>
-  <script src="./js/travel-helper.js?v=20261128_mobile_header_align"></script>
-  <script src="./js/fandom-sync.js?v=20261128_mobile_header_align"></script>
-  <script src="./js/feedback-ui.js?v=20261128_mobile_header_align"></script>
+  <script src="./js/config.js?v=20261128_batch1"></script>
+  <script src="./js/poster-local.js?v=20261128_batch1"></script>
+  <script src="./js/store.js?v=20261128_batch1"></script>
+  <script src="./js/home-ui.js?v=20261128_batch1"></script>
+  <script src="./js/shows-ui.js?v=20261128_batch1"></script>
+  <script src="./js/ticket-seat-ui.js?v=20261128_batch1"></script>
+  <script src="./js/parser.js?v=20261128_batch1"></script>
+  <script src="./js/footprint-ui.js?v=20261128_batch1"></script>
+  <script src="./js/admin-ui.js?v=20261128_batch1"></script>
+  <script src="./js/auth-ui.js?v=20261128_batch1"></script>
+  <script src="./js/travel-helper.js?v=20261128_batch1"></script>
+  <script src="./js/fandom-sync.js?v=20261128_batch1"></script>
+  <script src="./js/feedback-ui.js?v=20261128_batch1"></script>
   <script>
     if ('serviceWorker' in navigator) {
       // 刷新一次后清除标记，保证后续版本更新仍能自动刷新（10 秒后再放开，避免刷新循环）

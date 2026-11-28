@@ -1256,7 +1256,8 @@ function toggleBuddySoloMember(memberName, event) {
 }
 
 // 预设搭子标签
-const PRESET_BUDDY_TAGS = ['看台邻座', '内场同区', '散场拼车', '酒店拼房', '同城出发', '场馆外打卡', 'i人互拍', '一起喊应援'];
+const PRESET_BUDDY_TAGS = ['看台邻座', '内场同区', '散场拼车', '酒店拼房', '同城出发', '场馆外打卡', 'i人互拍', '一起喊应援', '🎁 互换物料'];
+window.activeBuddyTagFilter = window.activeBuddyTagFilter || {};
 if (!window.selectedBuddyTags) window.selectedBuddyTags = {};
 
 function toggleBuddyPresetTag(cloudId, tag, event) {
@@ -1280,6 +1281,8 @@ function toggleBuddyPresetTag(cloudId, tag, event) {
       btn.style.background = isOn ? getBuddyTheme() : '';
       btn.setAttribute('aria-pressed', String(isOn));
     });
+    const wrap = document.getElementById(`buddy-material-wrap-${cloudId}`);
+    if (wrap) wrap.classList.toggle('hidden', !tags.includes('🎁 互换物料'));
     return;
   }
   // 没有事件上下文时的兜底：重绘但恢复展开态
@@ -1407,10 +1410,31 @@ function renderBuddyEntryCard(cloudId, b, canManage) {
   `;
 }
 
+function getBuddyTagFilter(cloudId) {
+  return (window.activeBuddyTagFilter && window.activeBuddyTagFilter[cloudId]) || 'all';
+}
+
+function setBuddyTagFilter(cloudId, tag, event) {
+  if (event && event.stopPropagation) event.stopPropagation();
+  window.activeBuddyTagFilter = window.activeBuddyTagFilter || {};
+  window.activeBuddyTagFilter[cloudId] = tag || 'all';
+  const host = document.querySelector(`[data-buddy-list="${cloudId}"]`);
+  const panel = host && host.closest('[data-buddy-card]');
+  if (panel) {
+    panel.querySelectorAll('.buddy-filter-chip').forEach(chip => {
+      const on = chip.textContent.trim() === (tag === 'all' ? '全部' : tag);
+      chip.classList.toggle('is-active', on);
+    });
+  }
+  renderBuddyPanel(cloudId);
+}
+
 function renderBuddyListHtml(cloudId) {
-  const entries = getMergedBuddyEntries(cloudId);
+  const all = getMergedBuddyEntries(cloudId);
+  const filter = getBuddyTagFilter(cloudId);
+  const entries = filter === 'all' ? all : all.filter(b => (b.tags || []).includes(filter));
   if (!entries.length) {
-    return `<div class="p-4 rounded-xl bg-white border border-dashed border-slate-300 text-[11px] text-slate-400 text-center">选中上方预设标签，即可一键生成你的同场搭子卡片。</div>`;
+    return `<div class="p-4 rounded-xl bg-white border border-dashed border-slate-300 text-[11px] text-slate-400 text-center">${all.length ? '本场暂时还没有这类意向，换个筛选看看～' : '选中上方预设标签，即可一键生成你的同场搭子卡片。'}</div>`;
   }
   return entries.map(b => renderBuddyEntryCard(cloudId, b, isBuddyOwner(b))).join('');
 }
@@ -1604,7 +1628,15 @@ async function saveLocalBuddyIntent(cloudId, showTitle, event) {
   }
 
   const noteEl = document.getElementById(`buddy-note-${cloudId}`);
-  const publicNote = (noteEl ? noteEl.value : '').trim().replace(/\s+/g, ' ').slice(0, 60);
+  let publicNote = (noteEl ? noteEl.value : '').trim().replace(/\s+/g, ' ').slice(0, 60);
+  if (tags.includes('🎁 互换物料')) {
+    const matEl = document.getElementById(`buddy-material-${cloudId}`);
+    const material = (matEl ? matEl.value : '').trim().replace(/\s+/g, ' ').slice(0, 24);
+    if (!material) return toastError('勾选了「🎁 互换物料」，请填写要互换的物料名称');
+    const matLeak = findBuddyPublicNoteLeak(material);
+    if (matLeak) return alert('物料名称里不要填写联系方式或链接哦～');
+    publicNote = `🎁 互换物料：${material}${publicNote ? ` · ${publicNote}` : ''}`.slice(0, 90);
+  }
   if (publicNote) {
     const leak = findBuddyPublicNoteLeak(publicNote);
     if (leak) {
@@ -1732,7 +1764,7 @@ function syncOpenDrawerRegistryFromState() {
   if (!window.openTourDrawers) window.openTourDrawers = new Set();
   window.openTourDrawers.clear();
   Object.entries(window.activeFooterTab || {}).forEach(([cardKey, tab]) => {
-    if (!tab || !['traffic', 'venue', 'buddy'].includes(tab)) return;
+    if (!tab || !['traffic', 'venue', 'buddy', 'seats'].includes(tab)) return;
     const card = document.querySelector(`[data-show-card="${cardKey}"]`);
     const panel = card && card.querySelector(`[data-footer-panel="${tab}"]`);
     if (panel && panel.id) window.openTourDrawers.add(panel.id);
@@ -1778,6 +1810,10 @@ function setFooterTab(tab, trigger, event) {
     const buddyCloudId = card.dataset.showCard;
     window.__buddyActiveEventId = buddyCloudId;
     if (buddyCloudId && typeof refreshBuddyPanel === 'function') refreshBuddyPanel(buddyCloudId);
+  }
+  if (tab === 'seats') {
+    const seatEventId = card.dataset.showCard;
+    if (seatEventId && typeof openTicketSeatPanel === 'function') openTicketSeatPanel(seatEventId, '');
   }
   syncOpenDrawerRegistryFromState();
 }
@@ -2026,6 +2062,11 @@ function renderTourCards() {
           <button type="button" class="tour-action-btn" data-travel-btn data-city="${attrEsc(item.city || safeCity)}" data-venue="${attrEsc(cleanVenue || safeCity)}" data-date="${attrEsc(String(item.show_date || '').slice(0, 10))}" data-title="${attrEsc(safeCity)}" onclick="event.stopPropagation(); openTravelHelperFromButton(this)">🚄 出行比价</button>
           <button type="button" data-footer-tab="venue" data-tour-toggle="vexp-tour-drawer-${idx}" class="tour-action-btn" aria-expanded="false">${isShowStillRunning(item.show_date) ? '🛡️ 安检体验' : '📊 场馆体验'}</button>
           <button type="button" data-footer-tab="buddy" data-tour-toggle="buddy-drawer-${idx}" class="tour-action-btn" aria-expanded="false">🤝 找搭子</button>
+          <button type="button" data-footer-tab="seats" data-tour-toggle="seat-drawer-${idx}" class="tour-action-btn" aria-expanded="false">🎟️ 抢票统计</button>
+        </div>
+
+        <div id="seat-drawer-${idx}" data-footer-panel="seats" class="hidden p-3 rounded-xl bg-slate-50 border border-slate-200">
+          <div data-seat-table-host="${item.cloudId || idx}"></div>
         </div>
 
         <div id="guide-drawer-${idx}" data-footer-panel="traffic" class="hidden p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-1.5 leading-relaxed">
@@ -2040,6 +2081,8 @@ function renderTourCards() {
             <span class="font-bold text-slate-900">🤝 同场观演搭子界面 · ${safeCity}</span>
             <span class="text-[11px] text-slate-500">免注册一键发布 · 全站实时可见 · 严禁票务交易</span>
           </div>
+
+          <div class="buddy-privacy-strip">🔒 隐私保护：微信号/手机号等联系方式默认加密隐藏，仅双方互相点击同意后才会解锁展示</div>
 
           <div class="p-2.5 rounded-lg bg-white border border-slate-200 space-y-2.5">
             <div class="flex items-center justify-between flex-wrap gap-1.5">
@@ -2084,6 +2127,11 @@ function renderTourCards() {
                   `;
                 }).join('')}
               </div>
+              <div id="buddy-material-wrap-${item.cloudId}" class="${(window.selectedBuddyTags[item.cloudId] || []).includes('🎁 互换物料') ? '' : 'hidden'} space-y-1">
+                <input id="buddy-material-${item.cloudId}" type="text" maxlength="24" autocomplete="off"
+                  placeholder="要互换的物料名称：小卡 / 透扇 / 手幅…"
+                  class="buddy-material-input" />
+              </div>
             </div>
 
             <div class="space-y-1 pt-1 border-t border-slate-100">
@@ -2114,6 +2162,12 @@ function renderTourCards() {
 
           <div class="space-y-1.5 pt-1">
             <div class="text-[11px] font-semibold text-slate-600">📋 本场搭子动态（<span data-buddy-count="${item.cloudId}">${buddyEntries.length}</span>）：全站公开可见</div>
+            <div class="flex items-center gap-1.5 flex-wrap pb-0.5">
+              ${[['all', '全部'], ['🎁 互换物料', '🎁 互换物料']].map(([val, label]) => {
+                const on = (window.activeBuddyTagFilter[item.cloudId] || 'all') === val;
+                return `<button type="button" class="buddy-filter-chip ${on ? 'is-active' : ''}" onclick="setBuddyTagFilter('${item.cloudId}', '${val}', event)">${label}</button>`;
+              }).join('')}
+            </div>
             <div data-buddy-list="${item.cloudId}" class="space-y-1.5">${renderBuddyListHtml(item.cloudId)}</div>
           </div>
         </div>
