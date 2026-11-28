@@ -223,6 +223,10 @@ function confirmExternalToolJump() {
 // ================= 演出卡片地图唤端菜单 =================
 var showMapFallbackState = { timer: null, cleanup: null };
 
+function attrEsc(v) {
+  return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/['"<>]/g, '');
+}
+
 function encodeShowMapValue(value) {
   try {
     return encodeURIComponent(String(value || ''));
@@ -1940,6 +1944,7 @@ function renderTourCards() {
 
         <div class="tour-actions-row pt-2 border-t border-slate-200/70">
           <button type="button" data-footer-tab="traffic" data-tour-toggle="guide-drawer-${idx}" class="tour-action-btn" aria-expanded="false">🚇 交通</button>
+          <button type="button" class="tour-action-btn" data-travel-btn data-city="${attrEsc(item.city || safeCity)}" data-venue="${attrEsc(cleanVenue || safeCity)}" data-date="${attrEsc(String(item.show_date || '').slice(0, 10))}" data-title="${attrEsc(safeCity)}" onclick="event.stopPropagation(); openTravelHelperFromButton(this)">🚄 出行比价</button>
           <button type="button" data-footer-tab="venue" data-tour-toggle="vexp-tour-drawer-${idx}" class="tour-action-btn" aria-expanded="false">${isShowStillRunning(item.show_date) ? '🛡️ 安检体验' : '📊 场馆体验'}</button>
           <button type="button" data-footer-tab="buddy" data-tour-toggle="buddy-drawer-${idx}" class="tour-action-btn" aria-expanded="false">🤝 找搭子</button>
           <span class="tour-actions-divider" aria-hidden="true"></span>
@@ -2262,6 +2267,7 @@ function renderArchiveTimeline() {
           </div>
           <div class="flex items-center gap-1.5 flex-wrap justify-start sm:justify-end w-full sm:w-auto sm:shrink-0">
             ${hasSeries ? `<button type="button" data-theme="${safeJumpTheme}" onclick="openSeriesModal(this.dataset.theme)" class="tour-action-btn tour-action-btn--mini font-medium">${isFest ? '🎪 音乐节合集' : `🏛️ 专题页${seriesCount > 1 ? ` (${seriesCount}场)` : ''}`} ↗</button>` : ''}
+            <button type="button" class="tour-action-btn tour-action-btn--mini" data-travel-btn data-city="${attrEsc(getArchiveCity(item) || '')}" data-venue="${attrEsc(item.venue || '')}" data-date="${attrEsc(String(item.showDate || '').slice(0, 10))}" data-title="${attrEsc(safeTitle)}" onclick="event.stopPropagation(); openTravelHelperFromButton(this)">🚄 出行比价</button>
             <button type="button" data-tour-toggle="vexp-arc-drawer-${idx}" class="tour-action-btn tour-action-btn--mini">📊 场馆体验<span class="hidden sm:inline text-[10px] opacity-70 ml-1">${venueStats.total}${venueStats.unlocked ? '' : '/5'}</span></button>
             ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="archive" data-edit-title="${safeTitle.replace(/"/g, '&quot;')}" data-edit-date="${String(item.showDate || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini">✏️ 编辑</button>` : ''}
             <button type="button" onclick="recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="tour-action-btn tour-action-btn--mini ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已打卡' : '+ 足迹'}</button>

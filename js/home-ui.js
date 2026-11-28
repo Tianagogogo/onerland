@@ -570,6 +570,7 @@ function renderUpcomingMiniTimeline() {
         </div>
         <div class="tl-quick-bar" data-tl-bar="${idx}">
           <button type="button" class="tl-quick-btn" data-tl-action="traffic" data-tl-idx="${idx}" aria-expanded="false">🚇 交通</button>
+          <button type="button" class="tl-quick-btn" data-tl-action="travel" data-tl-idx="${idx}">🚄 出行比价</button>
           <button type="button" class="tl-quick-btn" data-tl-action="security" data-tl-idx="${idx}" aria-expanded="false">🛡️ 安检体验</button>
           <button type="button" class="tl-quick-btn" data-tl-action="buddy" data-tl-idx="${idx}">🤝 找搭子</button>
           <button type="button" class="tl-quick-btn" data-tl-action="calendar" data-tl-idx="${idx}">📅 日历</button>
@@ -661,6 +662,13 @@ function handleHomeTimelineAction(action, idx, btn) {
         <div class="tl-quick-panel-title">🚇 交通与入场指南</div>
         <div class="tl-quick-panel-body">${esc(text).replace(/\n/g, '<br />')}</div>
       </div>`);
+    return;
+  }
+
+  if (action === 'travel') {
+    if (typeof openTravelHelper === 'function') {
+      openTravelHelper({ city: rec.city, venue: rec.venue, date: rec.date, title: rec.city });
+    }
     return;
   }
 
