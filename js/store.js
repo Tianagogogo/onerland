@@ -280,12 +280,21 @@ function getAnniversaryState() {
 }
 
 function saveAnniversaryState(patch = {}) {
+  const prevTarget = (AppState.anniversary && Array.isArray(AppState.anniversary.targets))
+    ? (AppState.anniversary.targets[0] || '')
+    : '';
   AppState.anniversary = { ...AppState.anniversary, ...patch };
   localStorage.setItem(LOCAL_KEYS.ANNIVERSARY, JSON.stringify(AppState.anniversary));
   if (typeof renderAnniversaryCard === 'function') renderAnniversaryCard();
   if (typeof renderAnniversaryManager === 'function' &&
       !document.getElementById('anniversary-manager-modal')?.classList.contains('hidden')) {
     renderAnniversaryManager();
+  }
+  // 🔗 首页人物变更 → 与足迹页粉籍/应援色联动（静默同步或弹统一提醒）
+  const changedTarget = Object.prototype.hasOwnProperty.call(patch, 'targets')
+    || Object.prototype.hasOwnProperty.call(patch, 'fanIdentity');
+  if (changedTarget && typeof onHomeFandomTargetChanged === 'function') {
+    try { onHomeFandomTargetChanged(prevTarget); } catch (e) { console.warn('粉籍联动失败:', e); }
   }
 }
 

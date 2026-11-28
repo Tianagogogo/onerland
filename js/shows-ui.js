@@ -125,6 +125,9 @@ function switchMainTab(tabId) {
   if (tabId === 'home' && typeof renderHomeDashboard === 'function') renderHomeDashboard();
   if (tabId === 'shows' && typeof renderTourCards === 'function') renderTourCards();
   if (tabId === 'footprint' && typeof renderFootprintPage === 'function') renderFootprintPage();
+  if (tabId === 'footprint' && typeof checkFandomConflict === 'function') {
+    setTimeout(() => { try { checkFandomConflict(); } catch (e) { /* ignore */ } }, 120);
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 

@@ -128,6 +128,10 @@ window.renderFootprintPage = renderFootprintPage;
 
 // 2. 观演足迹记录与 SVG 连线轨迹图
 function recordFootprintFromShow(title, date, venue, artist = 'ONER') {
+  // 新增足迹前先做一次首页对象 ⇄ 足迹粉籍的一致性检测（本会话已选「保持各自独立」则跳过）
+  if (typeof checkFandomConflict === 'function') {
+    try { checkFandomConflict(); } catch (e) { /* ignore */ }
+  }
   const showKey = buildShowKey(venue, title);
   const existed = findFootprintIndex({ showKey, title, date, venue }) >= 0;
   upsertFootprintEntry({ showKey, title, date, venue, artist });

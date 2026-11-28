@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onerland-pwa-v79';
+const CACHE_NAME = 'onerland-pwa-v80';
 const IMAGE_CACHE_NAME = 'onerland-images-v3';
 const STATIC_ASSETS = [
   './',
@@ -14,6 +14,7 @@ const STATIC_ASSETS = [
   './js/admin-ui.js',
   './js/auth-ui.js',
   './js/travel-helper.js',
+  './js/fandom-sync.js',
   './js/feedback-ui.js'
 ];
 

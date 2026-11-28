@@ -2188,3 +2188,120 @@ body.travel-modal-open { overflow: hidden; }
   #tour-themes-bar.is-expanded .theme-extra { display: inline-flex; }
   #tour-themes-bar .theme-more-btn { display: inline-flex; align-items: center; }
 }
+
+/* ================= 🔗 粉籍统一提醒弹窗（冷银白液态金属磨砂） ================= */
+.fandom-conflict-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-family: "PingFang SC", "Noto Sans SC", "Source Han Sans SC", sans-serif;
+}
+.fandom-conflict-card {
+  width: 100%;
+  max-width: 22.5rem;
+  padding: 16px 16px 13px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(255,255,255,0.97) 0%, rgba(243,246,250,0.95) 52%, rgba(228,234,242,0.95) 100%);
+  border: 1px solid rgba(148, 163, 184, 0.62);
+  box-shadow: inset 0 1px 0 #ffffff, inset 0 -1px 0 rgba(255,255,255,0.6), 0 18px 46px rgba(15, 23, 42, 0.22);
+  color: #1e293b;
+  animation: fandomCardIn 0.18s ease-out;
+}
+@keyframes fandomCardIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.fandom-conflict-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+.fandom-conflict-title { font-size: 13px; font-weight: 700; color: #0f172a; letter-spacing: 0.01em; }
+.fandom-conflict-close {
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.fandom-conflict-close:hover { color: #334155; background: rgba(148,163,184,0.16); }
+.fandom-conflict-text {
+  font-size: 11.5px;
+  line-height: 1.75;
+  color: #475569;
+  margin: 0 0 9px;
+}
+.fandom-conflict-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-bottom: 12px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.36);
+  background: linear-gradient(135deg, #ffffff 0%, #f4f7fa 100%);
+  box-shadow: inset 0 1px 0 #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  color: #334155;
+}
+.fandom-conflict-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), 0 0 0 1px rgba(148,163,184,0.35);
+}
+.fandom-conflict-vs { color: #94a3b8; font-size: 11px; font-weight: 600; }
+.fandom-conflict-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fandom-conflict-btn {
+  width: 100%;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  background: linear-gradient(135deg, #ffffff 0%, #f3f6fa 52%, #e6ecf3 100%);
+  color: #334155;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), 0 1px 3px rgba(100,116,139,0.12);
+  transition: transform 0.14s ease, box-shadow 0.14s ease, color 0.14s ease;
+}
+.fandom-conflict-btn:hover { color: #0f172a; transform: translateY(-1px); box-shadow: inset 0 1px 0 #fff, 0 3px 10px rgba(100,116,139,0.2); }
+.fandom-conflict-btn.is-primary {
+  border-color: rgba(100, 116, 139, 0.7);
+  background: linear-gradient(135deg, #fbfcfe 0%, #e3e9f1 50%, #cfd8e3 100%);
+  color: #0f172a;
+}
+.fandom-conflict-btn.is-text {
+  height: 26px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #94a3b8;
+  font-weight: 600;
+  font-size: 11px;
+}
+.fandom-conflict-btn.is-text:hover { color: #475569; transform: none; box-shadow: none; }
+.fandom-conflict-foot {
+  margin: 9px 0 0;
+  text-align: center;
+  font-size: 10px;
+  color: #94a3b8;
+}
