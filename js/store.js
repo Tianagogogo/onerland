@@ -330,7 +330,9 @@ function compressImageToDataURL(file, maxWidth = 800, quality = 0.72, maxBytes =
     reader.onload = ev => {
       const img = new Image();
       img.onload = () => {
-        const ratio = img.width > maxWidth ? maxWidth / img.width : 1;
+        // 统一按「最大边长」限制（长图/竖图不再只卡宽度）
+        const longEdge = Math.max(img.width, img.height);
+        const ratio = longEdge > maxWidth ? maxWidth / longEdge : 1;
         const canvas = document.createElement('canvas');
         canvas.width = Math.max(1, Math.round(img.width * ratio));
         canvas.height = Math.max(1, Math.round(img.height * ratio));
@@ -368,6 +370,42 @@ function compressImageToDataURL(file, maxWidth = 800, quality = 0.72, maxBytes =
       };
       img.onerror = reject;
       img.src = ev.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// 音乐节时间表长图专用：按「最大边长」限制而非最大宽度，保留密集小字。
+// 原图 < 1.2MB 时只转 WebP（原分辨率、q=0.92）；否则最长边压到 2560px。
+function compressTimetableImage(file, maxEdge = 2560, quality = 0.92) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const originalDataUrl = ev.target.result;
+      const img = new Image();
+      img.onload = () => {
+        const longEdge = Math.max(img.width, img.height);
+        const needResize = longEdge > maxEdge;
+        const ratio = needResize ? maxEdge / longEdge : 1;
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * ratio));
+        canvas.height = Math.max(1, Math.round(img.height * ratio));
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        let out = '';
+        try { out = canvas.toDataURL('image/webp', quality); } catch (e) { out = ''; }
+        if (!out || !out.startsWith('data:image/webp')) {
+          try { out = canvas.toDataURL('image/jpeg', quality); } catch (e) { out = ''; }
+        }
+        // 小图直接转格式时，若输出反而更大则保留原图，避免二次损失
+        if (out && !needResize && out.length > originalDataUrl.length) out = originalDataUrl;
+        resolve(out || originalDataUrl);
+      };
+      img.onerror = () => resolve(originalDataUrl);
+      img.src = originalDataUrl;
     };
     reader.onerror = reject;
     reader.readAsDataURL(file);
@@ -424,7 +462,112 @@ async function openSeatMapForShow(cloudId, fallbackUrl, caption) {
   else alert('该场次暂未上传座位图');
 }
 
-// ================= 全局图片灯箱（置顶防遮挡） =================
+// ================= 全局图片灯箱（置顶防遮挡 + 双指缩放 / 拖动） =================
+const lightboxState = { scale: 1, x: 0, y: 0, src: '', pinchDist: 0, startX: 0, startY: 0, lastX: 0, lastY: 0 };
+
+function applyLightboxTransform() {
+  const img = document.getElementById('lightbox-img');
+  if (!img) return;
+  img.style.transform = `translate(${lightboxState.x}px, ${lightboxState.y}px) scale(${lightboxState.scale})`;
+}
+
+function resetLightboxZoom() {
+  const img = document.getElementById('lightbox-img');
+  lightboxState.scale = 1;
+  lightboxState.x = 0;
+  lightboxState.y = 0;
+  if (img) { img.classList.remove('is-original'); applyLightboxTransform(); }
+}
+
+function openLightboxInNewTab() {
+  const src = lightboxState.src;
+  if (!src) return;
+  if (/^data:/i.test(src)) {
+    // data: URL 不能被浏览器直接新标签打开，转成 blob URL
+    fetch(src).then(r => r.blob()).then(blob => {
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }).catch(() => window.open(src, '_blank', 'noopener'));
+    return;
+  }
+  window.open(src, '_blank', 'noopener');
+}
+
+function bindLightboxGestures() {
+  if (window.__lightboxGesturesBound) return;
+  window.__lightboxGesturesBound = true;
+  const stage = document.getElementById('lightbox-stage');
+  const img = document.getElementById('lightbox-img');
+  if (!stage || !img) return;
+
+  const distance = touches => Math.hypot(
+    touches[0].clientX - touches[1].clientX,
+    touches[0].clientY - touches[1].clientY
+  );
+
+  stage.addEventListener('touchstart', event => {
+    if (event.touches.length === 2) {
+      lightboxState.pinchDist = distance(event.touches);
+      lightboxState.startX = lightboxState.x;
+      lightboxState.startY = lightboxState.y;
+      return;
+    }
+    if (event.touches.length === 1) {
+      lightboxState.lastX = event.touches[0].clientX;
+      lightboxState.lastY = event.touches[0].clientY;
+    }
+  }, { passive: true });
+
+  stage.addEventListener('touchmove', event => {
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      const dist = distance(event.touches);
+      if (lightboxState.pinchDist > 0) {
+        const next = Math.min(6, Math.max(1, lightboxState.scale * (dist / lightboxState.pinchDist)));
+        lightboxState.scale = next;
+        applyLightboxTransform();
+      }
+      return;
+    }
+    if (event.touches.length === 1 && lightboxState.scale > 1) {
+      event.preventDefault();
+      const t = event.touches[0];
+      lightboxState.x += t.clientX - lightboxState.lastX;
+      lightboxState.y += t.clientY - lightboxState.lastY;
+      lightboxState.lastX = t.clientX;
+      lightboxState.lastY = t.clientY;
+      applyLightboxTransform();
+    }
+  }, { passive: false });
+
+  stage.addEventListener('touchend', event => {
+    if (event.touches.length < 2) lightboxState.pinchDist = 0;
+    if (event.touches.length === 1) {
+      lightboxState.lastX = event.touches[0].clientX;
+      lightboxState.lastY = event.touches[0].clientY;
+    }
+  }, { passive: true });
+
+  // 双击 / 双触点按快速放大到 2 倍
+  img.addEventListener('dblclick', event => {
+    event.preventDefault();
+    lightboxState.scale = lightboxState.scale > 1 ? 1 : 2;
+    if (lightboxState.scale === 1) { lightboxState.x = 0; lightboxState.y = 0; }
+    applyLightboxTransform();
+  });
+
+  // 桌面端滚轮缩放
+  stage.addEventListener('wheel', event => {
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    const next = Math.min(6, Math.max(1, lightboxState.scale - event.deltaY * 0.002));
+    lightboxState.scale = next;
+    if (next === 1) { lightboxState.x = 0; lightboxState.y = 0; }
+    applyLightboxTransform();
+  }, { passive: false });
+}
+
 function openLightbox(src, caption = '') {
   if (!src) return;
   const box = document.getElementById('image-lightbox');
@@ -433,10 +576,21 @@ function openLightbox(src, caption = '') {
   if (!box || !img) return;
   document.body.appendChild(box);
   box.style.zIndex = '9999';
+  lightboxState.src = src;
+  lightboxState.scale = 1;
+  lightboxState.x = 0;
+  lightboxState.y = 0;
+  img.classList.remove('is-original');
+  img.style.transform = 'none';
   img.src = src;
   if (cap) cap.textContent = caption;
   box.classList.remove('hidden');
+  bindLightboxGestures();
 }
+
+window.openLightbox = openLightbox;
+window.resetLightboxZoom = resetLightboxZoom;
+window.openLightboxInNewTab = openLightboxInNewTab;
 
 // ================= AI Key 状态（暂无对应 UI，先提供空实现避免启动报错） =================
 function updateAiKeyStatusUI() {

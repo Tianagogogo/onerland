@@ -712,3 +712,24 @@ select::-moz-focus-inner { border: 0; }
     padding: 8px 10px;
   }
 }
+
+/* ================= 高清长图预览：支持双指缩放 / 拖动 ================= */
+.lightbox-stage {
+  touch-action: pinch-zoom pan-x pan-y;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.lightbox-img {
+  transform-origin: center center;
+  transition: transform 0.05s linear;
+  will-change: transform;
+  -webkit-user-drag: none;
+  touch-action: pinch-zoom pan-x pan-y;
+}
+.lightbox-img.is-original {
+  max-width: none !important;
+  max-height: none !important;
+  width: auto;
+  height: auto;
+  cursor: grab;
+}

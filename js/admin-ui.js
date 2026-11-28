@@ -15,7 +15,8 @@ function renderAdminScheduleThumbs() {
 
 async function handleAdminScheduleFiles(event) {
   for (const file of Array.from(event.target.files || [])) {
-    const dataUrl = await compressImageToDataURL(file, 760, 0.72);
+    // 时间表：最长边 2560px、质量 0.92，保留两天拼图里的小字
+    const dataUrl = await compressTimetableImage(file, 2560, 0.92);
     adminScheduleImgs.push(dataUrl);
   }
   event.target.value = '';
@@ -34,8 +35,8 @@ function addAdminScheduleUrl() {
 async function handleAdminSeatFile(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  // 座位图：最大宽 1200px、质量 0.82、单张 ≤150KB
-  const dataUrl = await compressImageToDataURL(file, 1200, 0.82, 150 * 1024);
+  // 座位图：最大边 1600px、质量 0.86
+  const dataUrl = await compressImageToDataURL(file, 1600, 0.86, Infinity);
   const seatInput = document.getElementById('adm-seat');
   if (seatInput) seatInput.value = dataUrl;
   const prev = document.getElementById('adm-seat-preview');
@@ -60,8 +61,8 @@ function clearAdminSeat() {
 async function handleAdminPosterFile(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  // 海报：最大宽 600px、质量 0.78、单张 ≤150KB，浏览器端压成 WebP
-  const dataUrl = await compressImageToDataURL(file, 600, 0.78, 150 * 1024);
+  // 海报：最大边 600px、质量 0.80
+  const dataUrl = await compressImageToDataURL(file, 600, 0.80, Infinity);
   document.getElementById('adm-poster').value = dataUrl;
   const prev = document.getElementById('adm-poster-preview');
   prev.src = dataUrl;
