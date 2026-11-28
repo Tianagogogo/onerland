@@ -954,16 +954,15 @@ function matchVenueHotelPresets(show, city) {
   return VENUE_HOTEL_PRESETS.find(p => text.indexOf(p.city) >= 0 && p.match.some(k => venue.indexOf(k) >= 0)) || null;
 }
 
-// 未预置城市：正规连锁快筛（只用城市与场馆，绝不拼演出名）
-function buildFallbackVenueHotels(city, venue) {
+// 未预置城市：只展示真实连锁品牌，不拼接任何“城市+场馆+周边店”的假门店全称
+function buildFallbackVenueHotels(city) {
   const c = String(city || '').trim() || '当地';
-  const v = String(venue || c).trim();
   return [
-    { name: `汉庭酒店(${c}${v}周边店)`, desc: `${v} 周边正规连锁，价格透明`, tags: ['平价首选', '连锁保障'] },
-    { name: `如家商旅(${c}${v}周边店)`, desc: `${v} 周边经济型连锁`, tags: ['经济实惠', '近场馆'] },
-    { name: `全季酒店(${c}${v}周边店)`, desc: `${v} 周边品质连锁`, tags: ['高性价比', '安静舒适'] },
-    { name: `锦江之星(${c}地铁沿线店)`, desc: `${c} 地铁沿线老牌连锁`, tags: ['老牌平价', '地铁便捷'] },
-    { name: `维也纳酒店(${c}${v}周边店)`, desc: `${c} 连锁优选，交通便利`, tags: ['连锁优选', '交通便利'] }
+    { name: '汉庭酒店', keyword: `${c} 汉庭酒店`, desc: `${c} 全市正规连锁 · 跳转后可按距离/价格筛选`, tags: ['正规连锁', '经济型'] },
+    { name: '全季酒店', keyword: `${c} 全季酒店`, desc: `${c} 全市正规连锁 · 跳转后可按距离/价格筛选`, tags: ['正规连锁', '品质型'] },
+    { name: '如家商旅', keyword: `${c} 如家商旅`, desc: `${c} 全市正规连锁 · 跳转后可按距离/价格筛选`, tags: ['正规连锁', '商旅型'] },
+    { name: '锦江之星', keyword: `${c} 锦江之星`, desc: `${c} 全市正规连锁 · 跳转后可按距离/价格筛选`, tags: ['正规连锁', '老牌连锁'] },
+    { name: '维也纳酒店', keyword: `${c} 维也纳酒店`, desc: `${c} 全市正规连锁 · 跳转后可按距离/价格筛选`, tags: ['正规连锁', '舒适型'] }
   ];
 }
 
@@ -972,31 +971,34 @@ function travelHotelLinks(city, hotelName, checkIn, checkOut) {
   const ci = String(checkIn || '').slice(0, 10);
   const co = String(checkOut || '').slice(0, 10);
   return {
-    ctrip: `https://hotels.ctrip.com/hotels/list?cityName=${enc(city)}&keyword=${enc(hotelName)}${ci ? `&checkin=${ci}` : ''}${co ? `&checkout=${co}` : ''}&order=price`,
+    ctrip: `https://hotels.ctrip.com/hotels/list?cityName=${enc(city)}&keyword=${enc(hotelName)}${ci ? `&checkin=${ci}` : ''}${co ? `&checkout=${co}` : ''}`,
     meituan: `https://i.meituan.com/hotel/?cityName=${enc(city)}&keyword=${enc(hotelName)}${ci ? `&checkin=${ci}` : ''}${co ? `&checkout=${co}` : ''}`
   };
 }
 
-// 酒店面板：顶部连锁白名单卡片 + 底部纯地标低价检索 + 防广告声明
+// 酒店面板：真实连锁白名单 / 城市+品牌直搜 + 周边地标快捷搜索 + 防广告声明
 function buildHotelPanelHtml(show, city, venue) {
   const c = String(city || '').trim() || '当地';
   const v = String(venue || c).trim();
   const checkIn = String((show && show.date) || '').slice(0, 10);
   const checkOut = checkIn ? travelShiftDate(checkIn, 1) : '';
   const preset = matchVenueHotelPresets(show, c);
-  const hotels = preset ? preset.hotels.map(h => ({ name: h[0], desc: h[1], tags: h[2] || [] })) : buildFallbackVenueHotels(c, v);
+  const hotels = preset
+    ? preset.hotels.map(h => ({ name: h[0], keyword: h[0], desc: h[1], tags: h[2] || [] }))
+    : buildFallbackVenueHotels(c);
   const enc = encodeURIComponent;
   const landmark = [
-    { label: `📍 ${v} 周边酒店`, desc: '按价格低到高排序', url: `https://hotels.ctrip.com/hotels/list?cityName=${enc(c)}&keyword=${enc(v)}${checkIn ? `&checkin=${checkIn}${checkOut ? `&checkout=${checkOut}` : ''}` : ''}&order=price` },
-    { label: `🚇 ${c} 地铁沿线酒店`, desc: '地铁沿线 · 低价优先', url: `https://hotels.ctrip.com/hotels/list?cityName=${enc(c)}&keyword=${enc(`${c} 地铁 酒店`)}${checkIn ? `&checkin=${checkIn}${checkOut ? `&checkout=${checkOut}` : ''}` : ''}&order=price` },
-    { label: `🚄 ${c} 高铁站周边酒店`, desc: '高铁到站即住 · 低价优先', url: `https://hotels.ctrip.com/hotels/list?cityName=${enc(c)}&keyword=${enc(`${c} 高铁站 酒店`)}${checkIn ? `&checkin=${checkIn}${checkOut ? `&checkout=${checkOut}` : ''}` : ''}&order=price` }
+    { label: `📍 ${v} 周边酒店`, desc: '跳转后可按距离/价格筛选', url: `https://hotels.ctrip.com/hotels/list?cityName=${enc(c)}&keyword=${enc(v)}${checkIn ? `&checkin=${checkIn}${checkOut ? `&checkout=${checkOut}` : ''}` : ''}` },
+    { label: `🚇 ${c} 地铁沿线酒店`, desc: '地铁沿线通勤便捷', url: `https://hotels.ctrip.com/hotels/list?cityName=${enc(c)}&keyword=${enc(`${c} 地铁 酒店`)}${checkIn ? `&checkin=${checkIn}${checkOut ? `&checkout=${checkOut}` : ''}` : ''}` },
+    { label: `🚄 ${c} 高铁站周边酒店`, desc: '高铁站周边返程方便', url: `https://hotels.ctrip.com/hotels/list?cityName=${enc(c)}&keyword=${enc(`${c} 高铁站 酒店`)}${checkIn ? `&checkin=${checkIn}${checkOut ? `&checkout=${checkOut}` : ''}` : ''}` }
   ];
   return `
     <div class="travel-hotel-block">
-      <div class="travel-hotel-head">📍 ${travelEsc(c)} · 场馆周边正规连锁平价推荐</div>
+      <div class="travel-hotel-head">${preset ? `📍 ${travelEsc(c)} · 场馆周边正规连锁酒店参考` : `🏨 ${travelEsc(c)} 正规连锁品牌直搜`}</div>
       <div class="travel-hotel-list">
         ${hotels.map(hotel => {
-          const links = travelHotelLinks(c, hotel.name, checkIn, checkOut);
+          const keyword = hotel.keyword || hotel.name;
+          const links = travelHotelLinks(c, keyword, checkIn, checkOut);
           return `
             <article class="travel-hotel-card">
               <div class="travel-hotel-main">
@@ -1005,16 +1007,16 @@ function buildHotelPanelHtml(show, city, venue) {
                 <div class="travel-hotel-tags">${(hotel.tags || []).map(t => `<span class="travel-hotel-tag">${travelEsc(t)}</span>`).join('')}</div>
               </div>
               <div class="travel-hotel-acts">
-                <button type="button" class="travel-hotel-btn" data-hotel-copy="${travelEsc(hotel.name)}">📋 复制店名</button>
-                <a class="travel-hotel-btn is-primary" href="${links.ctrip}" target="_blank" rel="noopener noreferrer">携程低价 ↗</a>
-                <a class="travel-hotel-btn" href="${links.meituan}" target="_blank" rel="noopener noreferrer">美团比价 ↗</a>
+                <button type="button" class="travel-hotel-btn" data-hotel-copy="${travelEsc(keyword)}">📋 复制关键词</button>
+                <a class="travel-hotel-btn" href="${links.ctrip}" target="_blank" rel="noopener noreferrer">携程搜索 ↗</a>
+                <a class="travel-hotel-btn" href="${links.meituan}" target="_blank" rel="noopener noreferrer">美团搜索 ↗</a>
               </div>
             </article>`;
         }).join('')}
       </div>
     </div>
     <div class="travel-hotel-block">
-      <div class="travel-hotel-head">🧭 纯地标低价检索</div>
+      <div class="travel-hotel-head">🧭 周边地标快捷搜索</div>
       <div class="travel-link-grid travel-hotel-landmarks">
         ${landmark.map(item => `
           <a class="travel-link" href="${item.url}" target="_blank" rel="noopener noreferrer">
@@ -1023,7 +1025,7 @@ function buildHotelPanelHtml(show, city, venue) {
           </a>`).join('')}
       </div>
     </div>
-    <div class="travel-hotel-note">仅收录正规连锁酒店检索入口，无任何商业推广或返佣链接，跳转至官方平台自行比价预订</div>
+    <div class="travel-hotel-note">仅收录正规连锁酒店检索入口，无任何商业推广或返佣链接，跳转至官方平台自行筛选与预订</div>
   `;
 }
 
@@ -1089,7 +1091,7 @@ function buildTravelGroups() {
         title: '酒店',
         hint: `${venue} 周边${show.date ? ` · ${String(show.date).slice(0, 10)} 入住` : ''}`,
         links: [],
-        count: (matchVenueHotelPresets(show, dest.city) || { hotels: buildFallbackVenueHotels(dest.city, venue) }).hotels.length,
+        count: (matchVenueHotelPresets(show, dest.city) || { hotels: buildFallbackVenueHotels(dest.city) }).hotels.length,
         copyLabel: '📋 一键复制住宿关键词',
         customHtml: buildHotelPanelHtml(show, dest.city, venue)
       },
@@ -1101,7 +1103,7 @@ function travelLinkButtons(list) {
   const flat = [];
   (list || []).forEach(item => {
     flat.push(item);
-    (item.extraLinks || []).forEach(x => flat.push({ label: x.platform, desc: '同关键词 · 低价优先', url: x.url }));
+    (item.extraLinks || []).forEach(x => flat.push({ label: x.platform, desc: '同关键词 · 平台搜索结果', url: x.url }));
   });
   return flat.map(item => `
     <a class="travel-link" href="${travelEsc(item.url)}" ${item.memberSearch ? 'data-travel-member="1"' : ''} target="_blank" rel="noopener noreferrer">
@@ -1231,7 +1233,7 @@ function renderTravelHelper() {
           <button type="button" class="travel-copy-btn" data-copy-key="${travelEsc(group.id)}">${travelEsc(group.copyLabel || '📋 一键复制行程关键词')}</button>
           ${group.customHtml || `<div class="travel-link-grid">${travelLinkButtons(group.links)}</div>`}
           ${group.extraHtml || ''}
-          ${(group.links || []).some(l => l.extraLinks && l.extraLinks.length) ? `<div class="text-[10px] text-slate-400 px-1">同一住宿区也可切到：${[...new Set([].concat(...(group.links || []).map(l => (l.extraLinks || []).map(x => x.platform))))].join(' / ') || '—'} 比价</div>` : ''}
+          ${(group.links || []).some(l => l.extraLinks && l.extraLinks.length) ? `<div class="text-[10px] text-slate-400 px-1">同一住宿区也可切到：${[...new Set([].concat(...(group.links || []).map(l => (l.extraLinks || []).map(x => x.platform))))].join(' / ') || '—'} 搜索</div>` : ''}
         </div>
       </section>
     `;
@@ -1242,7 +1244,7 @@ function renderTravelHelper() {
       ev.stopPropagation();
       const name = btn.dataset.hotelCopy || '';
       if (!name) return;
-      const done = () => showToast(`已复制店名：${name}`);
+      const done = () => showToast(`已复制关键词：${name}`);
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(name).then(done).catch(done);
       } else {

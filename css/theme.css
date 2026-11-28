@@ -4597,7 +4597,7 @@ body.feature-modal-open { overflow: hidden; }
   #home-upcoming-timeline .timeline-card-actions { flex-wrap: nowrap !important; }
 }
 
-/* ================= 🏨 出行比价 · 酒店面板（正规连锁白名单 + 纯地标低价检索） ================= */
+/* ================= 🏨 出行比价 · 酒店面板（正规连锁白名单 + 周边地标快捷搜索） ================= */
 .travel-hotel-block { margin-top: 2px; }
 .travel-hotel-head {
   font-size: 11.5px;
@@ -4663,12 +4663,6 @@ body.feature-modal-open { overflow: hidden; }
   cursor: pointer;
 }
 .travel-hotel-btn:hover { border-color: #94a3b8; color: #0f172a; }
-.travel-hotel-btn.is-primary {
-  border-color: transparent;
-  background: linear-gradient(180deg, #1e293b 0%, #334155 100%);
-  color: #f8fafc;
-}
-.travel-hotel-btn.is-primary:hover { color: #ffffff; }
 .travel-hotel-landmarks { margin-top: 0; }
 .travel-hotel-note {
   margin-top: 8px;
