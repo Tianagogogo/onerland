@@ -1,10 +1,9 @@
 {
-  "updatedAt": 1795875897443,
+  "updatedAt": 1795879066384,
   "failedSources": [
     "ONER-微博",
     "ONER-小红书",
     "ONER-抖音",
-    "ONER-TikTok",
     "ONER-Instagram",
     "ONER-B站",
     "坤音娱乐-微博",
@@ -122,6 +121,17 @@
       "timestamp": 1795202813000
     },
     {
+      "artistId": "oner",
+      "artistName": "ONER",
+      "accountId": "oner_tt",
+      "platformName": "TikTok",
+      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
+      "text": "It’s like magic.#oner #pinkray #kwin #didi #fyp",
+      "imgs": [],
+      "link": "https://www.tiktok.com/@oner0830official/video/7710336595987090701",
+      "timestamp": 1795202632000
+    },
+    {
       "artistId": "qins",
       "artistName": "坤音娱乐",
       "accountId": "qins_yt",
@@ -142,6 +152,17 @@
       "imgs": [],
       "link": "https://www.youtube.com/watch?v=Uzp98gKPwRs",
       "timestamp": 1795152880000
+    },
+    {
+      "artistId": "oner",
+      "artistName": "ONER",
+      "accountId": "oner_tt",
+      "platformName": "TikTok",
+      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
+      "text": "Do you love me?#oner #pinkray #kwin #didi #fyp",
+      "imgs": [],
+      "link": "https://www.tiktok.com/@oner0830official/video/7709939073531514143",
+      "timestamp": 1795110077000
     },
     {
       "artistId": "kwin",
@@ -253,6 +274,28 @@
       "timestamp": 1795013377000
     },
     {
+      "artistId": "oner",
+      "artistName": "ONER",
+      "accountId": "oner_tt",
+      "platformName": "TikTok",
+      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
+      "text": "Feel it.#oner #pinkray #kwin #didi #slowmo",
+      "imgs": [],
+      "link": "https://www.tiktok.com/@oner0830official/video/7709522070186577165",
+      "timestamp": 1795012985000
+    },
+    {
+      "artistId": "oner",
+      "artistName": "ONER",
+      "accountId": "oner_tt",
+      "platformName": "TikTok",
+      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
+      "text": "Don’t worry, bro.#oner #pinkray #kwin #didi #idol",
+      "imgs": [],
+      "link": "https://www.tiktok.com/@oner0830official/video/7701960018291166478",
+      "timestamp": 1793252308000
+    },
+    {
       "artistId": "didi",
       "artistName": "灵超",
       "accountId": "lc_tt",
@@ -286,6 +329,17 @@
       "timestamp": 1793198481000
     },
     {
+      "artistId": "oner",
+      "artistName": "ONER",
+      "accountId": "oner_tt",
+      "platformName": "TikTok",
+      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
+      "text": "Turn it up! #oner #pinkray #kwin #didi #dance",
+      "imgs": [],
+      "link": "https://www.tiktok.com/@oner0830official/video/7699917393514024205",
+      "timestamp": 1792776722000
+    },
+    {
       "artistId": "kwin",
       "artistName": "木子洋",
       "accountId": "mzy_tt",
@@ -317,6 +371,17 @@
       "imgs": [],
       "link": "https://www.tiktok.com/@didi_oner/video/7699896985112907022",
       "timestamp": 1792771971000
+    },
+    {
+      "artistId": "oner",
+      "artistName": "ONER",
+      "accountId": "oner_tt",
+      "platformName": "TikTok",
+      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
+      "text": "party party party #oner #pinkray #kwin #didi #idol",
+      "imgs": [],
+      "link": "https://www.tiktok.com/@oner0830official/video/7699521188892101901",
+      "timestamp": 1792684474000
     },
     {
       "artistId": "kwin",
@@ -385,6 +450,17 @@
       "timestamp": 1792488434000
     },
     {
+      "artistId": "oner",
+      "artistName": "ONER",
+      "accountId": "oner_tt",
+      "platformName": "TikTok",
+      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
+      "text": "My friends.#oner #pinkray #kwin #didi #friends",
+      "imgs": [],
+      "link": "https://www.tiktok.com/@oner0830official/video/7698677648087665950",
+      "timestamp": 1792488072000
+    },
+    {
       "artistId": "pinkray",
       "artistName": "岳岳",
       "accountId": "yy_tt",
@@ -416,6 +492,28 @@
       "imgs": [],
       "link": "https://www.tiktok.com/@didi_oner/video/7697953358031736095",
       "timestamp": 1792319435000
+    },
+    {
+      "artistId": "oner",
+      "artistName": "ONER",
+      "accountId": "oner_tt",
+      "platformName": "TikTok",
+      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
+      "text": "STAGE LIGHTS ON…… #oner #idol #styling",
+      "imgs": [],
+      "link": "https://www.tiktok.com/@oner0830official/video/7697952534647819551",
+      "timestamp": 1792319243000
+    },
+    {
+      "artistId": "oner",
+      "artistName": "ONER",
+      "accountId": "oner_tt",
+      "platformName": "TikTok",
+      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
+      "text": "《Three heirs of a wealthy family 》 #oner #pinkray #kwin #didi #vibe",
+      "imgs": [],
+      "link": "https://www.tiktok.com/@oner0830official/video/7697335908550446366",
+      "timestamp": 1792175674000
     },
     {
       "artistId": "kwin",
@@ -482,6 +580,17 @@
       "imgs": [],
       "link": "https://www.tiktok.com/@didi_oner/video/7696561060031122702",
       "timestamp": 1791995265000
+    },
+    {
+      "artistId": "oner",
+      "artistName": "ONER",
+      "accountId": "oner_tt",
+      "platformName": "TikTok",
+      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
+      "text": "One-shot.#oner #pinkray #kwin #didi #idol",
+      "imgs": [],
+      "link": "https://www.tiktok.com/@oner0830official/video/7696517748137921822",
+      "timestamp": 1791985181000
     },
     {
       "artistId": "qins",
@@ -801,6 +910,17 @@
       "imgs": [],
       "link": "https://www.youtube.com/watch?v=bhUqpDJGA08",
       "timestamp": 1777435206000
+    },
+    {
+      "artistId": "oner",
+      "artistName": "ONER",
+      "accountId": "oner_tt",
+      "platformName": "TikTok",
+      "platformColor": "linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)",
+      "text": "Hi TikTok! We are ONER!",
+      "imgs": [],
+      "link": "https://www.tiktok.com/@oner0830official/video/7319264560349826346",
+      "timestamp": 1704149078000
     }
   ]
 }
