@@ -1916,7 +1916,7 @@ function renderTourCards() {
                 ${statusBadge}
               </div>
               <div class="flex items-center gap-1.5 shrink-0">
-                ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="ticket" class="tour-action-btn tour-action-btn--mini">✏️ 编辑</button>` : ''}
+                ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="ticket" data-edit-title="${safeCity.replace(/"/g, '&quot;')}" data-edit-date="${String(item.show_date || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini">✏️ 编辑</button>` : ''}
                 <button type="button" onclick="recordFootprintFromShow('${safeCity}', '${item.show_date}', '${cleanVenue}', '${item.artist}')" class="tour-action-btn tour-action-btn--mini ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已打卡' : '+ 足迹'}</button>
               </div>
             </div>
@@ -2256,7 +2256,7 @@ function renderArchiveTimeline() {
           <div class="flex items-center gap-1.5 flex-wrap justify-start sm:justify-end w-full sm:w-auto sm:shrink-0">
             ${hasSeries ? `<button type="button" data-theme="${safeJumpTheme}" onclick="openSeriesModal(this.dataset.theme)" class="tour-action-btn tour-action-btn--mini font-medium">${isFest ? '🎪 音乐节合集' : `🏛️ 专题页${seriesCount > 1 ? ` (${seriesCount}场)` : ''}`} ↗</button>` : ''}
             <button type="button" data-tour-toggle="vexp-arc-drawer-${idx}" class="tour-action-btn tour-action-btn--mini">📊 场馆体验<span class="hidden sm:inline text-[10px] opacity-70 ml-1">${venueStats.total}${venueStats.unlocked ? '' : '/5'}</span></button>
-            ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="archive" class="tour-action-btn tour-action-btn--mini">✏️ 编辑</button>` : ''}
+            ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="archive" data-edit-title="${safeTitle.replace(/"/g, '&quot;')}" data-edit-date="${String(item.showDate || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini">✏️ 编辑</button>` : ''}
             <button type="button" onclick="recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="tour-action-btn tour-action-btn--mini ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已打卡' : '+ 足迹'}</button>
           </div>
         </div>

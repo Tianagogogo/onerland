@@ -68,21 +68,56 @@ async function handleAdminPosterFile(event) {
   prev.classList.remove('hidden');
 }
 
-function startEditShow(kind, cloudId) {
+function findShowForEdit(kind, cloudId, fallback) {
+  const editKind = kind === 'archive' ? 'archive' : 'ticket';
+  const targetId = String(cloudId == null ? '' : cloudId).trim();
+  const sources = [];
+  if (editKind === 'archive') sources.push(AppState.cloudArchives, AppState.cloudTickets);
+  else sources.push(AppState.cloudTickets, AppState.cloudArchives);
+  // 全量合并池兜底（含音乐节 / 巡演合集里拆出来的子场次）
+  if (Array.isArray(AppState.shows)) sources.push(AppState.shows);
+  const sameId = x => String((x && (x.cloudId != null ? x.cloudId : x.id)) == null ? '' : (x.cloudId != null ? x.cloudId : x.id)) === targetId;
+  if (targetId) {
+    for (const src of sources) {
+      if (!Array.isArray(src)) continue;
+      const hit = src.find(sameId);
+      if (hit) return { item: hit, editKind };
+    }
+  }
+  // ID 缺失/类型漂移：用按钮所在卡片的标题 + 日期做语义兜底
+  const fbTitle = String((fallback && fallback.title) || '').trim();
+  const fbDate = String((fallback && fallback.date) || '').slice(0, 10);
+  if (fbTitle || fbDate) {
+    const norm = v => String(v || '').replace(/\s+/g, '').toUpperCase();
+    for (const src of sources) {
+      if (!Array.isArray(src)) continue;
+      const hit = src.find(x => {
+        const t = norm(x && (x.title || x.city));
+        const d = String((x && (x.showDate || x.show_date)) || '').slice(0, 10);
+        const titleOk = fbTitle ? (t.includes(norm(fbTitle)) || norm(fbTitle).includes(t) && t.length > 1) : true;
+        const dateOk = fbDate ? d === fbDate : true;
+        return titleOk && dateOk;
+      });
+      if (hit) return { item: hit, editKind };
+    }
+  }
+  return null;
+}
+
+function startEditShow(kind, cloudId, fallback) {
   if (!canEditContent()) {
     if (typeof openAdminUnlockModal === 'function') openAdminUnlockModal();
+    else alert('请先通过授权邮箱登录或管理员密码解锁。');
     return;
   }
-  const editKind = kind === 'archive' ? 'archive' : 'ticket';
-  const source = editKind === 'archive' ? AppState.cloudArchives : AppState.cloudTickets;
-  const targetId = String(cloudId == null ? '' : cloudId);
-  // ID 可能是数字自增或 UUID 字符串，统一字符串对比
-  const item = source.find(x => String(x?.cloudId == null ? '' : x.cloudId) === targetId)
-    || source.find(x => String(x?.id == null ? '' : x.id) === targetId);
-  if (!item) {
+  const resolved = findShowForEdit(kind, cloudId, fallback);
+  if (!resolved) {
     alert('未找到该场次数据，请点击右上角「刷新同步」后重试。');
     return;
   }
+  const item = resolved.item;
+  const editKind = resolved.editKind;
+  const targetId = String(item.cloudId != null ? item.cloudId : (item.id != null ? item.id : (cloudId == null ? '' : cloudId)));
 
   AppState.editingTicketId = item.cloudId != null ? item.cloudId : targetId;
   AppState.editingKind = editKind;
@@ -587,3 +622,36 @@ async function deleteEditingShow() {
     if (delBtn) { delBtn.disabled = false; delBtn.textContent = '🗑️ 删除该场次'; }
   }
 }
+
+
+// ================= 全站统一【✏️ 编辑】点击委托 =================
+// 覆盖顶部大卡片、扁平档案长条、音乐节/巡演合集、管理台待办等所有模板，
+// 兼容 data-edit-show / data-show-id / data-id 以及 onclick 内联调用缺失的情况。
+function bindGlobalEditDelegation() {
+  if (window.__editDelegationBound) return;
+  window.__editDelegationBound = true;
+  document.addEventListener('click', event => {
+    const btn = event.target && event.target.closest
+      ? event.target.closest('[data-edit-show], [data-show-id], [data-edit-id], [data-edit-kind]')
+      : null;
+    if (!btn) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const id = btn.dataset.editShow != null ? btn.dataset.editShow
+      : (btn.dataset.showId != null ? btn.dataset.showId : (btn.dataset.editId != null ? btn.dataset.editId : ''));
+    const kind = btn.dataset.editKind || 'ticket';
+    const card = btn.closest('[data-show-card]');
+    const fallback = {
+      title: btn.dataset.editTitle || (card && card.dataset.showTitle) || '',
+      date: btn.dataset.editDate || (card && card.dataset.showDate) || ''
+    };
+    if (!fallback.title) {
+      const textBlock = btn.closest('[data-show-card], .metal-card');
+      fallback.title = (textBlock && textBlock.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+    }
+    startEditShow(kind, id, fallback);
+  }, true);
+}
+window.startEditShow = startEditShow;
+window.findShowForEdit = findShowForEdit;
+bindGlobalEditDelegation();
