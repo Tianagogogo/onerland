@@ -1,17 +1,18 @@
-/* ================= 📣 应援词典：云端 / 本机应援词库 + 1～5 星难度评价 + 长图 / PDF 导出 =================
+/* ================= 📣 应援词典：Supabase 云端应援词库 + 1～5 星难度评价 + 长图 / PDF 导出 =================
    规范：
-   1) 曲目来自 Supabase fan_chants（匿名只读）；未建表 / 离线时降级到本机 localStorage，管理员仍可增删改；
-   2) 应援词正文用 [..] / 【..】 标记，渲染、长图、PDF 统一高亮；
-   3) 1～5 星难度评价只存本机 localStorage，匿名、无需登录，再次点击同一星级即取消；
-   4) 长图走纯 Canvas 2D（devicePixelRatio ≥ 2），不引用任何跨域图片；
-   5) PDF 走原生 window.print() + 专用打印排版，无第三方库。 */
+   1) 曲目只以 Supabase fan_chants 为权威数据源（匿名 SELECT）；读取失败会明确报错，本机草稿仅作待同步副本；
+   2) 管理员增删改必须调用 Supabase 管理员校验 RPC；失败直接提示原因，绝不静默写入本机伪装成功；
+   3) 本机历史草稿可在管理员解锁后一键上传云端；
+   4) 应援词正文用 [..] / 【..】 标记，渲染、长图、PDF 统一高亮；
+   5) 1～5 星难度评价本机记录 + vote_chant_star RPC 全站聚合，再次点击同一星级即取消；
+   6) 长图走纯 Canvas 2D（devicePixelRatio ≥ 2），不引用任何跨域图片；
+   7) PDF 走原生 window.print() + 专用打印排版，无第三方库。 */
 
 const CHANT_TABLE = 'fan_chants';
 const CHANT_LOCAL_KEY = 'onerland_fan_chants_v1';
 const CHANT_ALBUM_TAG_KEY = 'onerland_chant_album_tags_v1';
 const CHANT_ALBUM_TAG_PRESETS = ['过敏', '舞会', '恶浪', '镜象马戏团', 'ONER', '单曲 / 舞台'];
 const CHANT_RATING_KEY = 'onerland_chant_ratings';
-const CHANT_RATING_TABLE = 'fan_chant_ratings';
 const CHANT_CATEGORIES = ['ONER团歌', '岳岳', '木子洋', '灵超'];
 
 // 1～5 星应援难度评价
@@ -207,10 +208,6 @@ function normalizeChantRecord(row) {
   };
 }
 
-function chantNewId() {
-  return `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
 // ===== 专辑 Tag：预设 + 管理员新建 + 曲库已有专辑动态合并 =====
 function readChantAlbumTagStore() {
   try {
@@ -332,9 +329,27 @@ function chantRestHeaders() {
   };
 }
 
+function chantRemoteErrorText(status, raw, code) {
+  let info = null;
+  try { info = raw ? JSON.parse(raw) : null; } catch (e) { info = null; }
+  const msg = String((info && (info.message || info.details || info.hint || info.error)) || raw || '').trim();
+  const errCode = String(code || (info && (info.code || info.error_code)) || '');
+  let hint = '';
+  if (status === 404 || errCode === '42P01' || errCode === 'PGRST205') {
+    hint = '（fan_chants 表不存在，请先在 Supabase SQL Editor 执行 supabase/fan_chants.sql）';
+  } else if (errCode === 'PGRST202') {
+    hint = '（云端 RPC 未部署，请先在 Supabase SQL Editor 执行 supabase/fan_chants.sql）';
+  } else if (status === 401 || status === 403 || errCode === '28000' || errCode === '42501') {
+    hint = '（管理员口令校验失败或权限不足）';
+  } else if (status >= 500) {
+    hint = '（Supabase 服务端异常，请稍后重试）';
+  }
+  return `HTTP ${status}${errCode ? ` / ${errCode}` : ''}${msg ? `：${msg}` : ''}${hint}`;
+}
+
 async function fetchChantRemoteSongs() {
-  if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) return { ok: false, rows: [] };
-  if (typeof fetch !== 'function') return { ok: false, rows: [] };
+  if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) return { ok: false, rows: [], error: '未配置 SUPABASE_URL' };
+  if (typeof fetch !== 'function') return { ok: false, rows: [], error: '当前浏览器不支持网络请求' };
   const controller = typeof AbortController === 'function' ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), 4500) : null;
   try {
@@ -344,12 +359,16 @@ async function fetchChantRemoteSongs() {
       signal: controller ? controller.signal : undefined
     });
     if (timer) clearTimeout(timer);
-    if (!res.ok) return { ok: false, rows: [] };
+    if (!res.ok) {
+      const raw = await res.text().catch(() => '');
+      return { ok: false, rows: [], error: chantRemoteErrorText(res.status, raw) };
+    }
     const rows = await res.json();
     return { ok: true, rows: Array.isArray(rows) ? rows : [] };
   } catch (e) {
     if (timer) clearTimeout(timer);
-    return { ok: false, rows: [] };
+    const reason = e && e.name === 'AbortError' ? '请求超时（4.5 秒）' : (e && e.message) || '网络异常';
+    return { ok: false, rows: [], error: `无法访问 Supabase：${reason}` };
   }
 }
 
@@ -363,35 +382,192 @@ async function loadChantSongs(force) {
     chantLoadedFromRemote = !!remote.ok;
     chantRemoteSongs = remote.ok ? remote.rows.map(normalizeChantRecord) : [];
     chantState.loading = false;
-    if (!remote.ok) chantState.error = '云端应援词库暂不可用，已切换为本机数据';
+    if (!remote.ok) {
+      chantState.error = `云端应援词库读取失败：${remote.error || '未知错误'}。当前只显示本机草稿，其他设备与访客看不到云端数据。`;
+      if (typeof toastError === 'function') toastError(chantState.error, 5200);
+    }
     renderChantPage();
     return getChantSongs();
   })();
   return chantLoadPromise;
 }
 
-// ===== 云端写入：统一走 /api/admin（service_role + 管理员校验）=====
-function chantAdminHeaders() {
-  if (typeof getAdminRequestHeaders === 'function') return getAdminRequestHeaders();
-  return { 'Content-Type': 'application/json' };
+// ===== 云端写入：必须走 Supabase 管理员校验 RPC，失败不改本机 =====
+function chantResolveAdminKey(promptIfMissing) {
+  let key = '';
+  try {
+    if (typeof getSecurityAdminKey === 'function') key = String(getSecurityAdminKey() || '').trim();
+  } catch (e) { key = ''; }
+  if (!key && typeof getCheckinAdminKey === 'function') {
+    try { key = String(getCheckinAdminKey() || '').trim(); } catch (e) { key = ''; }
+  }
+  if (!key && promptIfMissing && typeof promptCheckinAdminKey === 'function') {
+    try { key = String(promptCheckinAdminKey('请输入全站管理员密码（与 /api/admin 解锁口令一致）：') || '').trim(); } catch (e) { key = ''; }
+  }
+  return key;
+}
+
+async function chantRpc(fnName, params) {
+  if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) throw new Error('未配置 SUPABASE_URL');
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
+    method: 'POST',
+    headers: { ...chantRestHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(params || {})
+  });
+  const raw = await res.text().catch(() => '');
+  if (!res.ok) {
+    const err = new Error(chantRemoteErrorText(res.status, raw));
+    err.status = res.status;
+    let info = null;
+    try { info = raw ? JSON.parse(raw) : null; } catch (e) { info = null; }
+    err.code = String((info && (info.code || info.error_code)) || '');
+    err.detail = String((info && (info.message || info.details || info.hint || info.error)) || raw || '');
+    throw err;
+  }
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return raw; }
+}
+
+function chantIsUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+}
+
+function chantLocalDraftCount() {
+  const store = readChantLocalStore();
+  return store.created.length + Object.keys(store.overrides).length;
 }
 
 async function chantAdminWrite(action, id, payload) {
+  const key = chantResolveAdminKey(true);
+  if (!key) return { ok: false, error: '需要管理员密码才能写入云端，已取消' };
+
+  const p = payload || {};
+  const common = {
+    p_admin_key: key,
+    p_title: String(p.title || ''),
+    p_category: String(p.category || ''),
+    p_content: String(p.content || ''),
+    p_album: String(p.album || '') || null,
+    p_video_url: String(p.video_url || '') || null
+  };
+
   try {
-    const res = await fetch('/api/admin', {
-      method: 'POST',
-      headers: chantAdminHeaders(),
-      body: JSON.stringify({ action, id, payload })
-    });
     let data = null;
-    try { data = await res.json(); } catch (e) { data = null; }
-    if (!res.ok || !data || data.ok !== true) {
-      return { ok: false, error: (data && (data.error || data.detail)) || `HTTP ${res.status}` };
+    if (action === 'createChant') {
+      data = await chantRpc('admin_create_fan_chant', common);
+    } else if (action === 'updateChant') {
+      if (!chantIsUuid(id)) return { ok: false, error: '这是本机草稿 ID，请用「一键同步上传」创建云端记录后再编辑' };
+      data = await chantRpc('admin_update_fan_chant', { ...common, p_id: id });
+    } else if (action === 'deleteChant') {
+      if (!chantIsUuid(id)) return { ok: false, error: '这是本机草稿 ID，请直接删除本机草稿' };
+      data = await chantRpc('admin_delete_fan_chant', { p_admin_key: key, p_id: id });
+    } else {
+      return { ok: false, error: `未知的应援词操作：${action}` };
     }
-    return { ok: true, data: data.data || null };
+    return { ok: true, data: data || null };
   } catch (e) {
-    return { ok: false, error: e.message || '网络异常' };
+    return { ok: false, error: e && e.message ? e.message : '云端写入失败' };
   }
+}
+
+// 管理员：把本机历史草稿逐条上传云端，失败项保留并明确提示
+async function syncLocalChantsToCloud() {
+  if (!chantIsAdmin()) {
+    if (typeof toastError === 'function') toastError('请先解锁管理员口令后再同步应援词');
+    return;
+  }
+  const store = readChantLocalStore();
+  const created = store.created.slice();
+  const overrides = Object.entries(store.overrides || {});
+  const total = created.length + overrides.length;
+  if (!total) {
+    if (typeof toastInfo === 'function') toastInfo('本机没有待上传的应援词草稿');
+    return;
+  }
+  if (!chantResolveAdminKey(true)) {
+    if (typeof toastError === 'function') toastError('未填写管理员密码，已取消同步');
+    return;
+  }
+  if (!confirm(`确认把本机 ${total} 条应援词草稿上传到 Supabase 云端？失败项会保留在本机并显示原因。`)) return;
+
+  const syncBtn = document.querySelector('.chant-sync-btn');
+  const syncLabel = syncBtn ? syncBtn.textContent : '';
+  if (syncBtn) { syncBtn.disabled = true; syncBtn.textContent = '☁️ 正在上传…'; }
+
+  let okCount = 0;
+  const failures = [];
+  const remainingCreated = [];
+  const remainingOverrides = {};
+
+  for (const row of created) {
+    const song = normalizeChantRecord(row);
+    if (!song.title || !song.content) {
+      remainingCreated.push(row);
+      failures.push(`${song.title || '未命名'}：缺少歌名或正文`);
+      continue;
+    }
+    const remote = await chantAdminWrite('createChant', '', {
+      title: song.title,
+      category: song.category,
+      album: song.album,
+      video_url: song.video,
+      content: song.content
+    });
+    if (remote.ok) okCount += 1;
+    else {
+      remainingCreated.push(row);
+      failures.push(`${song.title}：${remote.error}`);
+    }
+  }
+
+  for (const [id, row] of overrides) {
+    const song = normalizeChantRecord(row);
+    if (!song.title || !song.content) {
+      remainingOverrides[id] = row;
+      failures.push(`${song.title || id}：缺少歌名或正文`);
+      continue;
+    }
+    if (!chantIsUuid(id)) {
+      const remote = await chantAdminWrite('createChant', '', {
+        title: song.title,
+        category: song.category,
+        album: song.album,
+        video_url: song.video,
+        content: song.content
+      });
+      if (remote.ok) okCount += 1;
+      else {
+        remainingOverrides[id] = row;
+        failures.push(`${song.title}：${remote.error}`);
+      }
+      continue;
+    }
+    const remote = await chantAdminWrite('updateChant', id, {
+      title: song.title,
+      category: song.category,
+      album: song.album,
+      video_url: song.video,
+      content: song.content
+    });
+    if (remote.ok) okCount += 1;
+    else {
+      remainingOverrides[id] = row;
+      failures.push(`${song.title}：${remote.error}`);
+    }
+  }
+
+  writeChantLocalStore({ created: remainingCreated, overrides: remainingOverrides, deleted: store.deleted });
+  await loadChantSongs(true);
+  renderChantPage();
+
+  if (failures.length) {
+    if (typeof toastError === 'function') {
+      toastError(`已上传 ${okCount} 条，失败 ${failures.length} 条：${failures[0]}`, 7000);
+    }
+  } else if (typeof showToast === 'function') {
+    showToast(`☁️ 已把 ${okCount} 条本机应援词上传到云端`);
+  }
+  if (syncBtn) { syncBtn.disabled = false; syncBtn.textContent = syncLabel || '☁️ 将本机本地应援词一键同步上传到云端'; }
 }
 
 // ===== 1～5 星难度评价（个人本机 + 全站匿名聚合兜底）=====
@@ -448,64 +624,45 @@ function chantCommunityStats(songId) {
   return { avg: Math.round(item.avg * 10) / 10, count: item.count };
 }
 
-// 全站匿名聚合：优先 Supabase fan_chant_ratings，未建表 / 离线时静默跳过
+// 全站匿名聚合：统一走 get_chant_star_stats RPC，不直接读表暴露 visitor_id
 async function loadChantRatingStats(force) {
   if (chantRatingStatsPromise && !force) return chantRatingStatsPromise;
   if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL || typeof fetch !== 'function') return null;
   chantRatingStatsPromise = (async () => {
-    const controller = typeof AbortController === 'function' ? new AbortController() : null;
-    const timer = controller ? setTimeout(() => controller.abort(), 4500) : null;
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/${CHANT_RATING_TABLE}?select=chant_id,rating`, {
-        headers: chantRestHeaders(),
-        signal: controller ? controller.signal : undefined
-      });
-      if (timer) clearTimeout(timer);
-      if (!res.ok) return null;
-      const rows = await res.json();
-      const map = {};
+      const rows = await chantRpc('get_chant_star_stats', {});
       (Array.isArray(rows) ? rows : []).forEach(row => {
         const id = String(row && row.chant_id || '');
-        const rating = Number(row && row.rating);
-        if (!id || rating < 1 || rating > 5) return;
-        const cur = map[id] || { sum: 0, count: 0 };
-        cur.sum += rating;
-        cur.count += 1;
-        map[id] = cur;
-      });
-      Object.keys(map).forEach(id => {
-        chantRatingStats[id] = { avg: map[id].sum / map[id].count, count: map[id].count };
+        const avg = Number(row && row.avg_rating);
+        const count = Number(row && row.rating_count);
+        if (!id || !count || !isFinite(avg)) return;
+        chantRatingStats[id] = { avg, count };
       });
       renderChantPage();
       return chantRatingStats;
     } catch (e) {
-      if (timer) clearTimeout(timer);
+      // 统计失败不阻断曲库；详情页仍可显示本机个人评分
       return null;
     }
   })();
   return chantRatingStatsPromise;
 }
 
-// 打分写入：匿名尽力同步，失败完全不影响本机体验
+// 打分写入：走访客 vote_chant_star RPC，失败明确提示（本机个人评分仍保留）
 async function submitChantRatingRemote(songId, stars) {
   if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL || typeof fetch !== 'function') return;
+  if (!chantIsUuid(songId)) return;
   const visitor = typeof getDeviceId === 'function' ? String(getDeviceId() || '') : '';
-  const headers = { ...chantRestHeaders(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' };
   try {
-    if (stars) {
-      await fetch(`${SUPABASE_URL}/rest/v1/${CHANT_RATING_TABLE}?on_conflict=chant_id,visitor_id`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ chant_id: String(songId), rating: Number(stars), visitor_id: visitor || 'anonymous' })
-      });
-    } else {
-      await fetch(`${SUPABASE_URL}/rest/v1/${CHANT_RATING_TABLE}?chant_id=eq.${encodeURIComponent(String(songId))}&visitor_id=eq.${encodeURIComponent(visitor || 'anonymous')}`, {
-        method: 'DELETE',
-        headers: chantRestHeaders()
-      });
-    }
+    await chantRpc('vote_chant_star', {
+      p_chant_id: String(songId),
+      p_rating: Number(stars) || 0,
+      p_visitor_id: visitor || 'anonymous'
+    });
     setTimeout(() => loadChantRatingStats(true), 400);
-  } catch (e) { /* 静默兜底 */ }
+  } catch (e) {
+    if (typeof toastError === 'function') toastError(`星级云端同步失败：${e && e.message ? e.message : '未知错误'}`, 5200);
+  }
 }
 
 // ===== 列表 =====
@@ -591,9 +748,11 @@ function chantSongCardHtml(song) {
 
 function chantToolbarHtml() {
   if (!chantIsAdmin()) return '';
+  const pending = chantLocalDraftCount();
   return `<div class="chant-admin-toolbar">
     <button type="button" class="chant-add-btn" onclick="openChantEditor()">+ 新增应援词</button>
-    <span class="chant-admin-hint">🔓 管理员已解锁 · 可直接增删改</span>
+    ${pending ? `<button type="button" class="chant-sync-btn" onclick="syncLocalChantsToCloud()">☁️ 将本机本地应援词一键同步上传到云端（${pending}）</button>` : ''}
+    <span class="chant-admin-hint">🔓 管理员已解锁 · 写入 Supabase 云端</span>
   </div>`;
 }
 
@@ -605,6 +764,17 @@ function renderChantPage() {
 
   const toolbar = document.getElementById('chant-admin-toolbar');
   if (toolbar) toolbar.innerHTML = chantToolbarHtml();
+
+  const syncStatus = document.getElementById('chant-sync-status');
+  if (syncStatus) {
+    if (chantState.error) {
+      syncStatus.className = 'chant-sync-alert';
+      syncStatus.innerHTML = `⚠️ ${travelEsc(chantState.error)}`;
+    } else {
+      syncStatus.className = 'hidden';
+      syncStatus.innerHTML = '';
+    }
+  }
 
   if (chantState.editorId !== null && editorView) {
     listView.classList.add('hidden');
@@ -1293,7 +1463,6 @@ function clearChantImportDrafts() {
 }
 
 async function chantBatchCreateOne(draft, category, album) {
-  const id = chantNewId();
   const payload = {
     title: String(draft.title || '').trim().slice(0, 60),
     category,
@@ -1301,29 +1470,26 @@ async function chantBatchCreateOne(draft, category, album) {
     video_url: '',
     content: String(draft.content || '').trim()
   };
-  const record = normalizeChantRecord({ id, ...payload });
-  const remote = await chantAdminWrite('createChant', id, payload);
-  const store = readChantLocalStore();
-  if (remote.ok) {
-    const rows = Array.isArray(remote.data) ? remote.data : (remote.data ? [remote.data] : []);
-    const saved = rows.length ? normalizeChantRecord(rows[0]) : record;
-    const idx = chantRemoteSongs.findIndex(s => s.id === id);
-    if (idx >= 0) chantRemoteSongs[idx] = saved;
-    else chantRemoteSongs.push(saved);
-    store.created = store.created.filter(r => String(r.id) !== id);
-    delete store.overrides[id];
-    store.deleted = store.deleted.filter(x => x !== id);
-    writeChantLocalStore(store);
-    return { ok: true, remote: true };
-  }
-  store.created.push({ ...record });
-  writeChantLocalStore(store);
-  return { ok: true, remote: false };
+  const remote = await chantAdminWrite('createChant', '', payload);
+  if (!remote.ok) return { ok: false, error: remote.error };
+
+  const rows = Array.isArray(remote.data) ? remote.data : (remote.data ? [remote.data] : []);
+  const saved = rows.length ? normalizeChantRecord(rows[0]) : null;
+  if (!saved || !saved.id) return { ok: false, error: '云端未返回新建记录，请刷新后核对' };
+
+  const idx = chantRemoteSongs.findIndex(s => s.id === saved.id);
+  if (idx >= 0) chantRemoteSongs[idx] = saved;
+  else chantRemoteSongs.push(saved);
+  return { ok: true, remote: true, record: saved };
 }
 
 async function submitChantBatchImport() {
   if (!chantIsAdmin()) {
     if (typeof toastError === 'function') toastError('管理员状态已失效，请重新解锁');
+    return;
+  }
+  if (!chantResolveAdminKey(true)) {
+    if (typeof toastError === 'function') toastError('未填写管理员密码，无法写入云端');
     return;
   }
   const categoryEl = document.querySelector('input[name="chant-category"]:checked');
@@ -1349,25 +1515,32 @@ async function submitChantBatchImport() {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 正在批量入库…'; }
 
   let remoteCount = 0;
-  let localCount = 0;
+  const failures = [];
+  const failedDrafts = [];
   try {
     for (const draft of drafts) {
       const saved = await chantBatchCreateOne(draft, category, album);
-      if (saved.remote) remoteCount += 1;
-      else localCount += 1;
+      if (saved.ok) remoteCount += 1;
+      else {
+        failedDrafts.push(draft);
+        failures.push(`第 ${draft.pageNo} 页《${draft.title}》：${saved.error || '云端写入失败'}`);
+      }
     }
-    chantImportDrafts = [];
+    chantImportDrafts = failedDrafts;
     chantState.editorId = null;
     chantState.activeId = '';
     renderChantPage();
-    if (typeof showToast === 'function') {
-      showToast(localCount
-        ? `✅ 已导入 ${drafts.length} 首歌曲（其中 ${localCount} 首保存在本机）`
-        : `✅ 已批量导入 ${drafts.length} 首歌曲`);
+    if (failures.length) {
+      if (typeof toastError === 'function') {
+        toastError(`已入库 ${remoteCount} 首，失败 ${failures.length} 首：${failures[0]}`, 8000);
+      }
+    } else if (typeof showToast === 'function') {
+      showToast(`✅ 已批量导入 ${remoteCount} 首歌曲到 Supabase 云端`);
     }
   } catch (e) {
-    if (btn) { btn.disabled = false; btn.textContent = label || '✅ 批量导入全部歌曲'; }
     if (typeof toastError === 'function') toastError(`批量导入失败：${e && e.message ? e.message : '请稍后重试'}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = label || '✅ 批量导入全部歌曲'; }
   }
 }
 
@@ -1557,36 +1730,38 @@ async function submitChantEditor() {
   }
 
   const isEdit = Boolean(chantState.editorId);
-  const id = isEdit ? chantState.editorId : chantNewId();
+  const originalId = isEdit ? String(chantState.editorId) : '';
+  const isRemoteEdit = isEdit && chantIsUuid(originalId);
   const payload = { title, category, album, video_url: video, content };
-  const record = normalizeChantRecord({ id, ...payload });
 
-  const remote = await chantAdminWrite(isEdit ? 'updateChant' : 'createChant', id, payload);
-  const store = readChantLocalStore();
-  let finalId = id;
-  if (remote.ok) {
-    const rows = Array.isArray(remote.data) ? remote.data : (remote.data ? [remote.data] : []);
-    const saved = rows.length ? normalizeChantRecord(rows[0]) : record;
-    if (saved.id) finalId = saved.id;
-    const idx = chantRemoteSongs.findIndex(s => s.id === id);
+  const remote = await chantAdminWrite(isRemoteEdit ? 'updateChant' : 'createChant', originalId, payload);
+  if (!remote.ok) {
+    if (typeof toastError === 'function') toastError(`保存失败：${remote.error || '云端写入失败'}`, 7000);
+    return;
+  }
+
+  const rows = Array.isArray(remote.data) ? remote.data : (remote.data ? [remote.data] : []);
+  const saved = rows.length ? normalizeChantRecord(rows[0]) : null;
+  let finalId = saved && saved.id ? saved.id : originalId;
+  if (saved && saved.id) {
+    const idx = chantRemoteSongs.findIndex(s => s.id === saved.id);
     if (idx >= 0) chantRemoteSongs[idx] = saved;
     else chantRemoteSongs.push(saved);
-    store.created = store.created.filter(r => String(r.id) !== id);
-    delete store.overrides[id];
-    store.deleted = store.deleted.filter(x => x !== id);
-    writeChantLocalStore(store);
-    if (typeof showToast === 'function') showToast(isEdit ? '应援词已更新' : '应援词已新增');
-  } else {
-    const idx = store.created.findIndex(r => String(r.id) === id);
-    if (idx >= 0) store.created[idx] = { ...record };
-    else if (isEdit) store.overrides[id] = { ...record };
-    else store.created.push({ ...record });
-    writeChantLocalStore(store);
-    if (typeof showToast === 'function') showToast('已保存到本机（云端应援词表未就绪时自动降级）');
   }
+
+  const store = readChantLocalStore();
+  if (originalId) {
+    store.created = store.created.filter(r => String(r.id) !== originalId);
+    delete store.overrides[originalId];
+  }
+  store.deleted = store.deleted.filter(x => x !== originalId && x !== finalId);
+  writeChantLocalStore(store);
+
+  if (typeof showToast === 'function') showToast(isRemoteEdit ? '应援词已更新到云端' : '应援词已新增到云端');
   chantState.editorId = null;
   chantState.activeId = finalId;
   chantImportDrafts = [];
+  if (!saved || !saved.id) await loadChantSongs(true);
   renderChantPage();
 }
 
@@ -1601,11 +1776,28 @@ async function deleteChantSong(songId) {
   const name = song ? song.title : '';
   if (!confirm(`确认彻底删除「${name || '这首'}」的应援词？删除后无法恢复。`)) return;
 
+  if (!chantIsUuid(id)) {
+    const store = readChantLocalStore();
+    store.created = store.created.filter(r => String(r.id) !== id);
+    delete store.overrides[id];
+    writeChantLocalStore(store);
+    chantState.activeId = '';
+    chantState.editorId = null;
+    renderChantPage();
+    if (typeof showToast === 'function') showToast(`已删除本机草稿「${name}」（该记录从未上云）`);
+    return;
+  }
+
   const remote = await chantAdminWrite('deleteChant', id, {});
+  if (!remote.ok) {
+    if (typeof toastError === 'function') toastError(`删除失败：${remote.error || '云端写入失败'}`, 7000);
+    return;
+  }
+
   const store = readChantLocalStore();
   store.created = store.created.filter(r => String(r.id) !== id);
   delete store.overrides[id];
-  if (!store.deleted.includes(id)) store.deleted.push(id);
+  store.deleted = store.deleted.filter(x => x !== id);
   writeChantLocalStore(store);
   chantRemoteSongs = chantRemoteSongs.filter(s => s.id !== id);
 
@@ -1618,11 +1810,7 @@ async function deleteChantSong(songId) {
   chantState.activeId = '';
   chantState.editorId = null;
   renderChantPage();
-  if (remote.ok) {
-    if (typeof showToast === 'function') showToast(`已彻底删除「${name}」`);
-  } else if (typeof showToast === 'function') {
-    showToast(`已从本机彻底删除「${name}」（云端同步失败）`);
-  }
+  if (typeof showToast === 'function') showToast(`已从云端彻底删除「${name}」`);
 }
 
 // ===== 复制 / 长图 / PDF =====
@@ -2134,6 +2322,7 @@ window.submitChantEditor = submitChantEditor;
 window.deleteChantSong = deleteChantSong;
 window.getChantSongs = getChantSongs;
 window.loadChantSongs = loadChantSongs;
+window.syncLocalChantsToCloud = syncLocalChantsToCloud;
 window.parseChantContent = parseChantContent;
 window.parseChantTokens = parseChantContent;
 window.handleChantImportFile = handleChantImportFile;
