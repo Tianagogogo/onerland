@@ -1129,3 +1129,27 @@ select::-moz-focus-inner { border: 0; }
   .timeline-table-btn { font-size: 10px; padding: 2px 6px; }
   .timeline-slot-row { gap: 5px; }
 }
+
+/* ================= 往日演出回顾档案：标题 / 时间表胶囊 / 日期地点 固定三行 ================= */
+.archive-strip .archive-strip-body > * { min-width: 0; max-width: 100%; }
+.archive-strip .archive-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.archive-strip .archive-badge-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.archive-strip .archive-badge-row:empty { display: none; }
+.archive-strip .archive-date-row {
+  display: block;
+  margin-top: 4px;
+  line-height: 1.55;
+  white-space: normal;
+  word-break: break-word;
+}

@@ -2261,14 +2261,16 @@ function renderArchiveTimeline() {
             <div class="w-16 poster-square-box shrink-0">
               ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" data-cap="${safeTitle} · 往日海报" ${posterImgAttrs(item.posterUrl, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs text-slate-400">ONER</div>`}
             </div>
-            <div class="min-w-0 space-y-1">
-              <div class="flex items-center gap-1.5 flex-wrap">
+            <div class="min-w-0 space-y-1 archive-strip-body">
+              <div class="archive-title-row flex items-center gap-1.5 flex-wrap">
                 <span class="text-[10px] px-2 py-0.5 rounded text-white font-semibold" style="background:${badge}">${item.artist}</span>
                 <span class="archive-strip-title font-bold text-sm text-slate-900 leading-snug">${safeTitle}</span>
-                ${safeBooth ? `<span class="text-[10px] px-2 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-700 font-medium" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</span>` : ''}
-                ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeTitle)}
               </div>
-              <p class="text-xs text-slate-500">🗓️ ${item.showDate}${item.showTime ? ` ${item.showTime}` : ''} ｜ 📍 ${item.venue}</p>
+              ${(item.slot || (item.scheduleImgs && item.scheduleImgs.length) || safeBooth) ? `<div class="archive-badge-row">
+                ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeTitle)}
+                ${safeBooth ? `<span class="text-[10px] px-2 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-700 font-medium" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</span>` : ''}
+              </div>` : ''}
+              <p class="archive-date-row text-xs text-slate-500">🗓️ ${item.showDate}${item.showTime ? ` ${item.showTime}` : ''} ｜ 📍 ${item.venue}</p>
             </div>
           </div>
           <div class="flex items-center gap-1.5 flex-wrap justify-start sm:justify-end w-full sm:w-auto sm:shrink-0">
