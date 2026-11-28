@@ -22,6 +22,9 @@ alter table public.buddy_requests add column if not exists owner_device_id text;
 alter table public.buddy_requests add column if not exists status text default 'pending';
 alter table public.buddy_requests add column if not exists created_at timestamptz default now();
 
+-- 先解除旧外键（concert_buddies.id 为 uuid，与 text 不兼容会导致 42804 无法实施）
+alter table public.buddy_requests drop constraint if exists buddy_requests_buddy_id_fkey;
+
 -- 兼容历史 bigint 自增 ID / UUID 字符串 ID：统一改为 text
 alter table public.buddy_requests alter column buddy_id type text using buddy_id::text;
 alter table public.buddy_requests alter column buddy_id drop not null;
