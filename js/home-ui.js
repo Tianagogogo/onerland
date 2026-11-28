@@ -642,6 +642,7 @@ function renderUpcomingMiniTimeline() {
         <div class="tl-quick-bar" data-tl-bar="${idx}">
           <button type="button" class="tl-quick-btn" data-tl-action="traffic" data-tl-idx="${idx}" aria-expanded="false">🚇 交通</button>
           <button type="button" class="tl-quick-btn" data-tl-action="travel" data-tl-idx="${idx}">🚄 出行比价</button>
+          <button type="button" class="tl-quick-btn" data-tl-action="checkin" data-tl-idx="${idx}">🍜 同款打卡</button>
           <button type="button" class="tl-quick-btn" data-tl-action="security" data-tl-idx="${idx}" aria-expanded="false">🛡️ 安检体验</button>
           <button type="button" class="tl-quick-btn" data-tl-action="buddy" data-tl-idx="${idx}">🤝 找搭子</button>
         </div>
@@ -782,6 +783,13 @@ function handleHomeTimelineAction(action, idx, btn) {
   if (action === 'travel') {
     if (typeof openTravelHelper === 'function') {
       openTravelHelper({ city: rec.city, venue: rec.venue, date: rec.date, title: rec.city });
+    }
+    return;
+  }
+
+  if (action === 'checkin') {
+    if (typeof openCheckinHelper === 'function') {
+      openCheckinHelper({ city: rec.city, venue: rec.venue, date: rec.date, title: rec.city });
     }
     return;
   }

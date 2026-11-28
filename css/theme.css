@@ -4345,3 +4345,70 @@ input.seat-select { background-image: none; }
   .checkin-member-actions { flex-direction: column; }
   .checkin-action-primary, .checkin-action-ghost { width: 100%; }
 }
+
+/* ================= 🍜 同款打卡独立弹窗 + 出行比价手风琴裁切修复 ================= */
+/* 1) 手风琴：内容区真正可滚动，折叠条不再被纵向压扁裁字 */
+.travel-shell { overflow: hidden; }
+.travel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.travel-group {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+.travel-group-head {
+  flex-shrink: 0;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 11px;
+  line-height: 1.4;
+  overflow: visible;
+  margin: 0;
+}
+.travel-group-icon,
+.travel-group-title,
+.travel-group-hint,
+.travel-group-count,
+.travel-group-chev { flex-shrink: 0; line-height: 1.4; }
+.travel-group-hint { flex: 1 1 auto; min-width: 0; flex-shrink: 1; }
+.travel-group-panel { flex: 0 0 auto; }
+
+@media (max-width: 640px) {
+  .travel-group-head { min-height: 44px; padding: 10px 10px; }
+  .travel-group-title { line-height: 1.4; }
+  .travel-group-hint { line-height: 1.4; }
+}
+
+/* 2) 独立打卡弹窗 */
+body.checkin-modal-open { overflow: hidden; }
+.checkin-modal .checkin-shell { max-width: 720px; }
+.checkin-modal .travel-head { align-items: center; }
+.checkin-modal-body {
+  padding: 10px 16px 14px;
+  gap: 10px;
+}
+.checkin-quick-head {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #334155;
+  letter-spacing: 0.01em;
+}
+.checkin-quick-links { margin-top: -2px; }
+.checkin-standalone-box { margin-top: 0; }
+
+@media (max-width: 640px) {
+  .checkin-modal { padding: 0; align-items: flex-end; }
+  .checkin-modal .checkin-shell {
+    max-width: 100%;
+    max-height: 92vh;
+    border-radius: 18px 18px 0 0;
+    border-bottom: none;
+  }
+  .checkin-modal-body { padding: 8px 13px 14px; gap: 9px; }
+  .checkin-quick-links { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .checkin-quick-links .travel-link:last-child { grid-column: 1 / -1; }
+}

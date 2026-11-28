@@ -618,22 +618,15 @@ function renderCheckinSection() {
   `;
 }
 
-// 兼容旧入口：白框内不再重复放小胶囊按钮
-function buildFoodExtraHtml(city) {
-  const c = String(city || '').trim();
-  checkinState.city = c;
-  checkinState.loaded = false;
-  setTimeout(() => {
-    loadCheckinSpots(c, true);
-  }, 60);
-  return `
-    <div class="food-spot-box">
-      <div class="checkin-section-head">🍜 同款打卡点 <span>· 站长审核后公开</span></div>
-      <div id="checkin-spots-box" data-city="${travelEsc(c)}">
-        <div class="checkin-empty">⏳ 正在加载同款打卡点…</div>
-      </div>
-    </div>
-  `;
+// 🍜 同款打卡独立弹窗：顶部三张官方/站外入口卡
+function buildCheckinQuickLinks(city) {
+  const c = String(city || '').trim() || '当地';
+  const enc = encodeURIComponent;
+  return [
+    { label: '大众点评 · 城市必吃榜', desc: `${c} 本地特色美食排行`, url: `https://www.dianping.com/search/keyword/0/0_${enc(`${c} 必吃榜`)}` },
+    { label: '小红书 · 城市美食', desc: `${c} 探店与排队攻略`, url: `https://www.xiaohongshu.com/search_result?keyword=${enc(`${c} 必吃`)}` },
+    { label: '小红书 · 成员同款打卡', desc: '按成员分流检索同款探店', url: `https://www.xiaohongshu.com/search_result?keyword=${enc(`ONER ${c} 同款 探店`)}`, memberSearch: true }
+  ];
 }
 
 function buildTravelGroups() {
@@ -715,18 +708,6 @@ function buildTravelGroups() {
         ],
         extraHtml: `<div class="text-[10px] text-slate-500 px-1">🚇 场馆地铁沿线住宿区：点开即按低价优先筛选，可在携程 / 美团之间对比同站价格。</div>`
       },
-      {
-        id: 'food',
-        icon: '🍜',
-        title: '美食与同款打卡',
-        hint: `${dest.city} · 必吃榜 / 成员同款`,
-        links: [
-          { label: '大众点评 · 城市必吃榜', desc: `${dest.city} 本地特色美食排行`, url: `https://www.dianping.com/search/keyword/0/0_${enc(`${dest.city} 必吃榜`)}` },
-          { label: '小红书 · 城市美食', desc: `${dest.city} 探店与排队攻略`, url: `https://www.xiaohongshu.com/search_result?keyword=${enc(`${dest.city} 必吃`)}` },
-          { label: '小红书 · 成员同款打卡', desc: '按成员分流检索同款探店', url: `https://www.xiaohongshu.com/search_result?keyword=${enc(`ONER ${dest.city} 同款 探店`)}`, memberSearch: true }
-        ],
-        extraHtml: buildFoodExtraHtml(dest.city, venue)
-      }
     ]
   };
 }
@@ -878,24 +859,6 @@ function renderTravelHelper() {
     });
   });
 
-  body.querySelectorAll('[data-travel-member]').forEach(link => {
-    link.addEventListener('click', ev => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      const box = document.getElementById('checkin-spots-box');
-      if (box && box.scrollIntoView) {
-        try { box.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { /* ignore */ }
-      }
-      const bar = document.querySelector('.checkin-member-bar');
-      if (bar && bar.scrollIntoView) {
-        try { bar.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { /* ignore */ }
-      }
-      const first = document.querySelector('.checkin-member-bar .checkin-chip');
-      if (first) first.classList.add('is-hint');
-      setTimeout(() => { if (first) first.classList.remove('is-hint'); }, 1200);
-    });
-  });
-
   const originSelectEl = modal.querySelector('#travel-origin');
   if (originSelectEl) originSelectEl.value = travelHelperState.origin;
   modal.querySelectorAll('[data-hot-city]').forEach(chip => {
@@ -982,6 +945,135 @@ async function loadTravelFlightPrices() {
   }
 }
 
+// ================= 🍜 美食与同款打卡：独立弹窗（与出行比价同级） =================
+function highlightCheckinMemberBar() {
+  const bar = document.querySelector('#checkin-spots-box .checkin-member-bar');
+  if (!bar) return;
+  try { bar.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { /* ignore */ }
+  const first = bar.querySelector('.checkin-chip');
+  if (first) first.classList.add('is-hint');
+  setTimeout(() => { if (first) first.classList.remove('is-hint'); }, 1200);
+}
+
+function ensureCheckinModal() {
+  let modal = document.getElementById('checkin-modal');
+  if (modal) return modal;
+  modal = document.createElement('div');
+  modal.id = 'checkin-modal';
+  modal.className = 'travel-modal checkin-modal hidden';
+  modal.innerHTML = `
+    <div class="travel-shell checkin-shell" role="dialog" aria-modal="true" aria-label="美食与同款打卡">
+      <div class="travel-head">
+        <div class="travel-title-wrap">
+          <div class="travel-title">🍜 美食与同款打卡</div>
+          <div class="travel-sub" id="checkin-sub"></div>
+        </div>
+        <button type="button" class="travel-close" data-checkin-close aria-label="关闭">✕</button>
+      </div>
+      <div class="travel-body checkin-modal-body" id="checkin-body">
+        <div class="checkin-quick-head">🍜 找吃的 · 三张直达卡</div>
+        <div class="travel-link-grid checkin-quick-links" id="checkin-quick-links"></div>
+        <div class="food-spot-box checkin-standalone-box" id="checkin-spots-box">
+          <div class="checkin-empty">⏳ 正在加载同款打卡点…</div>
+        </div>
+      </div>
+      <div class="travel-foot">
+        美食与打卡信息由站外平台提供，新标签页打开；同款投稿经站长审核后公开展示，仅保存在本站数据库。<br />
+        📱 手机浏览器打开可自动拉起对应 App；若在微信内打开，点右上角「在默认浏览器打开」体验更完整。
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.addEventListener('click', event => {
+    if (event.target === modal || event.target.closest('[data-checkin-close]')) {
+      closeCheckinHelper();
+      return;
+    }
+    const memberLink = event.target.closest('[data-travel-member]');
+    if (memberLink) {
+      event.preventDefault();
+      event.stopPropagation();
+      highlightCheckinMemberBar();
+    }
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !modal.classList.contains('hidden')) closeCheckinHelper();
+  });
+  return modal;
+}
+
+function renderCheckinHelper() {
+  const modal = ensureCheckinModal();
+  const show = checkinState.show || {};
+  const city = String(checkinState.city || show.city || '').trim();
+  const sub = modal.querySelector('#checkin-sub');
+  const parts = [];
+  if (city) parts.push(city);
+  if (show.venue && show.venue !== city) parts.push(show.venue);
+  const dateText = String(show.date || '').slice(0, 10);
+  if (dateText) parts.push(dateText);
+  parts.push('仅保存在本机浏览记录，投稿经审核后公开');
+  if (sub) sub.textContent = parts.join(' · ');
+
+  const quick = modal.querySelector('#checkin-quick-links');
+  if (quick) quick.innerHTML = travelLinkButtons(buildCheckinQuickLinks(city));
+
+  const box = document.getElementById('checkin-spots-box');
+  if (box) box.dataset.city = city;
+  renderCheckinSection();
+}
+
+function openCheckinHelper(show) {
+  const src = show || {};
+  const rawDate = String(src.date || src.show_date || '').slice(0, 10);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : '';
+  checkinState.show = {
+    city: src.city || '',
+    venue: src.venue || '',
+    date,
+    title: src.title || src.city || ''
+  };
+  checkinState.city = String(src.city || '').trim();
+  checkinState.spots = [];
+  checkinState.pending = [];
+  checkinState.loaded = false;
+  checkinState.loading = false;
+  checkinState.failed = false;
+  checkinState.formOpen = false;
+  checkinState.pendingOpen = false;
+  checkinState.proofData = '';
+  checkinState.proofKb = 0;
+  checkinState.members = ['ONER全员'];
+  checkinState.category = CHECKIN_CATEGORIES[0];
+  checkinState.memberFilter = 'ONER全员';
+
+  const modal = ensureCheckinModal();
+  modal.classList.remove('hidden');
+  document.body.classList.add('checkin-modal-open');
+  renderCheckinHelper();
+  const body = modal.querySelector('#checkin-body');
+  if (body) body.scrollTop = 0;
+  loadCheckinSpots(checkinState.city, true);
+}
+
+function openCheckinFromButton(btn) {
+  if (!btn) return;
+  openCheckinHelper({
+    city: btn.dataset.city || '',
+    venue: btn.dataset.venue || '',
+    date: btn.dataset.date || '',
+    title: btn.dataset.title || ''
+  });
+}
+
+function closeCheckinHelper() {
+  const modal = document.getElementById('checkin-modal');
+  if (modal) modal.classList.add('hidden');
+  document.body.classList.remove('checkin-modal-open');
+}
+
 function openTravelHelper(show) {
   const src = show || {};
   const rawDate = String(src.date || src.show_date || '').slice(0, 10);
@@ -1020,6 +1112,9 @@ function closeTravelHelper() {
   document.body.classList.remove('travel-modal-open');
 }
 
+window.openCheckinHelper = openCheckinHelper;
+window.openCheckinFromButton = openCheckinFromButton;
+window.closeCheckinHelper = closeCheckinHelper;
 window.openTravelHelper = openTravelHelper;
 window.openTravelHelperFromButton = openTravelHelperFromButton;
 window.closeTravelHelper = closeTravelHelper;
