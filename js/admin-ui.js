@@ -121,6 +121,9 @@ function startEditShow(kind, cloudId, fallback) {
 
   AppState.editingTicketId = item.cloudId != null ? item.cloudId : targetId;
   AppState.editingKind = editKind;
+  AppState.editingId = String(AppState.editingTicketId);
+  const adminModalEl = document.getElementById('hidden-admin-modal');
+  if (adminModalEl && adminModalEl.dataset) adminModalEl.dataset.editingId = String(AppState.editingTicketId);
   document.getElementById('hidden-admin-modal').classList.remove('hidden');
   document.getElementById('adm-type').value = editKind;
   document.getElementById('adm-artist').value = item.artist || 'ONER';
@@ -166,6 +169,9 @@ function startEditShow(kind, cloudId, fallback) {
 function resetAdminForm() {
   AppState.editingTicketId = null;
   AppState.editingKind = null;
+  AppState.editingId = '';
+  const modalEl = document.getElementById('hidden-admin-modal');
+  if (modalEl && modalEl.dataset) modalEl.dataset.editingId = '';
   adminScheduleImgs = [];
   renderAdminScheduleThumbs();
   ['adm-title', 'adm-date', 'adm-body', 'adm-poster', 'adm-seat', 'adm-transport', 'adm-slot', 'adm-merch-booth', 'adm-url', 'adm-sale-time'].forEach(id => {
@@ -180,6 +186,14 @@ function resetAdminForm() {
 
 async function submitAdminQuickPost() {
   if (!canEditContent()) return alert('请先通过授权邮箱登录或管理员密码解锁。');
+  // editingId 必须在函数级作用域内声明：之前写在 ticket 分支里，archive（音乐节时间表）保存时会抛
+  // ReferenceError: Can't find variable: editingId
+  const adminModal = document.getElementById('hidden-admin-modal');
+  const editingId = String(
+    AppState.editingTicketId
+    || (adminModal && adminModal.dataset ? adminModal.dataset.editingId : '')
+    || ''
+  ).trim();
   const type = document.getElementById('adm-type').value;
   const artist = document.getElementById('adm-artist').value;
   const titleOrPlat = document.getElementById('adm-title').value.trim();
@@ -215,10 +229,9 @@ async function submitAdminQuickPost() {
         })}`,
         url
       };
-      const editingId = String(AppState.editingTicketId || '');
       const isPatch = Boolean(editingId) && !editingId.startsWith('local');
       if (isPatch) {
-        await adminApi('updateTicket', payload, AppState.editingTicketId);
+        await adminApi('updateTicket', payload, editingId);
       } else {
         await adminApi('createTicket', payload);
       }
@@ -248,7 +261,7 @@ async function submitAdminQuickPost() {
       };
       const isPatch = Boolean(editingId) && !editingId.startsWith('local');
       if (isPatch) {
-        await adminApi('updateTicket', payload, AppState.editingTicketId);
+        await adminApi('updateTicket', payload, editingId);
       } else {
         await adminApi('createTicket', payload);
       }
@@ -590,8 +603,16 @@ async function bulkCompressLegacyImages() {
 
 // ================= 🗑️ 删除当前编辑的场次（仅云端记录） =================
 async function deleteEditingShow() {
-  const id = String(AppState.editingTicketId || '');
-  if (!id) return;
+  const delModal = document.getElementById('hidden-admin-modal');
+  const id = String(
+    AppState.editingTicketId
+    || (delModal && delModal.dataset ? delModal.dataset.editingId : '')
+    || ''
+  ).trim();
+  if (!id) {
+    alert('未获取到当前场次 ID，请关闭弹窗后重新点击「✏️ 编辑」再试。');
+    return;
+  }
   if (!canEditContent()) {
     alert('请先通过管理员密码解锁后再删除场次。');
     return;
