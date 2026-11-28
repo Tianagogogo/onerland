@@ -15,11 +15,42 @@ create table if not exists public.show_security_votes (
   hw_hash    text        default '',
   visitor_id text        default '',
   client_ip  inet,
-  voter_key  text        not null,
+  voter_key  text,
   created_at timestamptz default now()
 );
 
-create unique index if not exists show_security_votes_unique_idx
+-- ---------- 1.1 旧表升级（上一版只建了 visitor_id，重复执行也不会报 42703） ----------
+alter table public.show_security_votes add column if not exists tag        text;
+alter table public.show_security_votes add column if not exists venue      text default '';
+alter table public.show_security_votes add column if not exists hw_hash    text default '';
+alter table public.show_security_votes add column if not exists visitor_id text default '';
+alter table public.show_security_votes add column if not exists client_ip  inet;
+alter table public.show_security_votes add column if not exists voter_key  text;
+alter table public.show_security_votes add column if not exists created_at timestamptz default now();
+
+-- 旧行的 visitor_id 可能带 NOT NULL，RPC 写入不带该列，需放开
+alter table public.show_security_votes alter column visitor_id drop not null;
+alter table public.show_security_votes alter column venue drop not null;
+
+-- 回填 voter_key：历史行按 visitor_id 兜底，保证 NOT NULL 能加上
+update public.show_security_votes
+   set voter_key = coalesce(nullif(btrim(voter_key), ''), 'legacy:' || coalesce(nullif(btrim(visitor_id), ''), id::text))
+ where voter_key is null or btrim(voter_key) = '';
+
+-- 去重后再建唯一索引（历史重复行只保留最早一条）
+delete from public.show_security_votes a
+ using public.show_security_votes b
+ where a.id > b.id
+   and a.show_id = b.show_id
+   and a.voter_key = b.voter_key
+   and a.tag = b.tag;
+
+alter table public.show_security_votes alter column voter_key set not null;
+alter table public.show_security_votes alter column tag set not null;
+
+-- 旧索引同名但列不同，必须先删再按新列重建
+drop index if exists public.show_security_votes_unique_idx;
+create unique index show_security_votes_unique_idx
   on public.show_security_votes (show_id, voter_key, tag);
 
 create index if not exists show_security_votes_show_idx
