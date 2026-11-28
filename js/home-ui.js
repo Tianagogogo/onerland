@@ -488,15 +488,27 @@ function buildHomeTimelineList() {
 function renderUpcomingMiniTimeline() {
   const box = document.getElementById('home-upcoming-timeline');
   if (!box) return;
-  // 严格按演出日期倒序（最新在前）后再截取 4 条，避免历史年份被排到最前
-  const list = buildHomeTimelineList()
-    .slice()
-    .sort((a, b) => {
-      const ta = new Date(String(a.date || '').slice(0, 10) + 'T00:00:00').getTime();
-      const tb = new Date(String(b.date || '').slice(0, 10) + 'T00:00:00').getTime();
-      return (isNaN(tb) ? -Infinity : tb) - (isNaN(ta) ? -Infinity : ta);
+  // 排序规则：最近一场未开演演出置顶，其余按演出日期倒序（从新到旧）
+  const all = buildHomeTimelineList().slice();
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayTs = todayStart.getTime();
+  const tsOf = item => new Date(String(item.date || '').slice(0, 10) + 'T00:00:00').getTime();
+  const upcoming = all
+    .filter(item => {
+      const t = tsOf(item);
+      return !isNaN(t) && t >= todayTs;
     })
-    .slice(0, 4);
+    .sort((a, b) => tsOf(a) - tsOf(b));
+  const pinned = upcoming.length ? upcoming[0] : null;
+  const rest = all
+    .filter(item => item !== pinned)
+    .sort((a, b) => {
+      const ta = tsOf(a);
+      const tb = tsOf(b);
+      return (isNaN(tb) ? -Infinity : tb) - (isNaN(ta) ? -Infinity : ta);
+    });
+  const list = (pinned ? [pinned, ...rest] : rest).slice(0, 4);
   if (!list.length) {
     box.innerHTML = `<div class="p-4 rounded-xl metal-card text-xs text-slate-400">近期暂无演出数据，去「档案」看看往期巡演回顾吧。</div>`;
     return;
@@ -509,7 +521,7 @@ function renderUpcomingMiniTimeline() {
     const weekday = isNaN(item.ts) ? '' : ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][new Date(item.ts).getDay()];
     const isFuture = item.ts + 3 * 3600 * 1000 > Date.now();
     return `
-      <div class="p-3.5 rounded-xl metal-card flex items-center justify-between gap-3">
+      <div class="p-3.5 rounded-xl metal-card timeline-card flex items-center justify-between gap-3 ${item === pinned ? 'timeline-card-next' : ''}">
         <div class="flex items-center gap-3 min-w-0">
           <div class="w-12 poster-square-box shrink-0">
             ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" ${posterImgAttrs(item.posterUrl, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
@@ -523,7 +535,9 @@ function renderUpcomingMiniTimeline() {
           </div>
         </div>
         <div class="flex items-center gap-1.5 shrink-0">
-          <span class="text-[10px] px-1.5 py-0.5 rounded ${isFuture ? 'bg-white border border-slate-300 text-slate-600' : 'bg-slate-100 text-slate-500'}">${isFuture ? '待开演' : '已落幕'}</span>
+          ${item === pinned
+            ? `<span class="timeline-next-badge text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap">⚡ 下一场 · 距开演 ${Math.max(0, Math.ceil((item.ts - todayTs) / 86400000))} 天</span>`
+            : `<span class="text-[10px] px-1.5 py-0.5 rounded ${isFuture ? 'bg-white border border-slate-300 text-slate-600' : 'bg-slate-100 text-slate-500'}">${isFuture ? '待开演' : '已落幕'}</span>`}
           ${(typeof item.cloudId === 'number' && !item.isArchive) ? `<button type="button" onclick="exportShowICS(${item.cloudId})" class="tour-action-btn tour-action-btn--mini" title="导出日历提醒">📅 日历</button>` : ''}
           <button type="button" onclick="switchMainTab('shows')" class="tour-action-btn tour-action-btn--mini">详情</button>
         </div>
