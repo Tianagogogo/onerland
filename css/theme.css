@@ -5306,3 +5306,347 @@ body.feature-modal-open { overflow: hidden; }
   .chant-star-suffix { display: none; }
   .chant-star-chip { padding: 0 5px; }
 }
+
+/* ================= 💼 商务档案：代言 / 品牌合作 ================= */
+.brand-shell { max-width: 900px; }
+.brand-modal-body {
+  padding: 14px 14px 20px;
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(221, 5, 20, 0.05), transparent 55%),
+    linear-gradient(165deg, #ffffff 0%, #f8fafc 60%, #eef2f7 100%);
+}
+.brand-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.brand-toolbar-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.brand-toolbar-title { font-size: 12.5px; font-weight: 800; color: #0f172a; }
+.brand-toolbar-sub { font-size: 10px; color: #94a3b8; }
+.brand-admin-toolbar { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.brand-add-btn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(221, 5, 20, 0.3);
+  background: linear-gradient(120deg, #DD0514 0%, #8D0D0E 100%);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(141, 13, 14, 0.2);
+}
+.brand-add-btn:hover { filter: brightness(1.06); }
+.brand-admin-hint { font-size: 9.5px; color: #64748b; }
+
+.brand-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px 11px;
+  border-radius: 13px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(8px);
+}
+.brand-filter-block { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.brand-filter-label {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.02em;
+}
+.brand-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.brand-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid #dbe2ea;
+  background: #ffffff;
+  color: #475569;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
+}
+.brand-filter-chip:hover { border-color: #94a3b8; }
+.brand-filter-chip.is-active {
+  border-color: var(--brand-accent, #DD0514);
+  color: var(--brand-accent, #B00814);
+  background: color-mix(in srgb, var(--brand-accent, #DD0514) 8%, #ffffff);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-accent, #DD0514) 18%, transparent);
+}
+.brand-filter-count {
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+}
+.brand-filter-chip.is-active .brand-filter-count { background: rgba(255, 255, 255, 0.75); color: inherit; }
+
+.brand-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 10px;
+}
+.brand-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 13px;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  background: linear-gradient(150deg, #ffffff 0%, #fbfcfe 70%, #f4f7fb 100%);
+  box-shadow: 0 5px 18px rgba(15, 23, 42, 0.05);
+}
+.brand-card.is-active { border-color: rgba(221, 5, 20, 0.22); box-shadow: 0 7px 22px rgba(221, 5, 20, 0.08); }
+.brand-card.is-active::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  border-radius: 14px 0 0 14px;
+  background: linear-gradient(180deg, #DD0514 0%, #8D0D0E 100%);
+}
+.brand-card.is-ended { opacity: 0.9; }
+.brand-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.brand-identity { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.brand-badge {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 16px;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+.brand-name-wrap { min-width: 0; }
+.brand-name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.35;
+  color: #0f172a;
+  overflow-wrap: anywhere;
+}
+.brand-role { margin: 2px 0 0; font-size: 10.5px; font-weight: 600; color: #64748b; }
+.brand-status {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.brand-status.is-active {
+  border: 1px solid rgba(22, 163, 74, 0.35);
+  background: linear-gradient(120deg, #dcfce7 0%, #bbf7d0 100%);
+  color: #15803d;
+  box-shadow: 0 3px 10px rgba(22, 163, 74, 0.14);
+}
+.brand-status.is-ended {
+  border: 1px solid #e2e8f0;
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+.brand-meta { margin: 0; font-size: 10.5px; line-height: 1.6; color: #475569; }
+.brand-note {
+  margin: 0;
+  padding: 7px 9px;
+  border-radius: 9px;
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid #eef2f7;
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+.brand-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 1px;
+  padding-top: 8px;
+  border-top: 1px solid #eef2f7;
+}
+.brand-official-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.brand-official-link:hover { background: #dbeafe; }
+.brand-official-empty { font-size: 9.5px; color: #cbd5e1; }
+.brand-card-admin { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-left: auto; }
+.brand-mini-btn {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid #dbe2ea;
+  background: #ffffff;
+  color: #475569;
+  font-size: 9.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.brand-mini-btn:hover { border-color: #94a3b8; color: #0f172a; }
+.brand-mini-btn.is-danger { color: #b91c1c; border-color: #fecaca; background: #fff7f7; }
+.brand-mini-btn.is-danger:hover { background: #fee2e2; }
+
+.brand-empty {
+  padding: 28px 14px;
+  border-radius: 14px;
+  border: 1px dashed #dbe2ea;
+  background: rgba(255, 255, 255, 0.68);
+  text-align: center;
+  font-size: 11.5px;
+  line-height: 1.8;
+  color: #94a3b8;
+}
+.brand-sync-note { margin: 10px 2px 0; font-size: 9.5px; color: #b45309; }
+
+/* 录入 / 编辑表单 */
+.brand-editor-card {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: linear-gradient(150deg, #ffffff 0%, #f8fafc 60%, #eef2f7 100%);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08), inset 0 1px 0 #ffffff;
+}
+.brand-editor-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.brand-back-btn {
+  border: none;
+  background: none;
+  padding: 2px 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+}
+.brand-back-btn:hover { color: #0f172a; }
+.brand-editor-tip { font-size: 10px; font-weight: 700; color: #b00814; }
+.brand-form-row { margin-top: 11px; min-width: 0; }
+.brand-form-label { display: block; margin-bottom: 5px; font-size: 11px; font-weight: 700; color: #334155; }
+.brand-req { color: #dc2626; }
+.brand-form-input,
+.brand-form-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 12px;
+  line-height: 1.5;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.brand-form-textarea { resize: vertical; min-height: 76px; }
+.brand-form-input:focus,
+.brand-form-textarea:focus { outline: none; border-color: #94a3b8; box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.18); }
+.brand-form-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 10px; }
+.brand-form-radios { display: flex; gap: 6px; flex-wrap: wrap; }
+.brand-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  font-size: 11px;
+  color: #334155;
+  cursor: pointer;
+}
+.brand-radio:has(input:checked) {
+  border-color: var(--brand-accent, #DD0514);
+  color: var(--brand-accent, #B00814);
+  background: color-mix(in srgb, var(--brand-accent, #DD0514) 7%, #ffffff);
+}
+.brand-radio input { margin: 0; accent-color: var(--brand-accent, #c0392b); }
+.brand-form-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.brand-action-btn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.brand-action-btn.is-primary {
+  border-color: rgba(221, 5, 20, 0.3);
+  background: linear-gradient(120deg, #DD0514 0%, #8D0D0E 100%);
+  color: #ffffff;
+  box-shadow: 0 7px 16px rgba(141, 13, 14, 0.18);
+}
+
+/* 🍜 同款打卡 → 商务档案 联动胶囊 */
+.brand-cross-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(221, 5, 20, 0.22);
+  background: rgba(255, 255, 255, 0.78);
+  color: #b00814;
+  font-size: 9.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.brand-cross-link:hover { background: #fff1f2; border-color: rgba(221, 5, 20, 0.42); }
+
+@media (max-width: 640px) {
+  .brand-modal-body { padding: 12px 11px 18px; }
+  .brand-grid { grid-template-columns: 1fr; }
+  .brand-filter-block { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .brand-filter-row { flex-wrap: nowrap; overflow-x: auto; width: 100%; padding-bottom: 2px; scrollbar-width: none; }
+  .brand-filter-row::-webkit-scrollbar { display: none; }
+  .brand-form-grid { grid-template-columns: 1fr; }
+  .brand-card-admin { width: 100%; justify-content: flex-end; }
+}
+@media (max-width: 380px) {
+  .brand-toolbar { flex-direction: column; }
+  .brand-admin-toolbar { width: 100%; justify-content: space-between; }
+  .brand-status { padding: 3px 7px; font-size: 9px; }
+  .brand-badge { font-size: 9px; padding: 2px 6px; }
+}
+@media (max-width: 360px) {
+  /* 320 极窄屏：三个入口胶囊同排收进卡片内，不越界 */
+  .chronicle-card .tour-action-btn--mini { font-size: 10px; padding: 0 7px; }
+}

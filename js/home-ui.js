@@ -193,6 +193,7 @@ function renderAnniversaryCard() {
         <div class="flex items-center gap-1.5 shrink-0 flex-wrap">
           <button type="button" onclick="switchMainTab('footprint')" class="tour-action-btn tour-action-btn--mini">🎫 生成纪念票根</button>
           <button type="button" onclick="openChantDictModal()" class="tour-action-btn tour-action-btn--mini">📣 应援词典</button>
+          <button type="button" onclick="openBrandModal()" class="tour-action-btn tour-action-btn--mini brand-entry-btn">💼 商务档案</button>
         </div>
       </div>
 

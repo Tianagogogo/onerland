@@ -25,6 +25,9 @@ const ALLOWED_ACTIONS = new Set([
   'createChant',
   'updateChant',
   'deleteChant',
+  'createBrand',
+  'updateBrand',
+  'deleteBrand',
 ]);
 
 const REVIEW_STATUSES = new Set(['pending', 'approved', 'rejected']);
@@ -191,6 +194,34 @@ function sanitizeChantPayload(payload) {
   };
 }
 
+const BRAND_CATEGORIES = new Set(['ONER全员', '岳岳', '木子洋', '灵超']);
+
+function sanitizeBrandPayload(payload) {
+  const p = payload || {};
+  const brand = String(p.brand || '').trim().slice(0, 60);
+  const title = String(p.title || '').trim().slice(0, 40);
+  const category = String(p.category || '').trim();
+  const activeRaw = p.is_active;
+  const isActive = !(activeRaw === false || activeRaw === 0 || activeRaw === 'false' || activeRaw === '0');
+  const announceDate = String(p.announce_date || '').trim().slice(0, 10);
+  const period = String(p.period || '').trim().slice(0, 60);
+  const note = String(p.note || '').trim().slice(0, 300);
+  const officialUrl = String(p.official_url || '').trim().slice(0, 400);
+  if (!brand || !title || !BRAND_CATEGORIES.has(category)) return null;
+  if (announceDate && !/^\d{4}-\d{2}-\d{2}$/.test(announceDate)) return null;
+  if (officialUrl && !/^https?:\/\//i.test(officialUrl)) return null;
+  return {
+    brand,
+    title,
+    category,
+    is_active: isActive,
+    announce_date: announceDate || null,
+    period: period || null,
+    note: note || null,
+    official_url: officialUrl || null,
+  };
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -339,6 +370,29 @@ export async function onRequest(context) {
     case 'deleteChant':
       if (!id) return json({ error: 'missing id' }, 400);
       url = `${env.SUPABASE_URL}/rest/v1/fan_chants?id=eq.${encodeURIComponent(id)}`;
+      method = 'DELETE';
+      data = undefined;
+      break;
+
+    // 💼 商务档案：品牌代言 / 合作（匿名只读，写操作仅管理员）
+    case 'createBrand':
+      url = `${env.SUPABASE_URL}/rest/v1/brand_endorsements`;
+      method = 'POST';
+      data = sanitizeBrandPayload(payload);
+      if (!data) return json({ error: 'invalid brand payload' }, 400);
+      break;
+
+    case 'updateBrand':
+      if (!id) return json({ error: 'missing id' }, 400);
+      url = `${env.SUPABASE_URL}/rest/v1/brand_endorsements?id=eq.${encodeURIComponent(id)}`;
+      method = 'PATCH';
+      data = sanitizeBrandPayload(payload);
+      if (!data) return json({ error: 'invalid brand payload' }, 400);
+      break;
+
+    case 'deleteBrand':
+      if (!id) return json({ error: 'missing id' }, 400);
+      url = `${env.SUPABASE_URL}/rest/v1/brand_endorsements?id=eq.${encodeURIComponent(id)}`;
       method = 'DELETE';
       data = undefined;
       break;

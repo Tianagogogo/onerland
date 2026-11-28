@@ -1374,6 +1374,7 @@ function ensureCheckinModal() {
         <div class="travel-title-wrap">
           <div class="travel-title" id="checkin-title">🍜 同款打卡</div>
           <div class="travel-sub" id="checkin-sub"></div>
+          <button type="button" class="brand-cross-link" onclick="event.stopPropagation(); closeCheckinHelper(); openBrandModal('active')">💼 查看正在合作中商务 ↗</button>
         </div>
         <button type="button" class="travel-close" data-checkin-close aria-label="关闭">✕</button>
       </div>

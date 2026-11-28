@@ -131,6 +131,11 @@ function syncAuthState() {
     const chantModal = document.getElementById('chant-dict-modal');
     if (chantModal && !chantModal.classList.contains('hidden') && typeof renderChantPage === 'function') renderChantPage();
   } catch (e) { /* ignore */ }
+  // 💼 商务档案：解锁 / 锁定后立即刷新新增与卡片管理按钮
+  try {
+    const brandModal = document.getElementById('brand-modal');
+    if (brandModal && !brandModal.classList.contains('hidden') && typeof renderBrandPage === 'function') renderBrandPage();
+  } catch (e) { /* ignore */ }
 }
 
 function saveGuestNicknameFromModal() {
