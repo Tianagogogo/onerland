@@ -1,21 +1,28 @@
-/* ================= 📣 应援词典：云端 / 本机应援词库 + 熟练度标签 + 长图 / PDF 导出 =================
+/* ================= 📣 应援词典：云端 / 本机应援词库 + 1～5 星难度评价 + 长图 / PDF 导出 =================
    规范：
    1) 曲目来自 Supabase fan_chants（匿名只读）；未建表 / 离线时降级到本机 localStorage，管理员仍可增删改；
    2) 应援词正文用 [..] / 【..】 标记，渲染、长图、PDF 统一高亮；
-   3) 熟练度标签只存本机 localStorage，匿名、无需登录，再次点击同一标签即取消；
+   3) 1～5 星难度评价只存本机 localStorage，匿名、无需登录，再次点击同一星级即取消；
    4) 长图走纯 Canvas 2D（devicePixelRatio ≥ 2），不引用任何跨域图片；
    5) PDF 走原生 window.print() + 专用打印排版，无第三方库。 */
 
 const CHANT_TABLE = 'fan_chants';
 const CHANT_LOCAL_KEY = 'onerland_fan_chants_v1';
-const CHANT_DIFFICULTY_KEY = 'onerland_chant_difficulty';
+const CHANT_RATING_KEY = 'onerland_chant_ratings';
+const CHANT_RATING_TABLE = 'fan_chant_ratings';
 const CHANT_CATEGORIES = ['ONER团歌', '岳岳', '木子洋', '灵超'];
 
-const CHANT_DIFFICULTIES = [
-  { key: 'easy', label: '🌱 新手入门', short: '🌱 新手', toast: '🌱 新手入门' },
-  { key: 'medium', label: '🔥 进阶跟喊', short: '🔥 进阶', toast: '🔥 进阶跟喊' },
-  { key: 'mastered', label: '👑 倒背如流', short: '👑 熟记', toast: '👑 倒背如流' }
+// 1～5 星应援难度评价
+const CHANT_STAR_LEVELS = [
+  { stars: 1, label: '★ 1星', desc: '超好跟喊' },
+  { stars: 2, label: '★★ 2星', desc: '轻松上手' },
+  { stars: 3, label: '★★★ 3星', desc: '中等节奏' },
+  { stars: 4, label: '★★★★ 4星', desc: '高能密集' },
+  { stars: 5, label: '★★★★★ 5星', desc: '地狱级手速/口速' }
 ];
+
+let chantRatingStats = {};
+let chantRatingStatsPromise = null;
 
 const chantState = {
   filter: 'all',
@@ -240,10 +247,10 @@ async function chantAdminWrite(action, id, payload) {
   }
 }
 
-// ===== 熟练度（仅本机）=====
-function getChantDifficultyMap() {
+// ===== 1～5 星难度评价（个人本机 + 全站匿名聚合兜底）=====
+function getChantRatingMap() {
   try {
-    const raw = localStorage.getItem(CHANT_DIFFICULTY_KEY);
+    const raw = localStorage.getItem(CHANT_RATING_KEY);
     const data = raw ? JSON.parse(raw) : {};
     return data && typeof data === 'object' ? data : {};
   } catch (e) {
@@ -251,57 +258,141 @@ function getChantDifficultyMap() {
   }
 }
 
-function saveChantDifficultyMap(map) {
+function saveChantRatingMap(map) {
   try {
-    localStorage.setItem(CHANT_DIFFICULTY_KEY, JSON.stringify(map || {}));
+    localStorage.setItem(CHANT_RATING_KEY, JSON.stringify(map || {}));
     return true;
   } catch (e) {
     return false;
   }
 }
 
-function getChantDifficulty(songId) {
-  const map = getChantDifficultyMap();
-  const val = map[String(songId || '')];
-  return CHANT_DIFFICULTIES.some(d => d.key === val) ? val : '';
+function getChantRating(songId) {
+  const map = getChantRatingMap();
+  const val = Number(map[String(songId || '')]);
+  return val >= 1 && val <= 5 ? val : 0;
 }
 
-function setChantDifficulty(songId, level) {
+function setChantRating(songId, stars) {
   const id = String(songId || '');
-  if (!id) return '';
-  const map = getChantDifficultyMap();
-  const next = map[id] === level ? '' : level;
-  if (next) map[id] = level;
+  const num = Number(stars);
+  if (!id || num < 1 || num > 5) return 0;
+  const map = getChantRatingMap();
+  const next = Number(map[id]) === num ? 0 : num;
+  if (next) map[id] = next;
   else delete map[id];
-  saveChantDifficultyMap(map);
+  saveChantRatingMap(map);
   return next;
 }
 
-function chantDifficultyMeta(key) {
-  return CHANT_DIFFICULTIES.find(d => d.key === key) || null;
+function chantStarText(stars) {
+  const n = Math.max(0, Math.min(5, Number(stars) || 0));
+  return '★'.repeat(n) + '☆'.repeat(5 - n);
+}
+
+function chantStarDesc(stars) {
+  const meta = CHANT_STAR_LEVELS.find(d => d.stars === Number(stars));
+  return meta ? meta.desc : '';
+}
+
+function chantCommunityStats(songId) {
+  const item = chantRatingStats[String(songId || '')];
+  if (!item || !item.count) return null;
+  return { avg: Math.round(item.avg * 10) / 10, count: item.count };
+}
+
+// 全站匿名聚合：优先 Supabase fan_chant_ratings，未建表 / 离线时静默跳过
+async function loadChantRatingStats(force) {
+  if (chantRatingStatsPromise && !force) return chantRatingStatsPromise;
+  if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL || typeof fetch !== 'function') return null;
+  chantRatingStatsPromise = (async () => {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 4500) : null;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${CHANT_RATING_TABLE}?select=chant_id,rating`, {
+        headers: chantRestHeaders(),
+        signal: controller ? controller.signal : undefined
+      });
+      if (timer) clearTimeout(timer);
+      if (!res.ok) return null;
+      const rows = await res.json();
+      const map = {};
+      (Array.isArray(rows) ? rows : []).forEach(row => {
+        const id = String(row && row.chant_id || '');
+        const rating = Number(row && row.rating);
+        if (!id || rating < 1 || rating > 5) return;
+        const cur = map[id] || { sum: 0, count: 0 };
+        cur.sum += rating;
+        cur.count += 1;
+        map[id] = cur;
+      });
+      Object.keys(map).forEach(id => {
+        chantRatingStats[id] = { avg: map[id].sum / map[id].count, count: map[id].count };
+      });
+      renderChantPage();
+      return chantRatingStats;
+    } catch (e) {
+      if (timer) clearTimeout(timer);
+      return null;
+    }
+  })();
+  return chantRatingStatsPromise;
+}
+
+// 打分写入：匿名尽力同步，失败完全不影响本机体验
+async function submitChantRatingRemote(songId, stars) {
+  if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL || typeof fetch !== 'function') return;
+  const visitor = typeof getDeviceId === 'function' ? String(getDeviceId() || '') : '';
+  const headers = { ...chantRestHeaders(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' };
+  try {
+    if (stars) {
+      await fetch(`${SUPABASE_URL}/rest/v1/${CHANT_RATING_TABLE}?on_conflict=chant_id,visitor_id`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ chant_id: String(songId), rating: Number(stars), visitor_id: visitor || 'anonymous' })
+      });
+    } else {
+      await fetch(`${SUPABASE_URL}/rest/v1/${CHANT_RATING_TABLE}?chant_id=eq.${encodeURIComponent(String(songId))}&visitor_id=eq.${encodeURIComponent(visitor || 'anonymous')}`, {
+        method: 'DELETE',
+        headers: chantRestHeaders()
+      });
+    }
+    setTimeout(() => loadChantRatingStats(true), 400);
+  } catch (e) { /* 静默兜底 */ }
 }
 
 // ===== 列表 =====
+// 有效难度：优先我的评分，其次全站平均（四舍五入）
+function chantEffectiveRating(song) {
+  const mine = getChantRating(song.id);
+  if (mine) return mine;
+  const stats = chantCommunityStats(song.id);
+  return stats ? Math.round(stats.avg) : 0;
+}
+
 function renderChantFilterBar() {
   const box = document.getElementById('chant-difficulty-filter');
   if (!box) return;
   const songs = getChantSongs();
-  const map = getChantDifficultyMap();
-  const unmarked = songs.filter(s => !map[s.id]).length;
   const options = [
     { key: 'all', label: '全部难度', count: songs.length },
-    ...CHANT_DIFFICULTIES.map(d => ({ key: d.key, label: d.label, count: songs.filter(s => map[s.id] === d.key).length })),
-    { key: 'unset', label: '未标记', count: unmarked }
+    { key: 'easy', label: '1-2星 轻松', count: songs.filter(s => { const r = chantEffectiveRating(s); return r >= 1 && r <= 2; }).length },
+    { key: 'mid', label: '3星 适中', count: songs.filter(s => chantEffectiveRating(s) === 3).length },
+    { key: 'hard', label: '4-5星 高难', count: songs.filter(s => chantEffectiveRating(s) >= 4).length }
   ];
   box.innerHTML = `
-    <span class="chant-filter-label">我的熟练度</span>
+    <span class="chant-filter-label">我的难度</span>
     ${options.map(opt => `<button type="button" class="chant-filter-chip ${chantState.filter === opt.key ? 'is-active' : ''}" data-chant-filter="${opt.key}" onclick="setChantFilter('${opt.key}')">${travelEsc(opt.label)}<span class="chant-filter-count">${opt.count}</span></button>`).join('')}
   `;
 }
 
 function chantSongCardHtml(song) {
-  const level = getChantDifficulty(song.id);
-  const meta = chantDifficultyMeta(level);
+  const mine = getChantRating(song.id);
+  const stats = chantCommunityStats(song.id);
+  const badgeText = mine ? `★ ${mine}` : (stats ? `★ ${stats.avg.toFixed(1)}` : '');
+  const badgeTitle = mine
+    ? `我的难度评价：${chantStarText(mine)}（${mine}星 · ${chantStarDesc(mine)}）`
+    : (stats ? `全站综合难度：★ ${stats.avg.toFixed(1)}（${stats.count}人评价）` : '');
   const chantCount = song.lines.filter(l => l.chant).length;
   const admin = chantIsAdmin();
   const idAttr = travelEsc(song.id);
@@ -314,7 +405,7 @@ function chantSongCardHtml(song) {
           <span class="chant-song-sub">🎯 ${chantCount} 处跟喊点${song.video ? ' · 🎬 官方应援视频' : ''}</span>
         </span>
       </button>
-      ${meta ? `<span class="chant-song-level is-${meta.key}" title="我的熟练度：${travelEsc(meta.label)}">${travelEsc(meta.short)}</span>` : ''}
+      ${badgeText ? `<span class="chant-song-level is-star" title="${travelEsc(badgeTitle)}">${travelEsc(badgeText)}</span>` : ''}
       ${admin ? `<span class="chant-card-admin">
         <button type="button" class="chant-mini-btn" title="编辑这首应援词" onclick="event.stopPropagation(); openChantEditor('${idAttr}')">✏️ 编辑</button>
         <button type="button" class="chant-mini-btn is-danger" title="彻底删除这首应援词" onclick="event.stopPropagation(); deleteChantSong('${idAttr}')">🗑️ 删除</button>
@@ -364,11 +455,13 @@ function renderChantPage() {
   renderChantFilterBar();
 
   const songs = getChantSongs();
-  const map = getChantDifficultyMap();
   const filtered = songs.filter(song => {
     if (chantState.filter === 'all') return true;
-    if (chantState.filter === 'unset') return !map[song.id];
-    return map[song.id] === chantState.filter;
+    const rating = chantEffectiveRating(song);
+    if (chantState.filter === 'easy') return rating >= 1 && rating <= 2;
+    if (chantState.filter === 'mid') return rating === 3;
+    if (chantState.filter === 'hard') return rating >= 4;
+    return true;
   });
   const grid = document.getElementById('chant-song-grid');
   if (!grid) return;
@@ -379,7 +472,7 @@ function renderChantPage() {
   grid.innerHTML = filtered.length
     ? filtered.map(chantSongCardHtml).join('')
     : `<div class="chant-empty">${songs.length
-      ? '该熟练度下还没有曲目，去详情页给歌曲打个标记吧～'
+      ? '该难度区间下还没有曲目，去详情页给歌曲打个星级吧～'
       : '应援词库还是空的：管理员解锁后点「+ 新增应援词」录入第一首吧～'}</div>`;
 }
 
@@ -404,11 +497,24 @@ function closeChantDetail() {
 }
 
 // ===== 详情 =====
-function chantDifficultyChipsHtml(song) {
-  const level = getChantDifficulty(song.id);
-  return CHANT_DIFFICULTIES.map(d => `
-    <button type="button" class="chant-level-chip ${level === d.key ? 'is-active' : ''}" aria-pressed="${level === d.key ? 'true' : 'false'}"
-      data-chant-level="${d.key}" onclick="toggleChantDifficulty('${travelEsc(song.id)}', '${d.key}')">${travelEsc(d.label)}</button>`).join('');
+function chantStarChipsHtml(song) {
+  const mine = getChantRating(song.id);
+  return CHANT_STAR_LEVELS.map(d => `
+    <button type="button" class="chant-level-chip chant-star-chip ${mine === d.stars ? 'is-active' : ''}" aria-pressed="${mine === d.stars ? 'true' : 'false'}"
+      data-chant-stars="${d.stars}" title="${travelEsc(d.desc)}"
+      onclick="toggleChantRating('${travelEsc(song.id)}', ${d.stars})">${'★'.repeat(d.stars)}<span class="chant-star-suffix"> ${d.stars}星</span></button>`).join('');
+}
+
+function chantRatingHintHtml(song) {
+  const mine = getChantRating(song.id);
+  if (!mine) return '你觉得这首应援有多难？点击上方星级评价';
+  return `我的难度评价：${chantStarText(mine)}（${mine}星 · ${chantStarDesc(mine)}）`;
+}
+
+function chantCommunityLineHtml(song) {
+  const stats = chantCommunityStats(song.id);
+  if (!stats) return '';
+  return `全站综合难度：★ ${stats.avg.toFixed(1)}（${stats.count}人评价）`;
 }
 
 function chantLineHtml(line) {
@@ -434,8 +540,6 @@ function renderChantDetail(song) {
   const box = document.getElementById('chant-detail-view');
   if (!box) return;
   box.dataset.song = song.id;
-  const level = getChantDifficulty(song.id);
-  const meta = chantDifficultyMeta(level);
   const admin = chantIsAdmin();
   const video = chantVideoUrl(song);
   const safeId = travelEsc(song.id);
@@ -443,7 +547,7 @@ function renderChantDetail(song) {
     <div class="chant-detail-card">
       <div class="chant-detail-head">
         <button type="button" class="chant-back-btn" onclick="closeChantDetail()">← 返回曲目</button>
-        <span class="chant-detail-tip">💾 熟练度只存本机 · 无需登录</span>
+        <span class="chant-detail-tip">💾 难度评价只存本机 · 无需登录</span>
       </div>
       ${admin ? `<div class="chant-admin-row">
         <button type="button" class="chant-mini-btn" onclick="openChantEditor('${safeId}')">✏️ 编辑</button>
@@ -452,8 +556,9 @@ function renderChantDetail(song) {
       <h3 class="chant-detail-title">${travelEsc(song.title)}</h3>
       <p class="chant-detail-meta">${travelEsc(song.album || song.category)} · ${travelEsc(song.category)}</p>
       ${video ? `<a class="chant-video-link" href="${travelEsc(video)}" target="_blank" rel="noopener noreferrer">🎬 官方应援视频 ↗</a>` : ''}
-      <div class="chant-level-row" id="chant-level-row">${chantDifficultyChipsHtml(song)}</div>
-      ${meta ? `<p class="chant-level-hint">当前标记：${travelEsc(meta.label)}（再次点击该标签可取消）</p>` : `<p class="chant-level-hint">尚未标记熟练度，点击上方标签即可记录</p>`}
+      <div class="chant-level-row chant-star-row" id="chant-level-row">${chantStarChipsHtml(song)}</div>
+      <p class="chant-level-hint" id="chant-rating-hint">${travelEsc(chantRatingHintHtml(song))}</p>
+      <p class="chant-level-hint chant-community-hint" id="chant-rating-community">${travelEsc(chantCommunityLineHtml(song))}</p>
       <div class="chant-detail-legend">
         <span class="chant-legend-swatch"></span> 高亮部分为粉丝应援词
       </div>
@@ -467,22 +572,20 @@ function renderChantDetail(song) {
   `;
 }
 
-function toggleChantDifficulty(songId, level) {
-  const next = setChantDifficulty(songId, level);
+function toggleChantRating(songId, stars) {
+  const next = setChantRating(songId, stars);
   const song = getChantSong(songId);
-  const meta = chantDifficultyMeta(next);
-  if (meta) {
-    if (typeof showToast === 'function') showToast(`已标记为「${meta.toast}」`);
+  if (next) {
+    if (typeof showToast === 'function') showToast(`已评价：${chantStarText(next)}（${next}星 · ${chantStarDesc(next)}）`);
   } else if (typeof showToast === 'function') {
-    showToast('已取消该曲的熟练度标记');
+    showToast('已取消该曲的难度评价');
   }
+  submitChantRatingRemote(songId, next);
   if (song) {
     const row = document.getElementById('chant-level-row');
-    const hint = document.querySelector('.chant-level-hint');
-    if (row) row.innerHTML = chantDifficultyChipsHtml(song);
-    if (hint) {
-      hint.textContent = meta ? `当前标记：${meta.label}（再次点击该标签可取消）` : '尚未标记熟练度，点击上方标签即可记录';
-    }
+    const hint = document.getElementById('chant-rating-hint');
+    if (row) row.innerHTML = chantStarChipsHtml(song);
+    if (hint) hint.textContent = chantRatingHintHtml(song);
   }
   renderChantFilterBar();
 }
@@ -644,11 +747,12 @@ async function deleteChantSong(songId) {
   writeChantLocalStore(store);
   chantRemoteSongs = chantRemoteSongs.filter(s => s.id !== id);
 
-  const diff = getChantDifficultyMap();
-  if (diff[id]) {
-    delete diff[id];
-    saveChantDifficultyMap(diff);
+  const ratings = getChantRatingMap();
+  if (ratings[id]) {
+    delete ratings[id];
+    saveChantRatingMap(ratings);
   }
+  delete chantRatingStats[id];
   chantState.activeId = '';
   chantState.editorId = null;
   renderChantPage();
@@ -1084,7 +1188,7 @@ window.renderChantPage = renderChantPage;
 window.setChantFilter = setChantFilter;
 window.openChantSong = openChantSong;
 window.closeChantDetail = closeChantDetail;
-window.toggleChantDifficulty = toggleChantDifficulty;
+window.toggleChantRating = toggleChantRating;
 window.copyChantLyrics = copyChantLyrics;
 window.saveChantLongImage = saveChantLongImage;
 window.openChantImageModal = openChantImageModal;
@@ -1092,7 +1196,9 @@ window.closeChantImageModal = closeChantImageModal;
 window.shareChantImage = shareChantImage;
 window.downloadChantImage = downloadChantImage;
 window.exportChantPdf = exportChantPdf;
-window.getChantDifficultyMap = getChantDifficultyMap;
+window.getChantRatingMap = getChantRatingMap;
+window.getChantRating = getChantRating;
+window.loadChantRatingStats = loadChantRatingStats;
 window.openChantDictModal = openChantDictModal;
 window.closeChantDictModal = closeChantDictModal;
 window.openChantEditor = openChantEditor;
@@ -1104,3 +1210,4 @@ window.loadChantSongs = loadChantSongs;
 window.parseChantContent = parseChantContent;
 
 loadChantSongs();
+loadChantRatingStats();
