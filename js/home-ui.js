@@ -124,13 +124,6 @@ function renderAnniversaryCard() {
          onblur="commitAnniversaryEdit('actionWord', this.value)" />`
     : `<button type="button" class="anniv-editable" title="点击修改动作词（如 同行 / 初遇 / 双向奔赴）" onclick="startAnniversaryEdit('actionWord')">${escapeAnnivText(actionWord)}</button>`;
 
-  const targetsHtml = ANNIVERSARY_TARGET_OPTIONS.map(member => {
-    const on = targets.includes(member);
-    // 激活态严格匹配官方应援色：ONER 全团红渐变，成员各自专属色
-    const color = getAnniversaryTargetColor(member);
-    return `<button type="button" class="anniv-chip ${on ? 'is-on' : ''}" ${on ? `style="background:${color};"` : ''} onclick="toggleAnniversaryTarget('${member}')">${on ? '✓ ' : ''}${member}</button>`;
-  }).join('');
-
   box.innerHTML = `
     <div class="p-4 sm:p-5 rounded-2xl chronicle-card space-y-3" style="--anniv-accent:${accent.solid};--anniv-accent-bg:${accent.bg}">
       <div class="flex items-start justify-between gap-3 flex-wrap">
@@ -138,10 +131,11 @@ function renderAnniversaryCard() {
           <div class="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
             <span class="theme-pill" style="background:${accent.bg}">✨ 时光提醒</span>
             <span class="inline-flex items-center gap-1">你好，${nicknameHtml}</span>
-            <span class="text-[10px] text-slate-400">（点击昵称 / 动作词可改）</span>
+            <span class="text-[10px] text-slate-400">（点击昵称 / 对象 / 动作词可改）</span>
           </div>
           <div class="text-base sm:text-lg font-bold text-slate-900 leading-relaxed">
-            与 <span class="font-bold text-slate-900">${escapeAnnivText(targetLabel)}</span>
+            与 <button type="button" class="anniv-editable anniv-target-btn" title="点击切换关联对象"
+              onclick="openAnniversaryTargetPicker(event)">${escapeAnnivText(targetLabel)}</button>
             ${actionHtml}
             的第 <button type="button" class="anniv-hot-number"
               style="color:${accent.solid}"
@@ -162,11 +156,6 @@ function renderAnniversaryCard() {
         </div>
       </div>
 
-      <div class="flex items-center gap-1.5 flex-wrap">
-        <span class="text-[11px] text-slate-500 shrink-0">关联对象：</span>
-        ${targetsHtml}
-      </div>
-
       <button type="button" onclick="openAnniversaryManager()"
         class="w-full flex items-center gap-2 pt-2.5 border-t border-slate-300/60 text-left hover:opacity-80 transition-opacity">
         <span class="anniv-day-strip flex items-center gap-2 overflow-x-auto flex-1 min-w-0">${microHtml}</span>
@@ -175,6 +164,94 @@ function renderAnniversaryCard() {
     </div>
   `;
 }
+
+// 主标题里的对象名：点击弹出简洁菜单，单选切换后实时持久化
+function openAnniversaryTargetPicker(event) {
+  if (event && event.stopPropagation) event.stopPropagation();
+  closeAnniversaryTargetPicker();
+  const ann = AppState.anniversary;
+  const current = Array.isArray(ann.targets) && ann.targets.length ? String(ann.targets[0]) : 'ONER';
+  const btn = event && event.currentTarget;
+  const rect = btn && btn.getBoundingClientRect ? btn.getBoundingClientRect() : { left: 20, bottom: 120, top: 100 };
+  const menu = document.createElement('div');
+  menu.id = 'anniv-target-picker';
+  menu.className = 'fixed z-[9998] min-w-[168px] p-1.5 rounded-xl bg-white/95 border border-slate-200 shadow-xl backdrop-blur text-xs';
+  menu.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - 190))}px`;
+  menu.style.top = `${Math.min(rect.bottom + 8, window.innerHeight - 190)}px`;
+  const options = ['ONER', '岳岳', '木子洋', '灵超'].map(name => {
+    const on = name === current;
+    return `<button type="button" data-target="${name}" class="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 ${on ? 'font-bold text-slate-900' : 'text-slate-600'}">
+      <span>${on ? '✓ ' : ''}${name}</span><span class="w-2.5 h-2.5 rounded-full" style="background:${getAnniversaryTargetColor(name)}"></span>
+    </button>`;
+  }).join('');
+  menu.innerHTML = `${options}
+    <div class="my-1 h-px bg-slate-200"></div>
+    <button type="button" data-target-custom="1" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-600">✏️ 自定义对象名…</button>`;
+  document.body.appendChild(menu);
+  menu.addEventListener('click', ev => {
+    const pick = ev.target.closest('[data-target]');
+    if (pick) {
+      saveAnniversaryState({ targets: [pick.dataset.target] });
+      closeAnniversaryTargetPicker();
+      return;
+    }
+    if (ev.target.closest('[data-target-custom]')) {
+      const name = (prompt('输入要关联的对象名称', current) || '').trim().slice(0, 12);
+      closeAnniversaryTargetPicker();
+      if (name) saveAnniversaryState({ targets: [name] });
+    }
+  });
+  setTimeout(() => document.addEventListener('click', closeAnniversaryTargetPicker, { once: true }), 0);
+}
+
+function closeAnniversaryTargetPicker() {
+  document.getElementById('anniv-target-picker')?.remove();
+}
+
+// ================= 开屏过渡收尾 =================
+const SPLASH_START_TS = Date.now();
+const SPLASH_MIN_MS = 350;
+const SPLASH_FADE_MS = 450;
+const SPLASH_MAX_MS = 3500;
+let splashFinished = false;
+
+function finishSplashNow() {
+  const el = document.getElementById('app-splash-screen');
+  if (!el) return;
+  el.classList.add('is-hiding');
+  setTimeout(() => el.remove(), SPLASH_FADE_MS + 50);
+}
+
+function hideSplashScreen() {
+  if (splashFinished) return;
+  splashFinished = true;
+  const el = document.getElementById('app-splash-screen');
+  if (!el) return;
+  // 首屏可见区域内的海报：等 onload / onerror，避免遮罩撤掉时露出空框
+  const imgs = Array.from(document.querySelectorAll('#home-upcoming-timeline img, #home-anniversary-box img'))
+    .filter(img => {
+      const r = img.getBoundingClientRect ? img.getBoundingClientRect() : null;
+      return !r || (r.top < (window.innerHeight || 800) && r.bottom > 0);
+    });
+  const waitImg = img => new Promise(resolve => {
+    if (img.complete) return resolve();
+    const done = () => { img.removeEventListener('load', done); img.removeEventListener('error', done); resolve(); };
+    img.addEventListener('load', done);
+    img.addEventListener('error', done);
+    // 单张图最多再等 1.2s，防弱网拖死
+    setTimeout(done, 1200);
+  });
+  const elapsed = Date.now() - SPLASH_START_TS;
+  const minWait = Math.max(0, SPLASH_MIN_MS - elapsed);
+  Promise.race([
+    Promise.all([Promise.all(imgs.map(waitImg)), new Promise(r => setTimeout(r, minWait))]),
+    new Promise(r => setTimeout(r, SPLASH_MAX_MS))
+  ]).finally(finishSplashNow);
+}
+
+// 弱网/脚本异常兜底：最多 3.5s 必撤
+setTimeout(() => { if (!splashFinished) { splashFinished = true; finishSplashNow(); } }, SPLASH_MAX_MS);
+window.hideSplashScreen = hideSplashScreen;
 
 function escapeAnnivText(text) {
   return String(text == null ? '' : text)

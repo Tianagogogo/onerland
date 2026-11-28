@@ -9,6 +9,14 @@
   <link rel="stylesheet" href="./css/theme.css" />
 </head>
 <body class="text-slate-800 min-h-screen antialiased selection:bg-slate-300 selection:text-slate-950">
+  <!-- 全屏开屏过渡：银白液态金属 -->
+  <div id="app-splash-screen" aria-hidden="true">
+    <div class="splash-inner">
+      <div class="splash-logo">ONERLAND</div>
+      <div class="splash-sub">COLD SILVER · LIQUID METAL</div>
+      <div class="splash-bar"><span></span></div>
+    </div>
+  </div>
 
   <header class="sticky top-0 z-30 bg-white/85 backdrop-blur-xl border-b border-slate-300/80">
     <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
@@ -385,7 +393,9 @@
     updateAiKeyStatusUI();
     if (location.hash === '#admin') openHiddenAdminDrawer();
     switchMainTab('home');
-    loadTourData();
+    Promise.resolve(loadTourData()).finally(() => {
+      if (typeof hideSplashScreen === 'function') hideSplashScreen();
+    });
     setInterval(updateCountdowns, 1000);
   </script>
 

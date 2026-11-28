@@ -733,3 +733,100 @@ select::-moz-focus-inner { border: 0; }
   height: auto;
   cursor: grab;
 }
+
+/* ================= 全屏开屏：银白液态金属 ================= */
+#app-splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(120% 80% at 20% 10%, #ffffff 0%, #eef2f7 38%, #d9e0e9 68%, #c3ccd8 100%);
+  overflow: hidden;
+  transition: opacity 0.45s ease, visibility 0.45s ease;
+}
+#app-splash-screen::before {
+  content: '';
+  position: absolute;
+  inset: -30%;
+  background: conic-gradient(from 120deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.85) 18%, rgba(160,178,198,0.15) 34%, rgba(255,255,255,0) 52%);
+  filter: blur(28px);
+  animation: splashSweep 3.2s linear infinite;
+}
+#app-splash-screen.is-hiding {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.splash-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 34px;
+  border-radius: 24px;
+  background: linear-gradient(145deg, rgba(255,255,255,0.72), rgba(226,232,240,0.42));
+  border: 1px solid rgba(255,255,255,0.85);
+  box-shadow: 0 20px 60px rgba(100,116,139,0.28), inset 0 1px 0 rgba(255,255,255,0.95);
+  backdrop-filter: blur(14px) saturate(1.2);
+  animation: splashBreathe 2.4s ease-in-out infinite;
+}
+.splash-logo {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: clamp(26px, 7vw, 44px);
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  padding-left: 0.28em;
+  background: linear-gradient(100deg, #64748b 0%, #ffffff 26%, #94a3b8 48%, #ffffff 70%, #475569 100%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: splashShine 2.6s linear infinite;
+}
+.splash-sub {
+  font-size: 10px;
+  letter-spacing: 0.32em;
+  color: #7c8798;
+}
+.splash-bar {
+  width: 120px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(148,163,184,0.35);
+  overflow: hidden;
+}
+.splash-bar span {
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, #ffffff, #94a3b8, transparent);
+  animation: splashBar 1.3s ease-in-out infinite;
+}
+@keyframes splashSweep { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes splashShine { 0% { background-position: 0% 50%; } 100% { background-position: 220% 50%; } }
+@keyframes splashBar { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
+@keyframes splashBreathe { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-3px) scale(1.012); } }
+@media (prefers-reduced-motion: reduce) {
+  #app-splash-screen::before, .splash-inner, .splash-logo, .splash-bar span { animation: none; }
+}
+
+/* 主标题中的可切换对象名：虚线下划线 + 指针 */
+.anniv-target-btn {
+  border: none;
+  background: transparent;
+  padding: 0 1px;
+  border-bottom: 1px dashed rgba(100, 116, 139, 0.55);
+  cursor: pointer;
+  font-weight: 700;
+  color: #0f172a;
+}
+.anniv-target-btn:hover {
+  border-bottom-color: var(--anniv-accent, var(--fan-theme-solid, #64748b));
+  color: var(--anniv-accent, var(--fan-theme-solid, #0f172a));
+}

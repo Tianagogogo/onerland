@@ -1304,9 +1304,25 @@ function renderBuddyOwnerRequests(b) {
   `;
 }
 
+// 按标签关键词（includes）匹配成员应援色：唯粉(灵超) / 唯粉(木子洋) / 唯粉(岳岳) / 团粉
+function getBuddyLabelTheme(b) {
+  const text = `${b.biasLabel || ''} ${(b.memberTags || []).join(' ')} ${b.fandomType || ''}`;
+  if (text.includes('灵超')) return { bg: 'linear-gradient(135deg, #32B5E1 0%, #1D8FB8 100%)', solid: '#32B5E1' };
+  if (text.includes('木子洋')) return { bg: 'linear-gradient(135deg, #F90092 0%, #C20071 100%)', solid: '#F90092' };
+  if (text.includes('岳岳')) return { bg: 'linear-gradient(135deg, #9C73EF 0%, #7447D6 100%)', solid: '#9C73EF' };
+  if (text.includes('ONER') || text.includes('团粉')) {
+    const oner = (typeof ARTIST_COLORS !== 'undefined' && ARTIST_COLORS['ONER']) || { bg: 'linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)', hex: '#DD0514' };
+    return { bg: oner.bg, solid: oner.hex };
+  }
+  const fallback = b.theme || '#64748b';
+  const solid = fallback.includes('gradient') ? (fallback.match(/#[A-Za-z0-9]{3,6}/)?.[0] || '#64748b') : fallback;
+  return { bg: fallback, solid };
+}
+
 function renderBuddyEntryCard(cloudId, b, canManage) {
-  const bTheme = b.theme || '#64748b';
-  const themeSolid = bTheme.includes('gradient') ? (bTheme.match(/#[A-Za-z0-9]{3,6}/)?.[0] || '#64748b') : bTheme;
+  const labelTheme = getBuddyLabelTheme(b);
+  const bTheme = labelTheme.bg;
+  const themeSolid = labelTheme.solid;
   const who = (b.nickname ? `${b.nickname} · ` : '') + (b.fandomType || '');
   const state = buddyStateFor(b.id);
   const myReq = state.myRequest;
