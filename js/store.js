@@ -1831,18 +1831,20 @@ function getSecurityAdminKey() { return __securityAdminKey; }
 async function adminClearSecurityVotes(showKey, tag) {
   const key = String(showKey || '');
   if (!key) return { ok: false, error: '缺少场次标识' };
-  let adminKey = getSecurityAdminKey();
+  let adminKey = String(getSecurityAdminKey() || '').trim();
   if (!adminKey) {
     let typed = '';
     try {
       typed = window.prompt('请输入管理员密码以确认清空操作：') || '';
     } catch (e) { typed = ''; }
-    if (!typed) return { ok: false, cancel: true };
-    adminKey = typed;
+    adminKey = String(typed).trim();
+    if (!adminKey) return { ok: false, error: '未填写管理员口令，已取消清空' };
   }
   try {
+    // 参数键名必须与 SQL 函数签名 p_show_id / p_admin_key / p_tag 完全一致；
+    // show_id 在函数内部用 ::text 比对，前端统一传字符串，避免类型不匹配导致 400
     const data = await securityRpc('admin_clear_security_votes', {
-      p_show_id: key,
+      p_show_id: String(key),
       p_admin_key: adminKey,
       p_tag: tag ? String(tag) : null
     });
@@ -2015,7 +2017,24 @@ async function securityRpc(fnName, params) {
     headers: { ...SB_HEADERS, 'Content-Type': 'application/json' },
     body: JSON.stringify(params || {})
   });
-  if (!res.ok) throw new Error(`RPC ${fnName} HTTP ${res.status}`);
+  if (!res.ok) {
+    // PostgREST 的错误详情都在响应体里：把 message / details / hint / code 一起抛出来，便于定位 400
+    let raw = '';
+    try { raw = await res.text(); } catch (e) { raw = ''; }
+    let info = null;
+    try { info = raw ? JSON.parse(raw) : null; } catch (e) { info = null; }
+    const detail = info && (info.message || info.error || info.details);
+    const parts = [];
+    if (detail) parts.push(String(detail).trim());
+    if (info && info.details && String(info.details) !== String(detail)) parts.push(String(info.details).trim());
+    if (info && info.hint) parts.push(`hint: ${String(info.hint).trim()}`);
+    if (info && info.code) parts.push(`code: ${info.code}`);
+    const suffix = parts.length ? `：${parts.join(' | ')}` : (raw ? `：${raw.slice(0, 240)}` : '');
+    const err = new Error(`RPC ${fnName} HTTP ${res.status}${suffix}`);
+    err.status = res.status;
+    err.detail = info;
+    throw err;
+  }
   return res.json().catch(() => null);
 }
 
