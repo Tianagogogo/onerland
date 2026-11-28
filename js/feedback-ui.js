@@ -232,6 +232,8 @@ async function submitSiteFeedback() {
     updateFeedbackCounter();
     closeFeedbackModal();
     showToast('感谢反馈，管理员已收到！');
+    showFeedbackThanksModal(nickname);
+    loadPublicThanksList();
   } catch (e) {
     toastError(`提交失败：${e && e.message ? e.message : '网络异常'}（若未建表，请先执行 site_feedback 建表 SQL）`);
   } finally {
@@ -329,6 +331,7 @@ function renderAdminFeedbackList(items) {
   box.innerHTML = items.map(item => {
     const id = String(item.id || '');
     const isRead = String(item.status || 'new') === 'read';
+    const isPublic = item.is_public !== false;
     return `
       <div class="feedback-inbox-item ${isRead ? 'is-read' : ''}">
         <div class="feedback-inbox-head">
@@ -343,6 +346,7 @@ function renderAdminFeedbackList(items) {
         </div>
         <div class="feedback-inbox-actions">
           ${isRead ? '' : `<button type="button" class="tour-action-btn tour-action-btn--mini" onclick="markFeedbackRead('${id}')">✓ 已读/处理</button>`}
+          <button type="button" class="fb-public-toggle ${isPublic ? '' : 'is-off'}" title="仅在公开鸣谢名单里隐藏该昵称，不删除留言" onclick="toggleFeedbackPublic('${id}', ${isPublic ? 'false' : 'true'})">🙈 ${isPublic ? '移出公开鸣谢' : '恢复公开鸣谢'}</button>
           <button type="button" class="feedback-del-btn" onclick="deleteFeedbackAsAdmin('${id}')">🗑️ 删除</button>
         </div>
       </div>
@@ -375,6 +379,118 @@ async function deleteFeedbackAsAdmin(id) {
   }
 }
 
+// ---------- 💌 提交成功专属致谢弹窗（冷银白液态金属，3.5 秒后自动淡出） ----------
+let __feedbackThanksTimer = null;
+function closeFeedbackThanksModal() {
+  const el = document.getElementById('feedback-thanks-modal');
+  if (!el) return;
+  el.classList.add('is-hiding');
+  clearTimeout(__feedbackThanksTimer);
+  setTimeout(() => el.remove(), 260);
+}
+
+function showFeedbackThanksModal(nickname) {
+  document.getElementById('feedback-thanks-modal')?.remove();
+  clearTimeout(__feedbackThanksTimer);
+  const name = String(nickname || '').trim().slice(0, 30);
+  const text = name
+    ? `感谢「${escapeFeedbackText(name)}」的反馈与陪伴！你的留言已安全送达管理员，名字已加入共建感谢名单 ✨`
+    : '感谢你的反馈与陪伴！你的留言已安全送达管理员 ✨';
+  const modal = document.createElement('div');
+  modal.id = 'feedback-thanks-modal';
+  modal.className = 'fb-thanks-overlay';
+  modal.innerHTML = `
+    <div class="fb-thanks-card" role="dialog" aria-modal="true" aria-label="感谢支持">
+      <button type="button" class="fb-thanks-close" aria-label="关闭" data-thanks-close>✕</button>
+      <div class="fb-thanks-icon">💌</div>
+      <div class="fb-thanks-title">感谢支持</div>
+      <p class="fb-thanks-text">${text}</p>
+      <div class="fb-thanks-foot">反馈正文仅管理员可见 · 访客之间互不可见</div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', ev => {
+    if (ev.target === modal || ev.target.closest('[data-thanks-close]')) closeFeedbackThanksModal();
+  });
+  __feedbackThanksTimer = setTimeout(closeFeedbackThanksModal, 3500);
+}
+
+// ---------- ✨ 共建感谢名单（公开只读 RPC，仅昵称/分类/时间，绝无正文） ----------
+function thanksCategoryLabel(cat) {
+  return feedbackCategoryLabel(cat);
+}
+
+function renderPublicThanksWall(items, anonCount) {
+  const box = document.getElementById('feedback-thanks-wall');
+  if (!box) return;
+  const list = Array.isArray(items) ? items : [];
+  const anon = Math.max(0, Number(anonCount) || 0);
+  if (!list.length && !anon) {
+    box.innerHTML = `<div class="fb-thanks-empty">还没有公开鸣谢记录，欢迎成为第一位共建伙伴 ✨</div>`;
+    return;
+  }
+  const chips = list.slice(0, 30).map(it => `
+    <span class="fb-thanks-chip" title="${escapeFeedbackText(it.created_at || '')}">
+      @${escapeFeedbackText(it.nickname || '')}<span class="fb-thanks-chip-sep">·</span>${escapeFeedbackText(thanksCategoryLabel(it.category))}
+    </span>
+  `).join('');
+  box.innerHTML = `
+    <div class="fb-thanks-chips">${chips || '<span class="fb-thanks-empty">暂无可展示的公开昵称</span>'}</div>
+    ${anon > 0 ? `<div class="fb-thanks-anon">以及 ${anon} 位匿名伙伴的暖心建议</div>` : ''}
+  `;
+}
+
+async function loadPublicThanksList() {
+  const box = document.getElementById('feedback-thanks-wall');
+  if (!box) return;
+  if (!box.dataset.loaded) box.innerHTML = '<div class="fb-thanks-empty">正在加载鸣谢名单…</div>';
+  try {
+    if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) throw new Error('未配置 Supabase');
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_public_thanks_list`, {
+      method: 'POST',
+      headers: { ...SB_HEADERS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json().catch(() => null);
+    const payload = Array.isArray(data) ? { items: data } : (data && typeof data === 'object' ? data : {});
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    // 昵称去重（保留最新一条的分类），最多 30 位
+    const seen = new Map();
+    items.forEach(it => {
+      const name = String(it && it.nickname || '').trim();
+      if (!name) return;
+      const prev = seen.get(name);
+      const ts = Date.parse(it.created_at || '') || 0;
+      if (!prev || ts >= prev.ts) seen.set(name, { nickname: name, category: it.category, created_at: it.created_at, ts });
+    });
+    const list = [...seen.values()].sort((a, b) => b.ts - a.ts);
+    renderPublicThanksWall(list, payload.anon_count);
+    box.dataset.loaded = '1';
+  } catch (e) {
+    box.innerHTML = `<div class="fb-thanks-empty">鸣谢名单暂不可用（可先在 Supabase 执行 get_public_thanks_list 建函数 SQL）</div>`;
+  }
+}
+
+// 管理员：把某条反馈的昵称移出 / 恢复公开鸣谢
+async function toggleFeedbackPublic(id, isPublic) {
+  const adminKey = getFeedbackAdminKeyFromMemory();
+  if (!adminKey) return toastError('管理员口令已过期，请重新打开反馈箱');
+  try {
+    await feedbackAdminRpc('admin_toggle_feedback_public', {
+      p_id: String(id),
+      p_admin_key: adminKey,
+      p_is_public: Boolean(isPublic)
+    });
+    showToast(isPublic ? '已恢复公开鸣谢' : '已移出公开鸣谢名单');
+    await loadAdminFeedbacks();
+    loadPublicThanksList();
+  } catch (e) {
+    toastError(`操作失败：${e && e.message ? e.message : '网络异常'}`);
+  }
+}
+
+
 window.openFeedbackModal = openFeedbackModal;
 window.closeFeedbackModal = closeFeedbackModal;
 window.submitSiteFeedback = submitSiteFeedback;
@@ -386,9 +502,14 @@ window.markFeedbackRead = markFeedbackRead;
 window.deleteFeedbackAsAdmin = deleteFeedbackAsAdmin;
 window.refreshFeedbackEntryPoints = refreshFeedbackEntryPoints;
 window.renderHelpGuide = renderHelpGuide;
+window.showFeedbackThanksModal = showFeedbackThanksModal;
+window.closeFeedbackThanksModal = closeFeedbackThanksModal;
+window.loadPublicThanksList = loadPublicThanksList;
+window.toggleFeedbackPublic = toggleFeedbackPublic;
 
 document.addEventListener('DOMContentLoaded', () => {
   renderHelpGuide();
+  loadPublicThanksList();
   refreshFeedbackEntryPoints();
   updateFeedbackCounter();
 });

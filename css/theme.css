@@ -2360,3 +2360,132 @@ body.travel-modal-open { overflow: hidden; }
   .help-guide-points li { font-size: 10.5px; line-height: 1.62; }
   .help-guide-pt-title { font-size: 10.5px; }
 }
+
+/* ================= ✨ 共建感谢名单（公开脱敏） ================= */
+.fb-thanks-wall {
+  padding: 8px 9px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  background: linear-gradient(145deg, #ffffff 0%, #f4f7fb 100%);
+  box-shadow: inset 0 1px 0 #ffffff;
+}
+.fb-thanks-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.fb-thanks-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: linear-gradient(135deg, #ffffff 0%, #eef3f9 60%, #e3eaf2 100%);
+  color: #475569;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+.fb-thanks-chip-sep { color: #94a3b8; margin: 0 1px; }
+.fb-thanks-anon {
+  margin-top: 6px;
+  font-size: 10px;
+  color: #94a3b8;
+}
+.fb-thanks-empty {
+  font-size: 10.5px;
+  color: #94a3b8;
+  line-height: 1.6;
+}
+
+/* ================= 💌 提交成功致谢弹窗 ================= */
+.fb-thanks-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  font-family: "PingFang SC", "Noto Sans SC", "Source Han Sans SC", sans-serif;
+  transition: opacity 0.26s ease;
+}
+.fb-thanks-overlay.is-hiding { opacity: 0; }
+.fb-thanks-card {
+  position: relative;
+  width: 100%;
+  max-width: 20rem;
+  padding: 20px 18px 15px;
+  text-align: center;
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(244,247,251,0.96) 52%, rgba(226,232,241,0.96) 100%);
+  border: 1px solid rgba(148, 163, 184, 0.62);
+  box-shadow: inset 0 1px 0 #ffffff, inset 0 -1px 0 rgba(255,255,255,0.65), 0 18px 46px rgba(15, 23, 42, 0.24);
+  animation: fbThanksIn 0.22s ease-out;
+}
+@keyframes fbThanksIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.fb-thanks-close {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.fb-thanks-close:hover { color: #334155; background: rgba(148,163,184,0.16); }
+.fb-thanks-icon { font-size: 26px; line-height: 1; margin-bottom: 6px; }
+.fb-thanks-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: 0.01em;
+  margin-bottom: 7px;
+}
+.fb-thanks-text {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.75;
+  color: #475569;
+  word-break: break-word;
+}
+.fb-thanks-foot {
+  margin-top: 11px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.28);
+  font-size: 9.5px;
+  color: #94a3b8;
+}
+
+/* ================= 📬 管理员：移出公开鸣谢开关 ================= */
+.fb-public-toggle {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+  color: #475569;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.fb-public-toggle:hover { color: #0f172a; border-color: #94a3b8; }
+.fb-public-toggle.is-off {
+  border-color: rgba(220, 38, 38, 0.3);
+  background: linear-gradient(135deg, #fff 0%, #fef2f2 100%);
+  color: #b91c1c;
+}
