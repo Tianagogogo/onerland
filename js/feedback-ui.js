@@ -440,36 +440,71 @@ function renderPublicThanksWall(items, anonCount) {
   `;
 }
 
+// RPC 返回结构兼容解析：后端可能返回 直接数组 / {items} / {contributors} / {data}
+function pickThanksPayload(data) {
+  if (Array.isArray(data)) return { items: data, anonCount: 0 };
+  if (!data || typeof data !== 'object') return { items: [], anonCount: 0 };
+  const candidates = [data.items, data.contributors, data.data, data.list, data.thanks, data.rows];
+  const items = candidates.find(v => Array.isArray(v)) || [];
+  const anonRaw = data.anon_count != null ? data.anon_count
+    : data.anonCount != null ? data.anonCount
+    : data.anonymous_count != null ? data.anonymous_count : 0;
+  return { items, anonCount: Number(anonRaw) || 0 };
+}
+
+// 依次尝试：直连 Supabase → 同源 /sb 反代（国内网络兜底）
+function thanksRpcUrls() {
+  const urls = [];
+  if (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) {
+    urls.push(`${SUPABASE_URL}/rest/v1/rpc/get_public_thanks_list`);
+  }
+  urls.push('/sb/rest/v1/rpc/get_public_thanks_list');
+  return urls.filter((u, i) => urls.indexOf(u) === i);
+}
+
+async function fetchThanksRpc(url) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { ...SB_HEADERS, 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  if (!res.ok) {
+    const raw = await res.text().catch(() => '');
+    let detail = '';
+    try { const j = JSON.parse(raw); detail = j.message || j.hint || j.error || ''; } catch (e) { detail = String(raw || '').slice(0, 120); }
+    throw new Error(`HTTP ${res.status}${detail ? ' · ' + detail : ''}`);
+  }
+  return res.json();
+}
+
 async function loadPublicThanksList() {
   const box = document.getElementById('feedback-thanks-wall');
   if (!box) return;
   if (!box.dataset.loaded) box.innerHTML = '<div class="fb-thanks-empty">正在加载鸣谢名单…</div>';
-  try {
-    if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) throw new Error('未配置 Supabase');
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_public_thanks_list`, {
-      method: 'POST',
-      headers: { ...SB_HEADERS, 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json().catch(() => null);
-    const payload = Array.isArray(data) ? { items: data } : (data && typeof data === 'object' ? data : {});
-    const items = Array.isArray(payload.items) ? payload.items : [];
-    // 昵称去重（保留最新一条的分类），最多 30 位
-    const seen = new Map();
-    items.forEach(it => {
-      const name = String(it && it.nickname || '').trim();
-      if (!name) return;
-      const prev = seen.get(name);
-      const ts = Date.parse(it.created_at || '') || 0;
-      if (!prev || ts >= prev.ts) seen.set(name, { nickname: name, category: it.category, created_at: it.created_at, ts });
-    });
-    const list = [...seen.values()].sort((a, b) => b.ts - a.ts);
-    renderPublicThanksWall(list, payload.anon_count);
-    box.dataset.loaded = '1';
-  } catch (e) {
-    box.innerHTML = `<div class="fb-thanks-empty">鸣谢名单暂不可用（可先在 Supabase 执行 get_public_thanks_list 建函数 SQL）</div>`;
+  const errors = [];
+  for (const url of thanksRpcUrls()) {
+    try {
+      const data = await fetchThanksRpc(url);
+      const payload = pickThanksPayload(data);
+      // 昵称去重（保留最新一条的分类），按时间倒序，最多 30 位
+      const seen = new Map();
+      payload.items.forEach(it => {
+        const name = String((it && it.nickname) || '').trim();
+        if (!name) return;
+        const ts = Date.parse((it && it.created_at) || '') || 0;
+        const prev = seen.get(name);
+        if (!prev || ts >= prev.ts) seen.set(name, { nickname: name, category: it.category, created_at: it.created_at, ts });
+      });
+      const list = [...seen.values()].sort((a, b) => b.ts - a.ts);
+      renderPublicThanksWall(list, payload.anonCount);
+      box.dataset.loaded = '1';
+      return;
+    } catch (e) {
+      errors.push(`${new URL(url, location.href).host}：${(e && e.message) || '网络异常'}`);
+    }
   }
+  box.innerHTML = `<div class="fb-thanks-empty">鸣谢名单暂不可用（${escapeFeedbackText(errors.join('；') || '未知错误')}）</div>`;
+  box.dataset.loaded = '';
 }
 
 // 管理员：把某条反馈的昵称移出 / 恢复公开鸣谢

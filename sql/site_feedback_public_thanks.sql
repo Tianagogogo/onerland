@@ -17,6 +17,9 @@ revoke all on public.site_feedback from public, anon, authenticated;
 grant insert on public.site_feedback to anon, authenticated;
 
 -- 2) 公开只读榜单：仅昵称 / 分类 / 时间，绝无正文
+--    先 DROP 再建，避免历史版本 return type 不一致时 create or replace 报错
+drop function if exists public.get_public_thanks_list();
+
 create or replace function public.get_public_thanks_list()
 returns jsonb
 language plpgsql
@@ -48,8 +51,10 @@ begin
   where coalesce(btrim(nickname), '') = ''
      or is_public = false;
 
+  -- items / contributors 双键返回，兼容不同版本前端解析
   return jsonb_build_object(
     'items', v_items,
+    'contributors', v_items,
     'anon_count', coalesce(v_anon, 0)
   );
 end;
