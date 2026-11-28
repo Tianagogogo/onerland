@@ -804,6 +804,229 @@ function buildCheckinQuickLinks(city) {
   ];
 }
 
+// ===== 🏨 酒店：15 城高频场馆周边正规连锁白名单（不含任何演出名称）=====
+const VENUE_HOTEL_PRESETS = [
+  {
+    city: '北京',
+    match: ['北京', '五棵松', '华熙LIVE', '华熙', 'ECM', '润百颜'],
+    hotels: [
+      ['全季酒店(北京五棵松店)', '距场馆约3.6公里，近五棵松商圈', ['品质连锁', '近商圈']],
+      ['全季酒店(北京五棵松万寿路地铁站店)', '1号线万寿路站接驳1站直达五棵松', ['地铁1站达', '散场便捷']],
+      ['全季酒店(北京五棵松五路居地铁站店)', '6号线五路居站旁，换乘便捷', ['地铁沿线', '安静好睡']]
+    ]
+  },
+  {
+    city: '深圳',
+    match: ['深圳', '大草地', '春茧', '深圳湾体育', '大运中心', '坪山'],
+    hotels: [
+      ['汉庭酒店(深圳南油地铁站店)', '南油地铁站旁，接驳春茧体育中心便捷', ['平价连锁', '近地铁']],
+      ['全季酒店(深圳科技园深大南地铁站店)', '深大南地铁站旁，近深圳湾体育中心商圈', ['高性价比', '地铁直达']],
+      ['汉庭酒店(深圳坪山火车站店)', '距新和地铁站步行约9分钟，适合坪山/大运演出及高铁返程', ['平价首选', '近高铁站']],
+      ['汉庭酒店(深圳坪山火车站南广场店)', '近深圳坪山高铁站与地铁站', ['高铁直达', '平价连锁']]
+    ]
+  },
+  {
+    city: '佛山',
+    match: ['佛山', '演艺中心', '世纪莲', '千灯湖', '大草地'],
+    hotels: [
+      ['途美酒店(佛山千灯湖礌岗地铁站店)', '距礌岗地铁站步行约7分钟，广佛线接驳演艺中心/世纪莲便捷', ['平价高分', '近商圈地铁']],
+      ['佛山云季智能酒店(千灯湖西约地铁站店)', '佛山3号线西约站步行约5分钟', ['高性价比', '地铁沿线']],
+      ['维也纳国际酒店(佛山千灯湖桂城地铁站店)', '近广佛线桂城地铁站，直达东平/世纪莲/演艺中心', ['连锁舒适', '广佛线直达']],
+      ['安瑾酒店(佛山祖庙桂城地铁站店)', '近桂城地铁站，餐饮外卖便利', ['平价优选', '交通便捷']]
+    ]
+  },
+  {
+    city: '上海',
+    match: ['上海', '梅赛德斯', '奔驰文化中心', '世博'],
+    hotels: [
+      ['锦江之星(上海世博园区浦三路店)', '近6/11号线轨交接驳世博/梅奔', ['老牌平价', '双轨交接驳']],
+      ['锦江之星(上海世博园区历城路店)', '近7/8号线耀华路/中华艺术宫站，散场便捷', ['近场馆', '高性价比']],
+      ['君亭酒店(上海黄浦滨江成曼店)', '8号线直达中华艺术宫站/梅奔', ['地铁直达', '江景商圈']]
+    ]
+  },
+  {
+    city: '成都',
+    match: ['成都', '东安湖', '凤凰山'],
+    hotels: [
+      ['汉庭酒店(成都龙泉驿东安湖店)', '东安湖周边平价口碑连锁', ['平价首选', '近东安湖']],
+      ['全季酒店(成都龙泉驿吾悦广场店)', '紧邻地铁2号线书房站及吾悦广场', ['近地铁2号线', '商圈配套全']],
+      ['丽枫酒店(成都东安湖龙湖天街店)', '距2号线书房站步行约14分钟，毗邻双商圈', ['高性价比', '购物餐饮全']],
+      ['在驿东安大酒店(成都东安湖公园大运会体育中心店)', '距东安湖体育公园约2.5公里', ['距场馆近', '平价舒适']]
+    ]
+  },
+  {
+    city: '广州',
+    match: ['广州', '宝能', '广州体育馆'],
+    hotels: [
+      ['汉庭酒店(广州科学城萝岗地铁站店)', '近6/7号线萝岗站，直达宝能演艺中心', ['平价连锁', '地铁直达']],
+      ['全季酒店(广州科学城萝岗万达广场店)', '近萝岗站及万达商圈', ['品质连锁', '配套成熟']],
+      ['如家商旅酒店(广州白云山云溪公园地铁站店)', '近2号线白云公园站，接驳广州体育馆', ['经济实惠', '近地铁']]
+    ]
+  },
+  {
+    city: '南京',
+    match: ['南京', '奥体中心', '青奥'],
+    hotels: [
+      ['汉庭酒店(南京奥体中心兴隆大街地铁站店)', '2号线兴隆大街站旁，1站直达奥体', ['平价首选', '地铁1站达']],
+      ['锦江之星(南京奥体中心梦都大街地铁站店)', '近奥体中心商圈，老牌平价连锁', ['老牌平价', '近场馆']],
+      ['全季酒店(南京河西奥体中心店)', '近10号线奥体中心站，散场步行便捷', ['步行可达', '高性价比']]
+    ]
+  },
+  {
+    city: '杭州',
+    match: ['杭州', '大莲花', '奥体中心', '黄龙'],
+    hotels: [
+      ['汉庭酒店(杭州奥体中心地铁站店)', '近6/7号线奥体中心站，散场便捷', ['平价首选', '近大莲花']],
+      ['如家酒店·neo(杭州黄龙体育中心学院路地铁站店)', '近黄龙体育中心与地铁口', ['经济实惠', '近地铁']],
+      ['全季酒店(杭州滨江奥体中心店)', '近奥体商圈，连锁品质稳定', ['高性价比', '近商圈']]
+    ]
+  },
+  {
+    city: '武汉',
+    match: ['武汉', '体育中心', '光谷国际网球'],
+    hotels: [
+      ['汉庭酒店(武汉体育中心东风公司地铁站店)', '3/6号线东风公司站旁，步行可达场馆', ['平价首选', '步行可达']],
+      ['全季酒店(武汉光谷国际网球中心店)', '近光谷网球中心与轨道交通', ['高性价比', '近场馆']],
+      ['锦江之星(武汉经济开发区沌口体育中心店)', '近体育中心，经济实惠', ['老牌平价', '近场馆']]
+    ]
+  },
+  {
+    city: '重庆',
+    match: ['重庆', '鱼洞', '华熙LIVE', '奥体中心'],
+    hotels: [
+      ['汉庭酒店(重庆巴南鱼洞地铁站店)', '2/3号线鱼洞站旁，步行可达华熙LIVE·鱼洞', ['平价首选', '步行可达']],
+      ['全季酒店(重庆巴南华熙LIVE店)', '紧邻华熙商圈，散场免打车', ['紧邻场馆', '散场便捷']],
+      ['如家商旅酒店(重庆奥体中心袁家岗地铁站店)', '2号线袁家岗站旁，近奥体中心', ['经济实惠', '地铁直达']]
+    ]
+  },
+  {
+    city: '长沙',
+    match: ['长沙', '贺龙', '芒果馆', '湖南国际会展'],
+    hotels: [
+      ['汉庭酒店(长沙贺龙体育馆侯家塘地铁站店)', '1/3号线侯家塘站旁，步行可达贺龙体育场', ['平价首选', '步行可达']],
+      ['全季酒店(长沙广电会展中心店)', '近芒果馆/世界之窗，步行可达演出现场', ['近芒果馆', '高性价比']],
+      ['如家酒店(长沙五一广场黄兴路步行街店)', '1/2号线换乘核心，夜宵与交通极便', ['双地铁口', '夜宵丰富']]
+    ]
+  },
+  {
+    city: '天津',
+    match: ['天津', '水滴', '奥林匹克中心', '天津体育馆'],
+    hotels: [
+      ['汉庭酒店(天津奥体中心宾水西道地铁站店)', '6号线宾水西道站旁，近水滴体育场', ['平价首选', '近水滴']],
+      ['全季酒店(天津奥体中心时代奥城店)', '紧邻时代奥城商圈与水滴场馆', ['紧邻商圈', '高性价比']]
+    ]
+  },
+  {
+    city: '西安',
+    match: ['西安', '奥体中心', '曲江竞技'],
+    hotels: [
+      ['汉庭酒店(西安奥体中心双寨地铁站店)', '3/14号线双寨站旁，接驳西安奥体便捷', ['平价首选', '地铁直达']],
+      ['全季酒店(西安曲江池大唐不夜城店)', '近曲江竞技中心与地铁站，配套成熟', ['高性价比', '配套成熟']]
+    ]
+  },
+  {
+    city: '苏州',
+    match: ['苏州', '奥林匹克体育中心', '苏州奥体'],
+    hotels: [
+      ['汉庭酒店(苏州奥体中心星塘街地铁站店)', '1/5号线星塘街站旁，1站直达苏州奥体', ['平价首选', '地铁1站达']],
+      ['全季酒店(苏州园区奥体中心店)', '近苏州奥体商圈，连锁高性价比', ['近苏州奥体', '品质连锁']]
+    ]
+  },
+  {
+    city: '郑州',
+    match: ['郑州', '奥林匹克体育中心', '郑州奥体'],
+    hotels: [
+      ['汉庭酒店(郑州奥体中心地铁站店)', '6/14号线奥体中心站旁，步行可达场馆', ['平价首选', '步行可达']],
+      ['锦江之星(郑州高新区科学大道店)', '近地铁沿线，经济实惠', ['老牌平价', '地铁沿线']]
+    ]
+  }
+];
+
+function matchVenueHotelPresets(show, city) {
+  const rawCity = String(city || (show && show.city) || '').trim();
+  const c = rawCity.replace(/[省市]$/g, '');
+  const venue = String((show && show.venue) || '').trim();
+  const text = `${rawCity} ${venue}`;
+  // ① 城市名命中（北京 / 北京市 / 北京站 均可）
+  const byCity = VENUE_HOTEL_PRESETS.find(p => c && (c === p.city || c.indexOf(p.city) >= 0 || (p.city.indexOf(c) >= 0 && c.length >= 2)));
+  if (byCity) return byCity;
+  // ② 场馆特征词命中：必须同时出现该城市名，避免「宁波奥体中心」误命中南京
+  return VENUE_HOTEL_PRESETS.find(p => text.indexOf(p.city) >= 0 && p.match.some(k => venue.indexOf(k) >= 0)) || null;
+}
+
+// 未预置城市：正规连锁快筛（只用城市与场馆，绝不拼演出名）
+function buildFallbackVenueHotels(city, venue) {
+  const c = String(city || '').trim() || '当地';
+  const v = String(venue || c).trim();
+  return [
+    { name: `汉庭酒店(${c}${v}周边店)`, desc: `${v} 周边正规连锁，价格透明`, tags: ['平价首选', '连锁保障'] },
+    { name: `如家商旅(${c}${v}周边店)`, desc: `${v} 周边经济型连锁`, tags: ['经济实惠', '近场馆'] },
+    { name: `全季酒店(${c}${v}周边店)`, desc: `${v} 周边品质连锁`, tags: ['高性价比', '安静舒适'] },
+    { name: `锦江之星(${c}地铁沿线店)`, desc: `${c} 地铁沿线老牌连锁`, tags: ['老牌平价', '地铁便捷'] },
+    { name: `维也纳酒店(${c}${v}周边店)`, desc: `${c} 连锁优选，交通便利`, tags: ['连锁优选', '交通便利'] }
+  ];
+}
+
+function travelHotelLinks(city, hotelName, checkIn, checkOut) {
+  const enc = encodeURIComponent;
+  const ci = String(checkIn || '').slice(0, 10);
+  const co = String(checkOut || '').slice(0, 10);
+  return {
+    ctrip: `https://hotels.ctrip.com/hotels/list?cityName=${enc(city)}&keyword=${enc(hotelName)}${ci ? `&checkin=${ci}` : ''}${co ? `&checkout=${co}` : ''}&order=price`,
+    meituan: `https://i.meituan.com/hotel/?cityName=${enc(city)}&keyword=${enc(hotelName)}${ci ? `&checkin=${ci}` : ''}${co ? `&checkout=${co}` : ''}`
+  };
+}
+
+// 酒店面板：顶部连锁白名单卡片 + 底部纯地标低价检索 + 防广告声明
+function buildHotelPanelHtml(show, city, venue) {
+  const c = String(city || '').trim() || '当地';
+  const v = String(venue || c).trim();
+  const checkIn = String((show && show.date) || '').slice(0, 10);
+  const checkOut = checkIn ? travelShiftDate(checkIn, 1) : '';
+  const preset = matchVenueHotelPresets(show, c);
+  const hotels = preset ? preset.hotels.map(h => ({ name: h[0], desc: h[1], tags: h[2] || [] })) : buildFallbackVenueHotels(c, v);
+  const enc = encodeURIComponent;
+  const landmark = [
+    { label: `📍 ${v} 周边酒店`, desc: '按价格低到高排序', url: `https://hotels.ctrip.com/hotels/list?cityName=${enc(c)}&keyword=${enc(v)}${checkIn ? `&checkin=${checkIn}${checkOut ? `&checkout=${checkOut}` : ''}` : ''}&order=price` },
+    { label: `🚇 ${c} 地铁沿线酒店`, desc: '地铁沿线 · 低价优先', url: `https://hotels.ctrip.com/hotels/list?cityName=${enc(c)}&keyword=${enc(`${c} 地铁 酒店`)}${checkIn ? `&checkin=${checkIn}${checkOut ? `&checkout=${checkOut}` : ''}` : ''}&order=price` },
+    { label: `🚄 ${c} 高铁站周边酒店`, desc: '高铁到站即住 · 低价优先', url: `https://hotels.ctrip.com/hotels/list?cityName=${enc(c)}&keyword=${enc(`${c} 高铁站 酒店`)}${checkIn ? `&checkin=${checkIn}${checkOut ? `&checkout=${checkOut}` : ''}` : ''}&order=price` }
+  ];
+  return `
+    <div class="travel-hotel-block">
+      <div class="travel-hotel-head">📍 ${travelEsc(c)} · 场馆周边正规连锁平价推荐</div>
+      <div class="travel-hotel-list">
+        ${hotels.map(hotel => {
+          const links = travelHotelLinks(c, hotel.name, checkIn, checkOut);
+          return `
+            <article class="travel-hotel-card">
+              <div class="travel-hotel-main">
+                <div class="travel-hotel-name">${travelEsc(hotel.name)}</div>
+                <div class="travel-hotel-desc">${travelEsc(hotel.desc)}</div>
+                <div class="travel-hotel-tags">${(hotel.tags || []).map(t => `<span class="travel-hotel-tag">${travelEsc(t)}</span>`).join('')}</div>
+              </div>
+              <div class="travel-hotel-acts">
+                <button type="button" class="travel-hotel-btn" data-hotel-copy="${travelEsc(hotel.name)}">📋 复制店名</button>
+                <a class="travel-hotel-btn is-primary" href="${links.ctrip}" target="_blank" rel="noopener noreferrer">携程低价 ↗</a>
+                <a class="travel-hotel-btn" href="${links.meituan}" target="_blank" rel="noopener noreferrer">美团比价 ↗</a>
+              </div>
+            </article>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="travel-hotel-block">
+      <div class="travel-hotel-head">🧭 纯地标低价检索</div>
+      <div class="travel-link-grid travel-hotel-landmarks">
+        ${landmark.map(item => `
+          <a class="travel-link" href="${item.url}" target="_blank" rel="noopener noreferrer">
+            <span class="travel-link-label">${travelEsc(item.label)} <span class="travel-link-arrow">↗</span></span>
+            <span class="travel-link-desc">${travelEsc(item.desc)}</span>
+          </a>`).join('')}
+      </div>
+    </div>
+    <div class="travel-hotel-note">仅收录正规连锁酒店检索入口，无任何商业推广或返佣链接，跳转至官方平台自行比价预订</div>
+  `;
+}
+
 function buildTravelGroups() {
   const show = travelHelperState.show || {};
   const dest = travelCityMeta(show.city);
@@ -865,23 +1088,10 @@ function buildTravelGroups() {
         icon: '🏨',
         title: '酒店',
         hint: `${venue} 周边${show.date ? ` · ${String(show.date).slice(0, 10)} 入住` : ''}`,
-        links: [
-          { label: '携程酒店', desc: '移动端酒店首页', url: 'https://m.ctrip.com/webapp/hotel/' },
-          { label: '去哪儿酒店', desc: '酒店比价', url: 'https://hotel.qunar.com/' },
-          ...(() => {
-            const metro = getVenueMetroAreas(show);
-            return metro.areas.slice(0, 3).map(area => {
-              const links = hotelSearchLinks(dest.city, area.keyword);
-              return {
-                label: `🚇 ${area.label}`,
-                desc: `${metro.station} · 低价优先`,
-                url: links[0].url,
-                extraLinks: links.slice(1).map(x => ({ platform: `${area.label.replace('周边', '')} · ${x.platform}`, url: x.url }))
-              };
-            });
-          })()
-        ],
-        extraHtml: `<div class="text-[10px] text-slate-500 px-1">🚇 场馆地铁沿线住宿区：点开即按低价优先筛选，可在携程 / 美团之间对比同站价格。</div>`
+        links: [],
+        count: (matchVenueHotelPresets(show, dest.city) || { hotels: buildFallbackVenueHotels(dest.city, venue) }).hotels.length,
+        copyLabel: '📋 一键复制住宿关键词',
+        customHtml: buildHotelPanelHtml(show, dest.city, venue)
       },
     ]
   };
@@ -1014,18 +1224,32 @@ function renderTravelHelper() {
           <span class="travel-group-icon">${travelEsc(group.icon)}</span>
           <span class="travel-group-title">${travelEsc(group.title)}</span>
           <span class="travel-group-hint">${travelEsc(group.hint)}</span>
-          <span class="travel-group-count">${group.links.length}</span>
+          <span class="travel-group-count">${group.count != null ? group.count : group.links.length}</span>
           <span class="travel-group-chev">▾</span>
         </button>
         <div class="travel-group-panel ${open ? '' : 'hidden'}">
-          <button type="button" class="travel-copy-btn" data-copy-key="${travelEsc(group.id)}">📋 一键复制行程关键词</button>
-          <div class="travel-link-grid">${travelLinkButtons(group.links)}</div>
+          <button type="button" class="travel-copy-btn" data-copy-key="${travelEsc(group.id)}">${travelEsc(group.copyLabel || '📋 一键复制行程关键词')}</button>
+          ${group.customHtml || `<div class="travel-link-grid">${travelLinkButtons(group.links)}</div>`}
           ${group.extraHtml || ''}
           ${(group.links || []).some(l => l.extraLinks && l.extraLinks.length) ? `<div class="text-[10px] text-slate-400 px-1">同一住宿区也可切到：${[...new Set([].concat(...(group.links || []).map(l => (l.extraLinks || []).map(x => x.platform))))].join(' / ') || '—'} 比价</div>` : ''}
         </div>
       </section>
     `;
   }).join('');
+  body.querySelectorAll('[data-hotel-copy]').forEach(btn => {
+    btn.addEventListener('click', ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const name = btn.dataset.hotelCopy || '';
+      if (!name) return;
+      const done = () => showToast(`已复制店名：${name}`);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(name).then(done).catch(done);
+      } else {
+        done();
+      }
+    });
+  });
   body.querySelectorAll('[data-copy-key]').forEach(btn => {
     btn.addEventListener('click', ev => {
       ev.preventDefault();
@@ -1063,7 +1287,15 @@ function copyTravelKeywords(groupId) {
   const data = buildTravelGroups();
   const group = data.groups.find(g => g.id === groupId);
   let text = data.keyword;
-  if (group) text = `${group.icon} ${group.title}：${data.keyword}`;
+  if (groupId === 'hotels') {
+    const show = travelHelperState.show || {};
+    const city = String(data.dest.city || show.city || '').trim();
+    const venue = String(data.venue || show.venue || city).trim();
+    const checkIn = String(show.date || '').slice(0, 10);
+    text = `${city} ${venue} ${checkIn ? `${checkIn}入住 1晚` : '近期入住 1晚'}`.replace(/\s+/g, ' ').trim();
+  } else if (group) {
+    text = `${group.icon} ${group.title}：${data.keyword}`;
+  }
   const done = () => showToast(`已复制：${text}`);
   const fallback = () => {
     try {
