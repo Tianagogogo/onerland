@@ -69,6 +69,56 @@ if (document.readyState === 'loading') {
   bindGlobalEnterSubmit();
 }
 
+// ================= 🎫 计划前往（未来场次标记，不计入已观演总数） =================
+const PLANNED_SHOWS_KEY = 'onerland_planned_shows';
+
+function getPlannedShowIds() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PLANNED_SHOWS_KEY) || '[]');
+    return Array.isArray(raw) ? raw.map(v => String(v)) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function isShowPlanned(id) {
+  if (id == null || id === '') return false;
+  return getPlannedShowIds().includes(String(id));
+}
+
+// 返回切换后的状态：true = 已加入计划，false = 已取消
+function togglePlannedShow(id) {
+  if (id == null || id === '') return false;
+  const key = String(id);
+  const list = getPlannedShowIds();
+  const idx = list.indexOf(key);
+  if (idx >= 0) list.splice(idx, 1);
+  else list.push(key);
+  try {
+    localStorage.setItem(PLANNED_SHOWS_KEY, JSON.stringify(list));
+  } catch (e) { /* 隐私模式下忽略写入失败 */ }
+  return list.includes(key);
+}
+
+function clearPlannedShows() {
+  try { localStorage.removeItem(PLANNED_SHOWS_KEY); } catch (e) { /* ignore */ }
+}
+
+// 今天（本地时区的 YYYY-MM-DD）
+function todayYmd() {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+// 演出日期 >= 今天 → 未来未开演场次（含今天）
+function isShowUpcomingOrToday(dateStr) {
+  const ymd = String(dateStr || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
+  return ymd >= todayYmd();
+}
+
 // ================= 全局状态与常量 =================
 const AppState = {
   activeArtistId: 'ALL',

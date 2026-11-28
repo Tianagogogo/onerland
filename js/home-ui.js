@@ -56,7 +56,8 @@ function toggleAnniversaryTarget(member) {
   saveAnniversaryState({ targets: next });
 }
 
-// 与所选对象最近一次线下见面的倒计时
+// 与所选对象的下一场见面倒计时
+// 优先级：① 已标记「计划前往」的未来场次 → ② 最近一场公开待开演场次 → ③ 无
 function getNextMeetCountdown(targets) {
   const list = (Array.isArray(AppState.cloudTickets) ? AppState.cloudTickets : [])
     .filter(item => {
@@ -66,16 +67,31 @@ function getNextMeetCountdown(targets) {
         ? (item.artist === 'ONER' || label.includes('极尽声色'))
         : item.artist === t);
     })
-    .map(item => ({
-      item,
-      ts: typeof parseLocalTime === 'function' ? parseLocalTime(item.show_date) : NaN
-    }))
+    .map(item => {
+      const ts = typeof parseLocalTime === 'function' ? parseLocalTime(item.show_date) : NaN;
+      const key = (typeof planShowKeyOf === 'function')
+        ? planShowKeyOf(item.cloudId, item.venue || item.city, item.city, item.show_date)
+        : String(item.cloudId);
+      return {
+        item,
+        ts,
+        key,
+        planned: typeof isShowPlanned === 'function' ? isShowPlanned(key) : false
+      };
+    })
     .filter(x => !isNaN(x.ts) && x.ts + 3 * 3600 * 1000 > Date.now())
     .sort((a, b) => a.ts - b.ts);
   if (!list.length) return null;
-  const first = list[0];
+  const plannedList = list.filter(x => x.planned);
+  const first = plannedList.length ? plannedList[0] : list[0];
   const days = Math.max(0, Math.ceil((first.ts - Date.now()) / 86400000));
-  return { days, city: first.item.city || '', date: String(first.item.show_date).slice(0, 10) };
+  return {
+    days,
+    planned: plannedList.length > 0,
+    city: first.item.city || '',
+    title: first.item.city || first.item.title || '演出',
+    date: String(first.item.show_date).slice(0, 10)
+  };
 }
 
 function renderAnniversaryCard() {
@@ -107,8 +123,11 @@ function renderAnniversaryCard() {
     : '';
 
   const nextMeet = getNextMeetCountdown(targets);
+  const nextMeetTitle = nextMeet ? String(nextMeet.title || nextMeet.city || '演出').replace(/[<>]/g, '') : '';
   const meetText = nextMeet
-    ? `距与 ${targetLabel} 下次见面还有 <strong class="countdown-value" style="color:${accent.solid}">${nextMeet.days}</strong> 天（${nextMeet.city} ${nextMeet.date}）`
+    ? (nextMeet.planned
+      ? `距与 ${targetLabel} 下次见面还有 <strong class="countdown-value" style="color:${accent.solid}">${nextMeet.days}</strong> 天（${nextMeetTitle} ${nextMeet.date}）`
+      : `距 ${targetLabel} 下一场演出还有 <strong class="countdown-value" style="color:${accent.solid}">${nextMeet.days}</strong> 天（${nextMeetTitle} ${nextMeet.date}）`)
     : `与 ${targetLabel} 暂无待开演场次 · 期待下一次线下奔赴`;
 
   const microList = getMergedAnniversaryList().slice(0, 3);
@@ -549,6 +568,11 @@ function renderUpcomingMiniTimeline() {
     const safeTitle = String(item.city || '').replace(/['"<>]/g, '');
     const weekday = isNaN(item.ts) ? '' : ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][new Date(item.ts).getDay()];
     const isFuture = item.ts + 3 * 3600 * 1000 > Date.now();
+    const isUpcomingShow = typeof isShowUpcomingOrToday === 'function' && isShowUpcomingOrToday(item.date);
+    const planKey = (typeof planShowKeyOf === 'function')
+      ? planShowKeyOf(item.cloudId, item.venue || item.city, item.city, item.date)
+      : '';
+    const plannedShow = isUpcomingShow && typeof isShowPlanned === 'function' && isShowPlanned(planKey);
     return `
       <div class="p-3.5 rounded-xl metal-card timeline-card flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 ${item === pinned ? 'timeline-card-next' : ''}">
         <div class="timeline-card-main flex items-start sm:items-center gap-3 min-w-0 w-full">
@@ -575,6 +599,9 @@ function renderUpcomingMiniTimeline() {
           ${item === pinned
             ? `<span class="timeline-next-badge text-[10px] px-1.5 py-0.5 rounded border">⚡ 下一场</span>`
             : `<span class="text-[10px] px-1.5 py-0.5 rounded ${isFuture ? 'bg-white border border-slate-300 text-slate-600' : 'bg-slate-100 text-slate-500'}">${isFuture ? '待开演' : '已落幕'}</span>`}
+          ${isUpcomingShow
+            ? `<button type="button" class="tour-action-btn tour-action-btn--mini tl-plan-btn ${plannedShow ? 'is-active' : ''}" aria-pressed="${plannedShow ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); handleHomeTimelinePlan(${idx}, this)">${plannedShow ? '✓ 计划前往' : '🎫 计划前往'}</button>`
+            : ''}
           <button type="button" onclick="switchMainTab('shows')" class="tour-action-btn tour-action-btn--mini">详情</button>
         </div>
         <div class="tl-quick-bar" data-tl-bar="${idx}">
@@ -653,6 +680,29 @@ function toggleHomeTimelinePanel(card, action, html) {
     try { hydrateSecurityVoteBlocks(); } catch (e) { /* ignore */ }
   }
   if (action === 'map' && typeof bindShowMapMenuDismiss === 'function') bindShowMapMenuDismiss();
+}
+
+// 🎫 计划前往：首页微时间轴卡片右上角，与档案页共用同一份本机标记
+function handleHomeTimelinePlan(idx, btn) {
+  const rec = homeTimelineRecords[idx];
+  if (!rec) return;
+  const key = (typeof planShowKeyOf === 'function')
+    ? planShowKeyOf(rec.cloudId, rec.venue || rec.city, rec.city, rec.date)
+    : String(rec.cloudId);
+  if (!key) {
+    toastError('该场次暂无可用的场次标识');
+    return;
+  }
+  if (typeof togglePlannedShowFromCard === 'function') {
+    togglePlannedShowFromCard(btn, key);
+  } else {
+    const on = togglePlannedShow(key);
+    if (btn) {
+      btn.classList.toggle('is-active', on);
+      btn.textContent = on ? '✓ 计划前往' : '🎫 计划前往';
+    }
+    showToast(on ? '已加入「计划前往」，不计入已观演' : '已取消「计划前往」');
+  }
 }
 
 // 卡片正文的日期文本 = 日历提醒入口（与「档案」页完全一致，走同一个 exportShowICS）

@@ -359,6 +359,26 @@ function launchShowMapApp(provider, trigger) {
   }, 900);
 }
 
+// 🎫 计划前往：未来未开演场次的本机标记，不计入「已点亮线下 X 面」
+function planShowKeyOf(cloudId, venue, title, date) {
+  if (cloudId != null && cloudId !== '') return String(cloudId);
+  const key = (typeof buildShowKey === 'function') ? buildShowKey(venue, title) : `${venue}::${title}`;
+  return `${key}::${String(date || '').slice(0, 10)}`;
+}
+
+function togglePlannedShowFromCard(btn, key) {
+  const on = togglePlannedShow(key);
+  if (btn) {
+    btn.classList.toggle('is-active', on);
+    btn.textContent = on ? '✓ 计划前往' : '🎫 计划前往';
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+  // 首页倒计时卡、首页微时间轴与档案卡共用同一份本机状态，立即联动刷新
+  if (typeof renderAnniversaryCard === 'function') renderAnniversaryCard();
+  if (typeof renderUpcomingMiniTimeline === 'function') renderUpcomingMiniTimeline();
+  showToast(on ? '已加入「计划前往」，不计入已观演' : '已取消「计划前往」');
+}
+
 function exportShowICS(cloudId) {
   const item = AppState.cloudTickets.find(t => String(t.cloudId) === String(cloudId));
   if (!item) return;
@@ -1879,6 +1899,9 @@ function renderTourCards() {
       date: item.show_date,
       venue: cleanVenue
     }) >= 0;
+    const isUpcomingShow = typeof isShowUpcomingOrToday === 'function' ? isShowUpcomingOrToday(item.show_date) : false;
+    const planKey = planShowKeyOf(item.cloudId, cleanVenue || safeCity, safeCity, item.show_date);
+    const plannedShow = isUpcomingShow && isShowPlanned(planKey);
 
     // 距离演出的天数（向上取整，仅精确到天）
     const daysToShow = isNaN(st.showTs)
@@ -1928,7 +1951,9 @@ function renderTourCards() {
               </div>
               <div class="show-card-actions flex items-center gap-1.5 shrink-0">
                 ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="ticket" data-edit-title="${safeCity.replace(/"/g, '&quot;')}" data-edit-date="${String(item.show_date || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini">✏️ 编辑</button>` : ''}
-                <button type="button" onclick="recordFootprintFromShow('${safeCity}', '${item.show_date}', '${cleanVenue}', '${item.artist}')" class="tour-action-btn tour-action-btn--mini ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已打卡' : '+ 足迹'}</button>
+                ${isUpcomingShow
+                  ? `<button type="button" class="tour-action-btn tour-action-btn--mini tl-plan-btn ${plannedShow ? 'is-active' : ''}" aria-pressed="${plannedShow ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); togglePlannedShowFromCard(this, '${planKey.replace(/['"<>]/g, '')}')">${plannedShow ? '✓ 计划前往' : '🎫 计划前往'}</button>`
+                  : `<button type="button" onclick="recordFootprintFromShow('${safeCity}', '${item.show_date}', '${cleanVenue}', '${item.artist}')" class="tour-action-btn tour-action-btn--mini ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已打卡' : '+ 足迹'}</button>`}
               </div>
             </div>
             <p class="show-card-meta text-xs text-slate-500"><span>📍 ${item.venue}</span><span class="meta-sep"> ｜ </span><button type="button" class="meta-date-ics" title="点击添加到日历提醒" onclick="event.stopPropagation(); exportShowICS('${String(item.cloudId == null ? '' : item.cloudId).replace(/["'<>]/g, '')}')">🗓️ ${item.show_date}</button></p>
@@ -2263,7 +2288,13 @@ function renderArchiveTimeline() {
             <button type="button" class="tour-action-btn tour-action-btn--mini" data-travel-btn data-city="${attrEsc(getArchiveCity(item) || '')}" data-venue="${attrEsc(item.venue || '')}" data-date="${attrEsc(String(item.showDate || '').slice(0, 10))}" data-title="${attrEsc(safeTitle)}" onclick="event.stopPropagation(); openTravelHelperFromButton(this)">🚄 出行比价</button>
             <button type="button" data-tour-toggle="vexp-arc-drawer-${idx}" class="tour-action-btn tour-action-btn--mini">📊 场馆体验<span class="hidden sm:inline text-[10px] opacity-70 ml-1">${venueStats.total}${venueStats.unlocked ? '' : '/5'}</span></button>
             ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="archive" data-edit-title="${safeTitle.replace(/"/g, '&quot;')}" data-edit-date="${String(item.showDate || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini">✏️ 编辑</button>` : ''}
-            <button type="button" onclick="recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="tour-action-btn tour-action-btn--mini ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已打卡' : '+ 足迹'}</button>
+            ${(typeof isShowUpcomingOrToday === 'function' && isShowUpcomingOrToday(item.showDate))
+              ? (() => {
+                  const pk = planShowKeyOf(item.cloudId, item.venue, safeTitle, item.showDate).replace(/['"<>]/g, '');
+                  const on = isShowPlanned(pk);
+                  return `<button type="button" class="tour-action-btn tour-action-btn--mini tl-plan-btn ${on ? 'is-active' : ''}" aria-pressed="${on ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); togglePlannedShowFromCard(this, '${pk}')">${on ? '✓ 计划前往' : '🎫 计划前往'}</button>`;
+                })()
+              : `<button type="button" onclick="recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="tour-action-btn tour-action-btn--mini ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已打卡' : '+ 足迹'}</button>`}
           </div>
         </div>
 
