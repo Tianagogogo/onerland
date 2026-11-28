@@ -566,27 +566,25 @@ function buildHomeTimelineList() {
 function renderUpcomingMiniTimeline() {
   const box = document.getElementById('home-upcoming-timeline');
   if (!box) return;
-  // 排序规则：最近一场未开演演出置顶，其余按演出日期倒序（从新到旧）
+  // 排序规则：按「距今（今天）由近到远」——未开演/进行中按日期升序在前，已落幕历史场次按日期降序紧随其后
   const all = buildHomeTimelineList().slice();
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todayTs = todayStart.getTime();
-  const tsOf = item => new Date(String(item.date || '').slice(0, 10) + 'T00:00:00').getTime();
-  const upcoming = all
-    .filter(item => {
-      const t = tsOf(item);
-      return !isNaN(t) && t >= todayTs;
-    })
-    .sort((a, b) => tsOf(a) - tsOf(b));
+  const tsOf = item => {
+    const raw = String(item.date || '').slice(0, 10);
+    const t = new Date(raw + 'T00:00:00').getTime();
+    return isNaN(t) ? NaN : t;
+  };
+  const valid = all.filter(item => !isNaN(tsOf(item)));
+  const upcoming = valid
+    .filter(item => tsOf(item) >= todayTs)
+    .sort((a, b) => tsOf(a) - tsOf(b)); // 由近到远：越临近今天越靠前
+  const past = valid
+    .filter(item => tsOf(item) < todayTs)
+    .sort((a, b) => tsOf(b) - tsOf(a)); // 同样由近到远：最近落幕的排更早历史场次之前
   const pinned = upcoming.length ? upcoming[0] : null;
-  const rest = all
-    .filter(item => item !== pinned)
-    .sort((a, b) => {
-      const ta = tsOf(a);
-      const tb = tsOf(b);
-      return (isNaN(tb) ? -Infinity : tb) - (isNaN(ta) ? -Infinity : ta);
-    });
-  const list = (pinned ? [pinned, ...rest] : rest).slice(0, 4);
+  const list = [...upcoming, ...past].slice(0, 4);
   if (!list.length) {
     box.innerHTML = `<div class="p-4 rounded-xl metal-card text-xs text-slate-400">近期暂无演出数据，去「档案」看看往期巡演回顾吧。</div>`;
     return;
