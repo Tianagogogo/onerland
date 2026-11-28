@@ -989,8 +989,36 @@ select::-moz-focus-inner { border: 0; }
 }
 
 /* ================= 近期演出与参演指南：双列卡片等高齐平 ================= */
-#tour-grid { align-items: stretch; }
-#tour-grid > .show-card { height: 100%; display: flex; flex-direction: column; justify-content: space-between; }
+/* 桌面端双列：取消等高拉伸，避免一侧展开抽屉时另一侧底部留白 */
+#tour-grid { align-items: start; }
+#tour-grid > .show-card {
+  height: auto;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+#tour-grid > .show-card > :last-child { margin-bottom: 0; }
+
+/* 桌面端 6 个功能按钮：上下两行 × 每行 3 个等宽矩阵，与状态条左右对齐 */
+@media (min-width: 769px) {
+  .tour-actions-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    align-items: stretch;
+    width: 100%;
+  }
+  .tour-actions-row .tour-action-btn {
+    width: 100%;
+    min-width: 0;
+    flex: initial;
+    justify-content: center;
+    text-align: center;
+    padding: 0 8px;
+  }
+  .tour-actions-row .tour-actions-divider { display: none; }
+}
 
 /* ================= 移动端：海报比例、标题字号与倒计时红色统一 ================= */
 @media (max-width: 640px) {
