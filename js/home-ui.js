@@ -612,7 +612,7 @@ function renderUpcomingMiniTimeline() {
       <div class="p-3.5 rounded-xl metal-card timeline-card flex flex-col gap-2.5 ${item === pinned ? 'timeline-card-next' : ''}">
         <div class="timeline-card-main flex items-start gap-3 min-w-0 w-full">
           <div class="w-12 poster-square-box shrink-0">
-            ${(() => { const ps = (typeof posterSrcFor === 'function') ? posterSrcFor(item, item.posterUrl) : item.posterUrl; return ps ? `<img src="${ps}" alt="${safeTitle}" ${(typeof posterAttrsFor === 'function') ? posterAttrsFor(item, item.posterUrl, idx) : posterImgAttrs(ps, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" />` : ((typeof posterPlaceholderHtml === 'function') ? posterPlaceholderHtml(safeTitle) : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`); })()}
+            ${(() => { const ps = (typeof posterSrcFor === 'function') ? posterSrcFor(item, item.posterUrl) : item.posterUrl; return ps ? `<img src="${ps}" alt="${safeTitle}" ${(typeof posterAttrsFor === 'function') ? posterAttrsFor(item, item.posterUrl, idx) : posterImgAttrs(ps, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" onclick="event.stopPropagation(); openPosterLightbox(this.dataset.hdSrc || this.src, '${safeTitle}')" class="cursor-zoom-in" />` : ((typeof posterPlaceholderHtml === 'function') ? posterPlaceholderHtml(safeTitle) : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`); })()}
           </div>
           <div class="timeline-card-body min-w-0 flex-1">
             <div class="timeline-title-row flex items-start gap-1.5 flex-wrap">

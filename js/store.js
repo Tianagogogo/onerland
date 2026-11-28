@@ -636,10 +636,23 @@ function localPosterFor(item) {
   return '';
 }
 
-function posterSrcFor(item, rawUrl) {
+// 列表页只加载 320px 轻量缩略图；高清原图留给灯箱按需加载
+function posterThumbFor(src) {
+  const s = String(src || '');
+  if (!/^assets\/posters\/[^/]+\.(jpe?g|png|webp)$/i.test(s)) return '';
+  return s.replace(/^assets\/posters\//, 'assets/posters/thumb/');
+}
+
+function posterHdSrcFor(item, rawUrl) {
   const local = localPosterFor(item);
   if (local) return local;
   return String(rawUrl || (item && (item.posterUrl || item.poster_url || item.poster || item.cover || item.image)) || '');
+}
+
+function posterSrcFor(item, rawUrl) {
+  const hd = posterHdSrcFor(item, rawUrl);
+  const thumb = posterThumbFor(hd);
+  return thumb || hd;
 }
 
 function escapeAttrValue(v) {
@@ -647,11 +660,13 @@ function escapeAttrValue(v) {
 }
 
 function posterAttrsFor(item, rawUrl, index) {
-  const local = localPosterFor(item);
+  const hd = posterHdSrcFor(item, rawUrl);
+  const src = posterSrcFor(item, rawUrl);
+  // 列表图秒开：eager + sync 解码，避免半截加载；高清地址挂在 data-hd-src
+  let attrs = 'loading="eager" fetchpriority="high" decoding="sync"';
+  if (hd && hd !== src) attrs += ` data-hd-src="${escapeAttrValue(hd)}"`;
   const remote = String(rawUrl || '');
-  const src = local || remote;
-  let attrs = posterImgAttrs(src, index);
-  if (local && remote && !/^data:/i.test(remote)) {
+  if (remote && !/^data:/i.test(remote) && hd !== remote) {
     attrs += ` data-remote-src="${escapeAttrValue(remote)}"`;
   }
   return attrs;
@@ -677,7 +692,13 @@ function degradePosterImage(img) {
     return;
   }
   if (img.dataset.degraded === '1') return;
-  // 本地文件失效（被删/路径错）时，先回落到原始外链再谈降级
+  // 缩略图失效 → 先换本地高清原图，再回落原始外链，最后才降级
+  const hd = String(img.dataset.hdSrc || '').trim();
+  if (hd && img.dataset.hdTried !== '1') {
+    img.dataset.hdTried = '1';
+    img.setAttribute('src', hd);
+    return;
+  }
   const remote = String(img.dataset.remoteSrc || '').trim();
   if (remote && img.dataset.remoteTried !== '1') {
     img.dataset.remoteTried = '1';
@@ -2923,3 +2944,60 @@ function importLocalBackupFromFile(file) {
   reader.onerror = () => alert('❌ 读取备份文件失败，请重试');
   reader.readAsText(file);
 }
+
+// ================= 高清海报灯箱 =================
+function openPosterLightbox(src, title) {
+  const box = document.getElementById('poster-hd-lightbox');
+  const img = document.getElementById('phd-img');
+  if (!box || !img || !src) return;
+  const loading = document.getElementById('phd-loading');
+  const titleEl = document.getElementById('phd-title');
+  if (titleEl) {
+    titleEl.textContent = String(title || '')
+      .replace(/\s*·\s*(海报|往日海报|演出海报|高清海报)$/g, '')
+      .trim();
+  }
+  img.classList.remove('is-ready');
+  if (loading) {
+    loading.textContent = '高清原图加载中...';
+    loading.style.display = 'flex';
+  }
+  img.setAttribute('src', src);
+  box.classList.remove('hidden');
+  document.body.classList.add('phd-open');
+}
+
+function onPosterLightboxLoaded(img) {
+  const loading = document.getElementById('phd-loading');
+  if (loading) loading.style.display = 'none';
+  if (img) img.classList.add('is-ready');
+}
+
+function onPosterLightboxError(img) {
+  const loading = document.getElementById('phd-loading');
+  if (loading) {
+    loading.style.display = 'flex';
+    loading.textContent = '高清原图加载失败，可稍后重试';
+  }
+  if (img) img.classList.remove('is-ready');
+}
+
+function closePosterLightbox() {
+  const box = document.getElementById('poster-hd-lightbox');
+  if (!box || box.classList.contains('hidden')) return;
+  box.classList.add('hidden');
+  document.body.classList.remove('phd-open');
+  const img = document.getElementById('phd-img');
+  if (img) {
+    img.classList.remove('is-ready');
+    img.removeAttribute('src');
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closePosterLightbox();
+});
+window.openPosterLightbox = openPosterLightbox;
+window.closePosterLightbox = closePosterLightbox;
+window.onPosterLightboxLoaded = onPosterLightboxLoaded;
+window.onPosterLightboxError = onPosterLightboxError;
