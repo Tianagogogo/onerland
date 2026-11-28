@@ -1209,8 +1209,12 @@ select::-moz-focus-inner { border: 0; }
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 5px rgba(100, 116, 139, 0.26);
 }
 .tl-quick-panel {
-  flex: 0 0 100%;
+  /* 不用 flex: 0 0 100%：在 column 方向会被当成「高度 100%」并 wrap 出第二列 */
+  flex: 0 0 auto;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   margin-top: 8px;
 }
 .tl-quick-panel-inner {
@@ -2547,3 +2551,54 @@ body.travel-modal-open { overflow: hidden; }
     opacity: 1 !important;
   }
 }
+
+/* ===== 移动端：卡片内嵌展开面板横向溢出修复 =====
+   根因：.timeline-card { flex-wrap: wrap } 与 .tl-quick-panel { flex: 0 0 100% } 叠加，
+   在 column 方向下 flex-basis:100% 被解析成「高度的 100%」，面板被 wrap 到卡片右侧形成
+   第二列，直接把布局视口从 390px 撑到 698px，页面整体被压扁、右侧出现白边。
+   修复：html/body 锁宽；移动端卡片强制单列不换行；面板改为 in-flow 全宽静态块。 */
+html {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+
+@media (max-width: 768px) {
+  .timeline-card,
+  .show-card {
+    display: flex !important;
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .timeline-card .tl-quick-panel,
+  .timeline-card .tl-quick-panel-inner,
+  .show-card [data-footer-panel],
+  .show-card .tour-drawer,
+  .show-card .security-panel,
+  .show-card [data-buddy-card] {
+    position: static !important;
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-top: 10px;
+    box-sizing: border-box !important;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  .timeline-card .tl-quick-panel-inner { margin-top: 0; }
+  .timeline-card .tl-quick-panel-title,
+  .timeline-card .tl-quick-panel-body { max-width: 100%; min-width: 0; }
+  .timeline-card .tl-map-menu { flex-wrap: wrap; }
+} 

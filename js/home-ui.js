@@ -635,7 +635,6 @@ function renderUpcomingMiniTimeline() {
         <div class="tl-quick-bar" data-tl-bar="${idx}">
           <button type="button" class="tl-quick-btn" data-tl-action="traffic" data-tl-idx="${idx}" aria-expanded="false">🚇 交通</button>
           <button type="button" class="tl-quick-btn" data-tl-action="travel" data-tl-idx="${idx}">🚄 出行比价</button>
-          <button type="button" class="tl-quick-btn" data-tl-action="map" data-tl-idx="${idx}" aria-expanded="false">📍 地图</button>
           <button type="button" class="tl-quick-btn" data-tl-action="security" data-tl-idx="${idx}" aria-expanded="false">🛡️ 安检体验</button>
           <button type="button" class="tl-quick-btn" data-tl-action="buddy" data-tl-idx="${idx}">🤝 找搭子</button>
         </div>
@@ -818,16 +817,5 @@ function handleHomeTimelineAction(action, idx, btn) {
     return;
   }
 
-  if (action === 'map') {
-    const city = esc(rec.city || '');
-    toggleHomeTimelinePanel(card, 'map', `
-      <div class="tl-quick-panel-inner">
-        <div class="tl-quick-panel-title">📍 场馆导航 · ${safeVenue || '场馆待定'}</div>
-        <div class="tl-map-menu" data-show-map-menu data-map-venue="${encodeURIComponent(rec.venue || rec.city || '')}" data-map-city="${encodeURIComponent(city)}">
-          <button type="button" onclick="launchShowMapApp('amap', this)" class="tour-action-btn tour-action-btn--mini">🧭 高德 App</button>
-          <button type="button" onclick="launchShowMapApp('baidu', this)" class="tour-action-btn tour-action-btn--mini">🗺️ 百度 App</button>
-          <button type="button" onclick="launchShowMapApp('web', this)" class="tour-action-btn tour-action-btn--mini">🌐 网页版地图</button>
-        </div>
-      </div>`);
-  }
+  // 地图导航已收拢进「🚄 出行比价 → 🚇 同城交通」，不再单独出按钮
 }

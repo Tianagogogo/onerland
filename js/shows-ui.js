@@ -1994,14 +1994,6 @@ function renderTourCards() {
         <div class="tour-actions-row pt-2 border-t border-slate-200/70">
           <button type="button" data-footer-tab="traffic" data-tour-toggle="guide-drawer-${idx}" class="tour-action-btn" aria-expanded="false">🚇 交通</button>
           <button type="button" class="tour-action-btn" data-travel-btn data-city="${attrEsc(item.city || safeCity)}" data-venue="${attrEsc(cleanVenue || safeCity)}" data-date="${attrEsc(String(item.show_date || '').slice(0, 10))}" data-title="${attrEsc(safeCity)}" onclick="event.stopPropagation(); openTravelHelperFromButton(this)">🚄 出行比价</button>
-          <div class="relative">
-            <button type="button" data-footer-tab="map" data-map-trigger class="tour-action-btn" aria-expanded="false">📍 地图</button>
-            <div data-show-map-menu data-footer-panel="map" data-map-venue="${encodeShowMapValue(cleanVenue || safeCity)}" data-map-city="${encodeShowMapValue(safeCity)}" class="hidden absolute right-0 bottom-full mb-1.5 z-50 w-44 p-1.5 rounded-xl bg-white border border-slate-300 shadow-2xl" role="menu">
-              <button type="button" role="menuitem" data-footer-close onclick="launchShowMapApp('amap', this)" class="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left text-xs text-slate-800 hover:bg-slate-100">🧭 高德 App</button>
-              <button type="button" role="menuitem" data-footer-close onclick="launchShowMapApp('baidu', this)" class="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left text-xs text-slate-800 hover:bg-slate-100">🗺️ 百度 App</button>
-              <button type="button" role="menuitem" data-footer-close onclick="launchShowMapApp('web', this)" class="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left text-xs text-slate-800 hover:bg-slate-100">🌐 网页版地图</button>
-            </div>
-          </div>
           <button type="button" data-footer-tab="venue" data-tour-toggle="vexp-tour-drawer-${idx}" class="tour-action-btn" aria-expanded="false">${isShowStillRunning(item.show_date) ? '🛡️ 安检体验' : '📊 场馆体验'}</button>
           <button type="button" data-footer-tab="buddy" data-tour-toggle="buddy-drawer-${idx}" class="tour-action-btn" aria-expanded="false">🤝 找搭子</button>
         </div>
