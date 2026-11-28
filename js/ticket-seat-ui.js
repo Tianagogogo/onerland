@@ -279,16 +279,6 @@
     return rows;
   }
 
-  function fastRankMap(rows) {
-    const map = new Map();
-    const byPlatform = {};
-    rows.forEach(r => { (byPlatform[r.platform] = byPlatform[r.platform] || []).push(r); });
-    Object.values(byPlatform).forEach(list => {
-      list.slice().sort((a, b) => a.seconds - b.seconds).slice(0, 3).forEach((r, i) => map.set(r.id, i + 1));
-    });
-    return map;
-  }
-
   function platformChips(st) {
     const extra = [];
     st.rows.forEach(r => { if (r.platform && !window.SEAT_PLATFORMS.includes(r.platform) && !extra.includes(r.platform)) extra.push(r.platform); });
@@ -305,7 +295,6 @@
     if (!host) return;
     const st = stateFor(key);
     const rows = visibleRows(key);
-    const rank = fastRankMap(st.rows);
     const own = getLocalOwn(key);
     const formOpen = Boolean(window.ticketSeatFormOpen[key]);
     const ownZone = splitZone(own && own.zone);
@@ -319,7 +308,7 @@
       <div class="seat-toolbar seat-zone-toolbar">
         ${ZONE_FILTERS.map(z => `<button type="button" class="seat-chip ${st.zoneFilter === z.key ? 'is-active' : ''}" onclick="setSeatZoneFilter('${key}', '${z.key}', event)">${z.label}</button>`).join('')}
         <span class="w-px h-4 bg-slate-300 mx-0.5 shrink-0"></span>
-        <button type="button" class="seat-chip ${st.sort === 'seconds' ? 'is-active' : ''}" onclick="setSeatSort('${key}', 'seconds', event)">⏱️ 按付款秒数升序</button>
+        <button type="button" class="seat-chip ${st.sort === 'seconds' ? 'is-active' : ''}" onclick="setSeatSort('${key}', 'seconds', event)">⏱️ 按手速从快到慢</button>
         <button type="button" class="seat-chip ${st.sort === 'created' ? 'is-active' : ''}" onclick="setSeatSort('${key}', 'created', event)">🕒 按提交时间最新</button>
       </div>`;
 
@@ -328,15 +317,14 @@
       : rows.length
         ? `<div class="seat-table-scroll">
             <table class="seat-table">
-              <thead><tr><th>购票平台</th><th>付款秒数</th><th>票档 / 区域</th><th>具体排座位置</th></tr></thead>
+              <thead><tr><th>购票平台</th><th>手速参考</th><th>票档 / 区域</th><th>具体排座位置</th></tr></thead>
               <tbody>
                 ${rows.map(r => {
                   const mine = (r.deviceId && r.deviceId === deviceId()) || String(r.id) === 'local-own';
-                  const rankNo = rank.get(r.id) || 0;
                   const isAdmin = typeof AppState !== 'undefined' && AppState.isAdminPasswordVerified;
                   return `<tr>
                     <td>${esc(r.platform)}${mine ? ' <span class="text-[9px] text-slate-400">（我的）</span>' : ''}</td>
-                    <td><strong>${r.seconds}秒</strong>${rankNo && st.sort === 'seconds' ? '<span class="seat-fast-badge">⚡ 手速参考</span>' : ''}</td>
+                    <td><strong>${r.seconds}秒</strong></td>
                     <td>${esc(r.zone || '—')}</td>
                     <td>
                       <span>${esc(r.seatDetail || '—')}</span>
@@ -362,7 +350,7 @@
           <select id="seat-platform-${key}" class="seat-select">${seatOptionsHTML(window.SEAT_PLATFORMS, own && own.platform)}</select>
         </label>
         <label class="seat-field">
-          <span>付款秒数（0–600）</span>
+          <span>付款秒数（手速参考 · 0–600）</span>
           <input id="seat-seconds-${key}" type="number" min="0" max="600" step="1" inputmode="numeric"
             value="${own ? esc(own.seconds) : ''}" placeholder="如 8" class="seat-select seat-intensity" />
         </label>
@@ -517,7 +505,7 @@
         <div class="seat-confirm-title">🔍 提交前请核对</div>
         <div class="seat-confirm-list">
           <div class="seat-confirm-row"><span>购票平台</span><strong>${esc(f.platform)}</strong></div>
-          <div class="seat-confirm-row"><span>付款秒数</span><strong>${f.seconds}秒</strong></div>
+          <div class="seat-confirm-row"><span>手速参考</span><strong>${f.seconds}秒</strong></div>
           <div class="seat-confirm-row"><span>票档 / 区域</span><strong>${esc(f.zone)}</strong></div>
           <div class="seat-confirm-row"><span>具体排座</span><strong>${esc(f.seatDetail)}</strong></div>
         </div>

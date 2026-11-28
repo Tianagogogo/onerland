@@ -3339,20 +3339,6 @@ body.phd-open { overflow: hidden; }
   vertical-align: middle;
 }
 .seat-table tbody tr:last-child td { border-bottom: none; }
-.seat-table .seat-fast-badge {
-  display: inline-block;
-  margin-left: 4px;
-  padding: 0 4px;
-  height: 16px;
-  line-height: 16px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%);
-  border: 1px solid #fdba74;
-  color: #9a3412;
-  font-size: 9px;
-  font-weight: 700;
-  white-space: nowrap;
-}
 .seat-form {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3377,7 +3363,6 @@ body.phd-open { overflow: hidden; }
   .seat-table th:nth-child(1), .seat-table td:nth-child(1) { width: 21%; }
   .seat-table th:nth-child(2), .seat-table td:nth-child(2) { width: 17%; }
   .seat-table th:nth-child(3), .seat-table td:nth-child(3) { width: 28%; }
-  .seat-table .seat-fast-badge { margin-left: 2px; padding: 0 3px; font-size: 8px; }
   .seat-form { grid-template-columns: 1fr; }
 }
 
