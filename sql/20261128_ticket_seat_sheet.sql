@@ -141,7 +141,7 @@ update public.show_ticket_seats t
  where t.id = p.id
    and not (
      coalesce(t.zone, '') ~ '^(内场|一层看台|二层看台|三层看台|包厢区|音乐节站区)$'
-     or coalesce(t.zone, '') ~ '^(内场|一层看台|二层看台|三层看台|包厢区|音乐节站区) · (无细分区|VIP区|[A-F]区|[A-D][1-4]区|C[12]区|D[12]区|[123](0[1-9]|1[0-9]|2[0-5])区)$'
+     or coalesce(t.zone, '') ~ '^(内场|一层看台|二层看台|三层看台|包厢区|音乐节站区) · (无细分区|VIP区|VIP包厢|[0-9]{1,2}号包厢|通用站区|VIP前排区|普通区|[A-F]区|[A-D][1-4]区|[123](0[1-9]|[12][0-9]|30)区)$'
    );
 
 -- 排座归一化：旧格式「9-15排（中区） · 中间号段」→ 新枚举「N排」或「N排 M号」
@@ -207,7 +207,7 @@ alter table public.show_ticket_seats drop constraint if exists show_ticket_seats
 alter table public.show_ticket_seats add constraint show_ticket_seats_zone_chk
   check (
     zone ~ '^(内场|一层看台|二层看台|三层看台|包厢区|音乐节站区)$'
-    or zone ~ '^(内场|一层看台|二层看台|三层看台|包厢区|音乐节站区) · (无细分区|VIP区|[A-F]区|[A-D][1-4]区|C[12]区|D[12]区|[123](0[1-9]|1[0-9]|2[0-5])区)$'
+    or zone ~ '^(内场|一层看台|二层看台|三层看台|包厢区|音乐节站区) · (无细分区|VIP区|VIP包厢|[0-9]{1,2}号包厢|通用站区|VIP前排区|普通区|[A-F]区|[A-D][1-4]区|[123](0[1-9]|[12][0-9]|30)区)$'
   );
 
 -- 排座：站区/无排号 或「N排」或「N排 M号」

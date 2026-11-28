@@ -6,17 +6,31 @@
 
   // 票档 / 区域：第 1 框大类 + 第 2 框区号（组合拼接）
   const ZONE_MAINS = ['内场', '一层看台', '二层看台', '三层看台', '包厢区', '音乐节站区'];
-  const ZONE_SUBS = (function () {
-    const list = ['无细分区', 'VIP区',
-      'A区', 'B区', 'C区', 'D区', 'E区', 'F区',
-      'A1区', 'A2区', 'A3区', 'A4区',
-      'B1区', 'B2区', 'B3区', 'B4区',
-      'C1区', 'C2区', 'D1区', 'D2区'];
-    [100, 200, 300].forEach(base => {
-      for (let i = 1; i <= 25; i++) list.push(`${base + i}区`);
-    });
-    return list;
+  // 二级联动：每个大类对应的专属区号白名单
+  const ZONE_SUB_MAP = (function () {
+    const floor = ['无细分区', 'VIP区', 'A区', 'B区', 'C区', 'D区', 'E区', 'F区',
+      'A1区', 'A2区', 'A3区', 'A4区', 'B1区', 'B2区', 'B3区', 'B4区',
+      'C1区', 'C2区', 'C3区', 'C4区', 'D1区', 'D2区', 'D3区', 'D4区'];
+    const makeNum = (base, to) => {
+      const list = ['无细分区'];
+      for (let i = 1; i <= to; i++) list.push(`${base + i}区`);
+      return list;
+    };
+    const boxes = ['无细分区', 'VIP包厢'];
+    for (let i = 1; i <= 20; i++) boxes.push(`${i}号包厢`);
+    return {
+      '内场': floor,
+      '一层看台': makeNum(100, 30).concat(['A区', 'B区', 'C区', 'D区']),
+      '二层看台': makeNum(200, 30),
+      '三层看台': makeNum(300, 30),
+      '包厢区': boxes,
+      '音乐节站区': ['通用站区', 'VIP前排区', 'A区', 'B区', '普通区']
+    };
   })();
+
+  function zoneSubsOf(main) {
+    return ZONE_SUB_MAP[main] || ['无细分区'];
+  }
 
   // 排数 / 座号：两个数字组合下拉
   const ROW_NOS = (function () {
@@ -96,7 +110,8 @@
     if (idx > 0) {
       const main = s.slice(0, idx);
       const sub = s.slice(idx + 3);
-      return { main: ZONE_MAINS.includes(main) ? main : ZONE_MAINS[0], sub: ZONE_SUBS.includes(sub) ? sub : '无细分区' };
+      const safeMain = ZONE_MAINS.includes(main) ? main : ZONE_MAINS[0];
+      return { main: safeMain, sub: zoneSubsOf(safeMain).includes(sub) ? sub : '无细分区' };
     }
     if (ZONE_MAINS.includes(s)) return { main: s, sub: '无细分区' };
     const hit = ZONE_MAINS.find(m => s.indexOf(m) === 0);
@@ -272,8 +287,8 @@
         <div class="seat-field">
           <span>票档 / 区域（大类 + 区号）</span>
           <div class="seat-combo">
-            <select id="seat-zone-main-${key}" class="seat-select">${seatOptionsHTML(ZONE_MAINS, ownZone.main)}</select>
-            <select id="seat-zone-sub-${key}" class="seat-select">${seatOptionsHTML(ZONE_SUBS, ownZone.sub)}</select>
+            <select id="seat-zone-main-${key}" class="seat-select" onchange="onSeatZoneMainChange('${key}', event)">${seatOptionsHTML(ZONE_MAINS, ownZone.main)}</select>
+            <select id="seat-zone-sub-${key}" class="seat-select">${seatOptionsHTML(zoneSubsOf(ownZone.main), ownZone.sub)}</select>
           </div>
         </div>
         <div class="seat-field">
@@ -285,7 +300,7 @@
         </div>
         <div class="seat-form-actions">
           <span class="text-[10px] text-slate-400">同一设备每场限 1 条，可随时修改或撤回</span>
-          <button type="button" onclick="submitSeatRow('${key}', event)" class="seat-chip is-active">💾 提交登记 / 保存修改</button>
+          <button type="button" onclick="submitSeatRow('${key}', event)" class="seat-chip is-active seat-submit-btn">${own ? '💾 保存修改' : '💾 提交登记'}</button>
         </div>
       </div>`;
 
@@ -320,11 +335,22 @@
     };
   }
 
+  // 大类切换时，第二个下拉即时重建为对应区号，重置为「无细分区」
+  function onSeatZoneMainChange(showId) {
+    const key = String(showId);
+    const mainEl = document.getElementById(`seat-zone-main-${key}`);
+    const subEl = document.getElementById(`seat-zone-sub-${key}`);
+    if (!mainEl || !subEl) return;
+    const subs = zoneSubsOf(mainEl.value);
+    subEl.innerHTML = seatOptionsHTML(subs, '无细分区');
+    if (!subs.includes(subEl.value)) subEl.value = subs[0];
+  }
+
   function validateForm(f) {
     if (!Number.isInteger(f.seconds) || f.seconds < 0 || f.seconds > 600) return '请填写 0–600 之间的整数秒数';
     if (!window.SEAT_PLATFORMS.includes(f.platform)) return '请选择列表中的购票平台';
     if (!ZONE_MAINS.includes(f.zoneMain)) return '请选择票档区域大类';
-    if (!ZONE_SUBS.includes(f.zoneSub)) return '请选择具体区号';
+    if (!zoneSubsOf(f.zoneMain).includes(f.zoneSub)) return '请选择该区域对应的大类区号';
     if (!ROW_NOS.includes(f.rowNo)) return '请选择排数';
     if (!SEAT_NOS.includes(f.seatNo)) return '请选择座号';
     return '';
@@ -468,6 +494,7 @@
   window.setSeatPlatformFilter = setSeatPlatformFilter;
   window.setSeatZoneFilter = setSeatZoneFilter;
   window.setSeatSort = setSeatSort;
+  window.onSeatZoneMainChange = onSeatZoneMainChange;
   window.submitSeatRow = openSeatConfirm;
   window.openSeatConfirm = openSeatConfirm;
   window.confirmSeatSubmit = confirmSeatSubmit;

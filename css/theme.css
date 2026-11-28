@@ -3983,3 +3983,11 @@ input.seat-select { background-image: none; }
   .seat-confirm-card { max-width: 100%; }
   .seat-confirm-actions button { font-size: 11.5px; }
 }
+
+/* ================= 🎟️ 抢票表：区域二级联动 + 提交按钮不裁切 ================= */
+.seat-form-actions .seat-submit-btn {
+  white-space: nowrap;
+  flex: 0 0 auto;
+  max-width: 100%;
+  padding: 0 14px;
+}
