@@ -31,8 +31,10 @@ async function handleAdminScheduleFiles(event) {
   try {
     const slot = await recognizeTimetableSlot(firstDataUrl);
     const slotInput = document.getElementById('adm-slot');
+    const scheduleSlotInput = document.getElementById('adm-schedule-slot');
     if (slot && slotInput) {
       slotInput.value = slot;
+      if (scheduleSlotInput) scheduleSlotInput.value = slot;
       if (statusEl) statusEl.textContent = `✅ 已识别艺人时段：${slot}（可手动微调）`;
     } else if (statusEl) {
       statusEl.textContent = '⚠️ 未识别到明确时段，可手动填写「音乐节演出时段」';
@@ -158,6 +160,9 @@ function startEditShow(kind, cloudId, fallback) {
     document.getElementById('adm-seat').value = item.seatUrl || '';
   }
   document.getElementById('adm-slot').value = item.slot || '';
+  if (document.getElementById('adm-schedule-slot')) {
+    document.getElementById('adm-schedule-slot').value = item.slot || '';
+  }
   document.getElementById('adm-seat').value = item.seatUrl || '';
   document.getElementById('adm-prices') && (document.getElementById('adm-prices').value = item.prices || '');
   if (document.getElementById('adm-merch-booth')) {
@@ -194,7 +199,7 @@ function resetAdminForm() {
   if (modalEl && modalEl.dataset) modalEl.dataset.editingId = '';
   adminScheduleImgs = [];
   renderAdminScheduleThumbs();
-  ['adm-title', 'adm-date', 'adm-body', 'adm-poster', 'adm-seat', 'adm-transport', 'adm-slot', 'adm-merch-booth', 'adm-url', 'adm-sale-time'].forEach(id => {
+  ['adm-title', 'adm-date', 'adm-body', 'adm-poster', 'adm-seat', 'adm-transport', 'adm-slot', 'adm-schedule-slot', 'adm-merch-booth', 'adm-url', 'adm-sale-time'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -222,7 +227,8 @@ async function submitAdminQuickPost() {
   const posterUrl = document.getElementById('adm-poster').value.trim();
   const seatUrl = (document.getElementById('adm-seat')?.value || '').trim();
   const transportText = (document.getElementById('adm-transport')?.value || '').trim();
-  const slotText = (document.getElementById('adm-slot')?.value || '').trim();
+  const slotText = (document.getElementById('adm-schedule-slot')?.value
+    || document.getElementById('adm-slot')?.value || '').trim();
   const merchBooth = (document.getElementById('adm-merch-booth')?.value || '').trim();
   const url = document.getElementById('adm-url').value.trim();
   const saleTimeRaw = document.getElementById('adm-sale-time').value;
@@ -698,3 +704,37 @@ function bindGlobalEditDelegation() {
 window.startEditShow = startEditShow;
 window.findShowForEdit = findShowForEdit;
 bindGlobalEditDelegation();
+
+
+// 手动触发时间表 OCR：对当前已上传的第一张时间表图识别艺人时段
+async function manualRecognizeTimetableSlot() {
+  const statusEl = document.getElementById('adm-schedule-ocr-status');
+  const source = (Array.isArray(adminScheduleImgs) && adminScheduleImgs[0]) || '';
+  if (!source) {
+    alert('请先上传或填入一张音乐节时间表图片');
+    return;
+  }
+  if (typeof recognizeTimetableSlot !== 'function') {
+    alert('OCR 模块未加载，请刷新页面后重试');
+    return;
+  }
+  const btn = document.querySelector('button[onclick="manualRecognizeTimetableSlot()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 识别中…'; }
+  if (statusEl) { statusEl.classList.remove('hidden'); statusEl.textContent = '🔍 正在识别时间表中的艺人时段…'; }
+  try {
+    const slot = await recognizeTimetableSlot(source);
+    if (slot) {
+      document.getElementById('adm-slot').value = slot;
+      document.getElementById('adm-schedule-slot').value = slot;
+      if (statusEl) statusEl.textContent = `✅ 已识别：${slot}（可手动微调后保存）`;
+    } else {
+      if (statusEl) statusEl.textContent = '⚠️ 未识别到明确时段，请直接在输入框手动填写';
+      alert('未识别到 ONER / 岳岳 / 木子洋 / 灵超 附近的演出时段，请手动填写输入框。');
+    }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = `⚠️ 识别失败：${e.message || '网络异常'}，请手动填写`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔍 手动识别时间段'; }
+  }
+}
+window.manualRecognizeTimetableSlot = manualRecognizeTimetableSlot;

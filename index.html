@@ -58,7 +58,7 @@
           <h2 class="text-base font-bold text-slate-900">🎫 近期演出与参演指南</h2>
           <div id="tour-themes-bar" class="flex items-center gap-1.5 flex-wrap"></div>
         </div>
-        <div id="tour-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4 items-start"></div>
+        <div id="tour-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch"></div>
       </div>
 
       <div class="space-y-3">
@@ -318,6 +318,10 @@
               <button type="button" onclick="addAdminScheduleUrl()" class="px-2.5 py-1 rounded-lg liquid-silver-btn">添加</button>
             </div>
             <div id="adm-schedule-thumbs" class="flex gap-2 flex-wrap"></div>
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <button type="button" onclick="manualRecognizeTimetableSlot()" class="px-2.5 py-1 rounded-lg liquid-silver-btn font-medium">🔍 手动识别时间段</button>
+              <input id="adm-schedule-slot" type="text" placeholder="演出时段（如 19:30-20:10）" class="flex-1 min-w-[150px] px-2 py-1 rounded border border-slate-300 bg-white" />
+            </div>
             <p id="adm-schedule-ocr-status" class="hidden text-[11px] text-slate-500"></p>
           </div>
           <textarea id="adm-body" rows="2" placeholder="场馆名称..." class="w-full px-2.5 py-2 rounded-lg border border-slate-300 bg-white"></textarea>
