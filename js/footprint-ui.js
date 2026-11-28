@@ -131,9 +131,9 @@ function recordFootprintFromShow(title, date, venue, artist = 'ONER') {
   const showKey = buildShowKey(venue, title);
   const existed = findFootprintIndex({ showKey, title, date, venue }) >= 0;
   upsertFootprintEntry({ showKey, title, date, venue, artist });
-  alert(existed
-    ? `「${title}」的足迹已更新（共 ${AppState.footprints.length} 面），不会重复计数。`
-    : `已将「${title}」记入本机观演足迹（第 ${AppState.footprints.length} 面）！`);
+  showToast(existed
+    ? `「${title}」的足迹已更新（共 ${AppState.footprints.length} 面）`
+    : `已将「${title}」记入本机观演足迹（第 ${AppState.footprints.length} 面）`);
   renderAnniversaryCard();
   renderUpcomingMiniTimeline();
   if (!document.getElementById('view-footprint-page')?.classList.contains('hidden')) renderFootprintPage();

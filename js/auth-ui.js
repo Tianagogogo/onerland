@@ -128,7 +128,8 @@ function saveGuestNicknameFromModal() {
   const name = saveGuestNickname(input ? input.value : '');
   if (input) input.value = name;
   syncAuthState();
-  alert(name ? `昵称已保存：${name}` : '已清空昵称，将以匿名访客身份展示');
+  // 保存成功 → 立即收起弹窗 + 轻量提示（不再用 alert 打断浏览）
+  closeModalWithToast('user-auth-modal', name ? `昵称已保存：${name}` : '已清空昵称，将以匿名访客身份展示');
 }
 
 function openUserAuthModal() {
@@ -153,7 +154,7 @@ function openAdminUnlockModal() {
 async function verifyAdminPassword() {
   const input = document.getElementById('admin-password-input');
   const password = input ? input.value : '';
-  if (!password) return alert('请输入管理员密码');
+  if (!password) return toastError('请输入管理员密码');
 
   const btn = document.querySelector('#admin-unlock-modal button[onclick="verifyAdminPassword()"]');
   const oldText = btn ? btn.textContent : '';
@@ -174,9 +175,11 @@ async function verifyAdminPassword() {
     if (input) input.value = '';
     document.getElementById('admin-unlock-modal')?.classList.add('hidden');
     syncAuthState();
+    showToast('管理员密码解锁成功');
     openHiddenAdminDrawer();
   } catch (e) {
-    alert(`管理员密码验证失败：${e.message}`);
+    // 校验失败：弹窗保持打开，已输入的密码不丢失
+    toastError(`管理员密码验证失败：${e.message}`);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = oldText || '验证解锁'; }
   }
@@ -192,7 +195,7 @@ function lockAdminPassword() {
   document.getElementById('hidden-admin-modal')?.classList.add('hidden');
   document.getElementById('admin-unlock-modal')?.classList.add('hidden');
   syncAuthState();
-  alert('已锁定管理员密码解锁态');
+  showToast('已锁定管理员密码解锁态');
 }
 
 // 管理接口统一请求头：邮箱会话与管理员密码令牌互相独立，可同时携带。
@@ -256,7 +259,7 @@ function handleAuthSuccess(data, email, successText) {
   syncAuthState();
   const modal = document.getElementById('user-auth-modal');
   if (modal) modal.classList.add('hidden');
-  alert(successText);
+  showToast(successText);
 }
 
 // 登录：POST /auth/v1/token?grant_type=password（等价 signInWithPassword）

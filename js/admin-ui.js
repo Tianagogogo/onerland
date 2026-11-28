@@ -234,7 +234,7 @@ async function submitAdminQuickPost() {
   const saleTimeRaw = document.getElementById('adm-sale-time').value;
   const salePlat = document.getElementById('adm-sale-plat').value.trim() || '大麦';
 
-  if (!titleOrPlat) return alert('请填写标题！');
+  if (!titleOrPlat) return toastError('请填写标题后再同步');
 
   try {
     if (type === 'ticket') {
@@ -298,9 +298,11 @@ async function submitAdminQuickPost() {
 
     resetAdminForm();
     renderAdminTodoQueue();
-    alert('已保存并同步至云端！');
+    // 保存成功 → 收起管理台弹窗 + 轻量提示，页面数据已在 loadTourData 后刷新
+    closeModalWithToast('hidden-admin-modal', '已保存并同步至云端');
   } catch (e) {
-    alert(`操作失败：${e.message}`);
+    // 失败时保持弹窗与已填内容
+    toastError(`操作失败：${e.message}`);
   }
 }
 
@@ -415,7 +417,7 @@ async function reviewTicketProof(id, status) {
   }
   const label = { approved: '已通过', rejected: '已驳回', pending: '已重置为待复核' }[status] || status;
   await loadProofReviewQueue('pending');
-  alert(`✅ ${label}`);
+  showToast(label);
 }
 
 // 统一调用服务端写接口（functions/api/admin.js），由服务端校验授权邮箱或管理员密码令牌。
@@ -459,12 +461,12 @@ function configGeminiKey() {
   if (!val) {
     localStorage.removeItem(GEMINI_KEY_STORAGE);
     if (typeof updateAiKeyStatusUI === 'function') updateAiKeyStatusUI();
-    alert('已清除本地 AI 密钥');
+    showToast('已清除本地 AI 密钥');
     return;
   }
   localStorage.setItem(GEMINI_KEY_STORAGE, val);
   if (typeof updateAiKeyStatusUI === 'function') updateAiKeyStatusUI();
-  alert('密钥已保存到本机浏览器，仅用于本地海报识别。');
+  showToast('密钥已保存到本机浏览器，仅用于本地海报识别');
 }
 
 // ================= ⚡ 一键瘦身历史大图（海报 / 座位图 → WebP） =================
@@ -661,7 +663,7 @@ async function deleteEditingShow() {
   if (delBtn) { delBtn.disabled = true; delBtn.textContent = '⏳ 正在删除…'; }
   try {
     await adminApi('deleteTicket', {}, id);
-    alert('✅ 已从云端删除该场次。');
+    showToast('已从云端删除该场次');
     resetAdminForm();
     document.getElementById('hidden-admin-modal')?.classList.add('hidden');
     await loadTourData();

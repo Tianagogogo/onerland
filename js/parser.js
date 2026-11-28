@@ -198,7 +198,7 @@ async function importOCRBatchShows() {
     return alert(`批量导入失败：${e.message}`);
   }
   document.getElementById('adm-ocr-batch-box').classList.add('hidden');
-  alert(`已成功导入 ${payloads.length} 场演出！`);
+  showToast(`已成功导入 ${payloads.length} 场演出`);
   await loadTourData();
 }
 

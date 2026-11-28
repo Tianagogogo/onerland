@@ -1,3 +1,74 @@
+// ================= 全局轻量反馈：Toast + 表单回车提交 =================
+let __globalToastTimer = null;
+
+function ensureToastHost() {
+  let host = document.getElementById('global-toast-host');
+  if (host) return host;
+  host = document.createElement('div');
+  host.id = 'global-toast-host';
+  host.className = 'global-toast-host';
+  host.setAttribute('role', 'status');
+  host.setAttribute('aria-live', 'polite');
+  document.body.appendChild(host);
+  return host;
+}
+
+// type: success | error | info
+function showToast(message, type = 'success', duration = 2400) {
+  const text = String(message == null ? '' : message).replace(/\s*\n+\s*/g, ' · ').trim();
+  if (!text) return;
+  const host = ensureToastHost();
+  host.innerHTML = '';
+  const icon = type === 'error' ? '⚠️' : type === 'info' ? 'ℹ️' : '✅';
+  const el = document.createElement('div');
+  el.className = `global-toast global-toast--${type}`;
+  el.textContent = `${icon} ${text}`;
+  host.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('is-visible'));
+  clearTimeout(__globalToastTimer);
+  __globalToastTimer = setTimeout(() => {
+    el.classList.remove('is-visible');
+    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 220);
+  }, duration);
+}
+
+function toastError(message, duration = 3200) { return showToast(message, 'error', duration); }
+function toastInfo(message) { return showToast(message, 'info'); }
+
+// 成功即收尾：关闭指定弹窗 + 轻量提示（不打断用户已填内容之外的任何操作）
+function closeModalWithToast(modalId, message) {
+  const modal = modalId ? document.getElementById(modalId) : null;
+  if (modal) modal.classList.add('hidden');
+  if (message) showToast(message, 'success');
+}
+
+// 所有单行输入框回车 = 点击当前弹窗内的主提交按钮（data-enter-submit）
+function bindGlobalEnterSubmit() {
+  if (window.__globalEnterSubmitBound) return;
+  window.__globalEnterSubmitBound = true;
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter' || event.isComposing) return;
+    if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return;
+    const el = event.target;
+    if (!el || el.tagName !== 'INPUT') return;
+    const type = String(el.type || 'text').toLowerCase();
+    if (['button', 'submit', 'reset', 'file', 'checkbox', 'radio', 'range', 'color', 'image'].includes(type)) return;
+    if (el.disabled || el.readOnly) return;
+    const scope = el.closest('[data-enter-scope], [id$="-modal"], form');
+    if (!scope) return;
+    const btn = scope.querySelector('[data-enter-submit]');
+    if (!btn || btn.disabled) return;
+    event.preventDefault();
+    btn.click();
+  }, true);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bindGlobalEnterSubmit);
+} else {
+  bindGlobalEnterSubmit();
+}
+
 // ================= 全局状态与常量 =================
 const AppState = {
   activeArtistId: 'ALL',

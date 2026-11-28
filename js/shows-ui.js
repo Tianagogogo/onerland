@@ -453,7 +453,7 @@ function buildSlotHoverBadgeHTML(slotText, scheduleImgs, popoverId, titleLabel) 
 function submitPrivateNoteForm(showKey, formPrefix, rerenderScope, venue, title, date, artist) {
   const input = document.getElementById(`${formPrefix}-priv-note`);
   const text = (input?.value || '').trim();
-  if (!text) return alert('请先填写你的私人观演评语！');
+  if (!text) return toastError('请先填写你的私人观演评语');
   addPrivateShowNote(showKey, text);
   if (input) input.value = '';
 
@@ -475,6 +475,7 @@ function submitPrivateNoteForm(showKey, formPrefix, rerenderScope, venue, title,
   if (typeof renderUpcomingMiniTimeline === 'function') renderUpcomingMiniTimeline();
   if (rerenderScope === 'archive') renderArchiveTimeline();
   else renderTourCards();
+  showToast('私人评语已保存，仅自己可见');
 }
 
 function removePrivateNoteItem(showKey, noteId, rerenderScope) {
@@ -489,7 +490,7 @@ async function handleTicketProofVerify(event, showKey, formPrefix, rerenderScope
   const file = event?.target?.files?.[0] || null;
   if (event?.target) event.target.value = ''; // 允许重复选择同一张图
   if (!file) return;
-  if (!/^image\//i.test(file.type || '')) return alert('请上传图片格式的脱敏票根');
+  if (!/^image\//i.test(file.type || '')) return toastError('请上传图片格式的脱敏票根');
 
   // 先写入「上传中」锁定态，避免等待期间被误认为已解锁
   markTicketProofSubmitted(showKey, { cloudStatus: 'uploading', fileName: file.name });
@@ -509,10 +510,10 @@ async function handleTicketProofVerify(event, showKey, formPrefix, rerenderScope
       fileName: file.name,
       submittedAt: new Date().toLocaleString('zh-CN')
     });
-    alert('✅ 脱敏票根已提交，正在等待审核通过。\n\n审核通过后评分入口才会自动解锁；未通过可重新上传。');
+    showToast('脱敏票根已提交，等待审核通过');
   } catch (e) {
     setProofCloudStatus(showKey, 'upload-failed', { fileName: file.name });
-    alert(`⚠️ 票根云端提交失败：${e.message}\n\n评分仍保持锁定，请稍后重新上传。`);
+    toastError(`票根云端提交失败：${e.message}（评分仍保持锁定）`);
   }
   refreshShowCardAfterProof(rerenderScope, ctx.drawerId);
 }
@@ -555,7 +556,7 @@ function readSelectLabel(formPrefix, key, fallback = '') {
 
 function submitVenueExperienceForm(venueName, showKey, formPrefix, rerenderScope, ctx = {}) {
   if (!isShowTicketVerified(showKey)) {
-    return alert('🔒 本场脱敏票根尚未审核通过，评分入口保持锁定。');
+    return toastError('本场脱敏票根尚未审核通过，评分入口保持锁定');
   }
 
   const objectiveScores = {
@@ -600,9 +601,9 @@ function submitVenueExperienceForm(venueName, showKey, formPrefix, rerenderScope
       renderFootprintPage();
     }
     refreshShowCardAfterProof(rerenderScope, ctx.drawerId);
-    alert('✅ 已保存并归档到「我的足迹」：\n· 七项评分维度\n· 座位大区\n· 个人体验记录\n\n同一场次重复保存会自动覆盖更新，不会产生重复条目。');
+    showToast('已保存并归档到「我的足迹」（重复保存会覆盖更新）');
   } catch (e) {
-    alert(e.message);
+    toastError(e.message);
   }
 }
 
@@ -1047,9 +1048,9 @@ function buildVenueExperienceDrawerHTML(venueName, drawerId, formPrefix, showTit
         <span class="font-bold text-slate-900">🔒 我的私人观演评语（默认仅自己本机可见）</span>
         <span class="text-[11px] text-slate-400">仅存当前浏览器 · 绝不公开发布</span>
       </div>
-      <div class="flex gap-1.5 security-note-row">
+      <div class="flex gap-1.5 security-note-row" data-enter-scope>
         <input id="${formPrefix}-priv-note" type="text" placeholder="记录仅自己看的观演感受、座位号细节、舞台回忆..." class="flex-1 min-w-0 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white security-note-input" />
-        <button type="button" onclick="submitPrivateNoteForm('${safeShowKey}', '${formPrefix}', '${rerenderScope}', '${safeCtxVenue}', '${safeCtxTitle}', '${safeCtxDate}', '${safeCtxArtist}')" class="tour-action-btn shrink-0 security-note-submit">仅自己保存</button>
+        <button type="button" data-enter-submit onclick="submitPrivateNoteForm('${safeShowKey}', '${formPrefix}', '${rerenderScope}', '${safeCtxVenue}', '${safeCtxTitle}', '${safeCtxDate}', '${safeCtxArtist}')" class="tour-action-btn shrink-0 security-note-submit">仅自己保存</button>
       </div>
       ${privateNotes.length
         ? `<div class="space-y-1.5 pt-1">
@@ -1473,7 +1474,7 @@ async function submitBuddyRequestFromModal() {
   if (noteEl) noteEl.value = '';
   if (contactEl) contactEl.value = '';
   renderBuddyPanel(target.eventId);
-  alert('申请已发送，等待对方同意后即可互相看到联系方式');
+  showToast('申请已发送，等待对方同意');
 }
 
 async function adminDeleteBuddyCard(buddyId, eventId, event) {
@@ -1489,28 +1490,28 @@ async function adminDeleteBuddyCard(buddyId, eventId, event) {
   }
   window.buddyCloudCache[eventId] = (window.buddyCloudCache[eventId] || []).filter(x => String(x.id) !== String(buddyId));
   renderBuddyPanel(eventId);
-  alert('已删除该搭子信息');
+  showToast('已删除该搭子信息');
 }
 
 async function acceptBuddyRequestUI(buddyId, requestId, event) {
   if (event && event.stopPropagation) event.stopPropagation();
   const res = await acceptBuddyRequest(buddyId, requestId);
-  if (!res.ok) return alert('同意失败，请稍后重试');
+  if (!res.ok) return toastError('同意失败，请稍后重试');
   const state = buddyStateFor(buddyId);
   await fetchBuddyRequests(buddyId, getDeviceId());
   if (!state.myContact) state.myContact = await fetchBuddyContact(buddyId);
   if (window.__buddyActiveEventId) renderBuddyPanel(window.__buddyActiveEventId);
   else renderTourCards();
-  alert('已同意，双方联系方式已互相解锁');
+  showToast('已同意，双方联系方式已互相解锁');
 }
 
 function copyBuddyContact(value, event) {
   if (event && event.stopPropagation) event.stopPropagation();
   const text = String(value || '').trim();
   if (!text) return;
-  const done = () => alert('已复制');
+  const done = () => showToast('已复制');
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(done).catch(() => alert('复制失败，请手动长按复制'));
+    navigator.clipboard.writeText(text).then(done).catch(() => toastError('复制失败，请手动长按复制'));
     return;
   }
   const tmp = document.createElement('textarea');
@@ -1530,7 +1531,7 @@ async function saveLocalBuddyIntent(cloudId, showTitle, event) {
   if (waitLeft > 0) return alert(`发布太频繁，请 ${waitLeft} 秒后再试`);
 
   const tags = window.selectedBuddyTags[cloudId] || [];
-  if (tags.length === 0) return alert('请至少选中 1 个预设标签以发布搭子意向！');
+  if (tags.length === 0) return toastError('请至少选中 1 个预设标签以发布搭子意向');
 
   const platformEl = document.getElementById(`buddy-platform-${cloudId}`);
   const contactInput = document.getElementById(`buddy-contact-${cloudId}`);
@@ -1583,6 +1584,7 @@ async function saveLocalBuddyIntent(cloudId, showTitle, event) {
   resetBuddyTagButtons(cloudId);
   renderBuddyPanel(cloudId);
   if (contactInput) contactInput.value = '';
+  showToast('搭子意向已发布');
 }
 
 async function withdrawBuddyIntent(cloudId, entryId, event) {
@@ -2024,7 +2026,7 @@ function renderTourCards() {
               </div>
             </div>
 
-            <div class="space-y-1 pt-1 border-t border-slate-100">
+            <div class="space-y-1 pt-1 border-t border-slate-100" data-enter-scope>
               <span class="text-[11px] font-semibold text-slate-700">联系方式（选填，仅双方同意后互换）：</span>
               <div class="buddy-contact-row">
                 <select id="buddy-platform-${item.cloudId}" class="buddy-platform-select">
@@ -2037,7 +2039,7 @@ function renderTourCards() {
             </div>
           </div>
 
-          <button type="button" onclick="saveLocalBuddyIntent('${item.cloudId}', '${safeCity}', event)"
+          <button type="button" data-enter-submit onclick="saveLocalBuddyIntent('${item.cloudId}', '${safeCity}', event)"
             class="tour-action-btn w-full font-semibold">
             🚀 一键发布搭子意向
           </button>

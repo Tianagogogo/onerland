@@ -346,10 +346,10 @@ function renderAnniversaryManager() {
 
     <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
       <div class="text-[11px] font-semibold text-slate-700">➕ 新增纪念日（年度循环）</div>
-      <div class="flex items-center gap-1.5 flex-wrap">
+      <div class="flex items-center gap-1.5 flex-wrap" data-enter-scope>
         <input id="anniv-new-title" type="text" placeholder="纪念日名称（如：初遇 / 双向奔赴）" class="flex-1 min-w-[8rem] px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-xs" />
         <input id="anniv-new-date" type="date" class="px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-xs" />
-        <button type="button" onclick="managerAddAnniversary()" class="tour-action-btn tour-action-btn--mini">添加</button>
+        <button type="button" data-enter-submit onclick="managerAddAnniversary()" class="tour-action-btn tour-action-btn--mini">添加</button>
       </div>
       <p class="text-[10px] text-slate-400 leading-relaxed">纪念票根生成器里的「同步记录为纪念日」也会写入这里，同日期同名自动覆盖，不会重复。</p>
     </div>
@@ -399,20 +399,24 @@ function managerAddAnniversary() {
   const dateRaw = document.getElementById('anniv-new-date')?.value || '';
   const date = dateRaw ? dateRaw.slice(5) : '';
   const result = addCustomAnniversary(title, date);
-  if (!result.ok) return alert(result.message);
+  if (!result.ok) return toastError(result.message);
   const titleInput = document.getElementById('anniv-new-title');
+  const dateInput = document.getElementById('anniv-new-date');
   if (titleInput) titleInput.value = '';
+  if (dateInput) dateInput.value = '';
+  renderAnniversaryCard();
   renderAnniversaryManager();
+  showToast(`已添加纪念日：${title}`);
 }
 
 // 纪念票根 → 同步为纪念日（打通两个模块）
 function syncTicketToAnniversary() {
   const showName = (document.getElementById('tk-show-name')?.value || '').trim();
   const showDate = (document.getElementById('tk-show-date')?.value || '').trim();
-  if (!showName || !showDate) return alert('请先填写演出名称与日期');
+  if (!showName || !showDate) return toastError('请先填写演出名称与日期');
   const result = addCustomAnniversary(showName, showDate.slice(5));
-  if (!result.ok) return alert(result.message);
-  alert(`✅ 已将「${showName}」同步到时光提醒纪念日（${showDate.slice(5)} 年度循环倒数）。`);
+  if (!result.ok) return toastError(result.message);
+  showToast(`已将「${showName}」同步为 ${showDate.slice(5)} 年度纪念日`);
   renderAnniversaryCard();
   renderAnniversaryManager();
 }

@@ -181,7 +181,7 @@
           <input id="guest-nickname-input" type="text" maxlength="16" autocomplete="nickname"
             placeholder="如 小豆 / 阿豆，最多 16 字"
             class="flex-1 px-3 py-2 rounded-lg border border-slate-300 bg-white" />
-          <button type="button" onclick="saveGuestNicknameFromModal()" class="px-3 py-2 rounded-lg liquid-silver-btn font-semibold shrink-0">保存昵称</button>
+          <button type="button" data-enter-submit onclick="saveGuestNicknameFromModal()" class="px-3 py-2 rounded-lg liquid-silver-btn font-semibold shrink-0">保存昵称</button>
         </div>
         <p id="guest-device-hint" class="text-[11px] text-slate-400 leading-relaxed"></p>
       </div>
@@ -217,7 +217,7 @@
         </div>
         <p class="buddy-safety-hint">⚠️ 严禁填写手机号、身份证号或转账链接，线下见面请核对票根并注意安全</p>
       </div>
-      <button type="button" onclick="submitBuddyRequestFromModal()" class="tour-action-btn w-full font-semibold">发送申请</button>
+      <button type="button" data-enter-submit onclick="submitBuddyRequestFromModal()" class="tour-action-btn w-full font-semibold">发送申请</button>
     </div>
   </div>
 
@@ -230,7 +230,7 @@
       <p class="text-slate-500 leading-relaxed">管理员密码用于向服务端换取临时管理令牌，不会保存在浏览器。</p>
       <div class="flex gap-2">
         <input id="admin-password-input" type="password" autocomplete="current-password" placeholder="输入管理员密码" onkeydown="if(event.key==='Enter')verifyAdminPassword()" class="flex-1 px-3 py-2 rounded-lg border border-slate-300 bg-white" />
-        <button type="button" onclick="verifyAdminPassword()" class="tour-action-btn font-semibold shrink-0">验证解锁</button>
+        <button type="button" data-enter-submit onclick="verifyAdminPassword()" class="tour-action-btn font-semibold shrink-0">验证解锁</button>
       </div>
       <div class="flex items-center justify-between gap-2 pt-1">
         <button type="button" onclick="openUserAuthModal()" class="text-slate-600 hover:underline">返回身份设置</button>
@@ -333,7 +333,7 @@
           <textarea id="adm-transport" rows="4" placeholder="🚇 交通与入场指南（选填，留空自动按场馆匹配内置词库；填写后优先展示云端内容）" class="w-full px-2.5 py-2 rounded-lg border border-slate-300 bg-white"></textarea>
           <div class="flex items-center justify-between gap-2">
             <button id="adm-delete-btn" type="button" onclick="deleteEditingShow()" class="hidden px-3 py-2 rounded-lg bg-rose-600 text-white font-semibold hover:bg-rose-700">🗑️ 删除该场次</button>
-            <button id="adm-submit-btn" type="button" onclick="submitAdminQuickPost()" class="tour-action-btn font-semibold ml-auto">☁️ 同步发布</button>
+            <button id="adm-submit-btn" type="button" data-enter-submit onclick="submitAdminQuickPost()" class="tour-action-btn font-semibold ml-auto">☁️ 同步发布</button>
           </div>
         </div>
         <div class="space-y-2">
