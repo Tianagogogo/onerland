@@ -632,11 +632,11 @@ function renderUpcomingMiniTimeline() {
             <div class="timeline-card-title font-bold text-sm text-slate-900 leading-snug break-words">${safeTitle}</div>
             <div class="timeline-card-meta text-xs text-slate-500 mt-1">
               <button type="button" class="timeline-meta-line timeline-meta-date meta-date-ics" title="点击添加到日历提醒"
-                onclick="event.stopPropagation(); handleHomeTimelineDateClick(${idx})">📅 ${item.date} ${weekday}</button>
+                onclick="event.stopPropagation(); handleHomeTimelineCalendarClick(${idx})">📅 ${item.date} ${weekday}</button>
               <div class="timeline-meta-line timeline-meta-venue" title="${String(item.venue || '场馆待定').replace(/["<>]/g, '')}">📍 ${item.venue || '场馆待定'}</div>
             </div>
             ${(item.slot || (item.scheduleImgs && item.scheduleImgs.length)) ? `<div class="timeline-slot-row">
-              ${item.slot ? `<span class="timeline-slot-badge">⏰ ${String(item.slot).replace(/[<>"']/g, '')}</span>` : ''}
+              ${item.slot ? `<button type="button" class="timeline-slot-badge is-calendar-link" title="点击添加到日历提醒" onclick="event.stopPropagation(); handleHomeTimelineCalendarClick(${idx})">⏰ ${String(item.slot).replace(/[<>"']/g, '')}</button>` : ''}
               ${(item.scheduleImgs && item.scheduleImgs.length) ? `<button type="button" data-sched="${idx}" class="timeline-table-btn" title="查看音乐节时间表大图">🗓️ 时间表${item.scheduleImgs.length > 1 ? ` ×${item.scheduleImgs.length}` : ''}</button>` : ''}
             </div>` : ''}
           </div>
@@ -750,18 +750,19 @@ function handleHomeTimelinePlan(idx, btn) {
   }
 }
 
-// 卡片正文的日期文本 = 日历提醒入口（与「档案」页完全一致，走同一个 exportShowICS）
-function handleHomeTimelineDateClick(idx) {
+// 首页时间轴的日期行与时间胶囊共用同一个日历入口
+function handleHomeTimelineCalendarClick(idx) {
   const rec = homeTimelineRecords[idx];
   if (!rec) return;
-  if (rec.cloudId == null || rec.cloudId === '') {
-    return toastError('该场次暂无可用的精确时间，无法生成日历');
-  }
   try {
-    exportShowICS(rec.cloudId);
+    return handleShowCalendarClick(rec.cloudId, rec);
   } catch (e) {
     toastError(`日历生成失败：${e.message}`);
   }
+}
+
+function handleHomeTimelineDateClick(idx) {
+  return handleHomeTimelineCalendarClick(idx);
 }
 
 // 📄 详情浮窗：集中展示场次信息，并保留「📣 查看应援词」双入口
@@ -784,6 +785,7 @@ function openHomeTimelineDetail(idx) {
         ${title ? `<p><strong>🎤 演出名称：</strong>${title}</p>` : ''}
       </div>
       <div class="tl-detail-actions">
+        <button type="button" class="tour-action-btn tour-action-btn--mini" onclick="handleHomeTimelineCalendarClick(${idx})">📅 加入日历提醒</button>
         <button type="button" class="tour-action-btn tour-action-btn--mini" onclick="closeShowFeatureModal(); openChantDictModal()">📣 查看应援词</button>
         <button type="button" class="tour-action-btn tour-action-btn--mini" onclick="closeShowFeatureModal(); switchMainTab('shows')">🏛️ 在档案查看完整场次 ↗</button>
       </div>

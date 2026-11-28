@@ -368,13 +368,172 @@ function togglePlannedShowFromCard(btn, key) {
 }
 
 function calIcsStamp(d) {
-  // ICS 标准使用 UTC 时间（末尾 Z），各日历客户端会自动换算为本地时区
+  // DTSTAMP 使用 UTC；日程本体则按演出当地时区输出，避免客户端换算错位
   return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 }
-// 生成符合 RFC5545 / Apple Calendar 严格规范的 .ics 文本
-function buildShowICS(item, state, label, start, end) {
-  const escIcs = v => String(v == null ? '' : v)
+
+const SHOW_CAL_TZID = 'Asia/Shanghai';
+
+function calIcsEsc(v) {
+  return String(v == null ? '' : v)
     .replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+}
+
+function calPad2(n) {
+  return String(Math.max(0, Math.floor(Number(n) || 0))).padStart(2, '0');
+}
+
+function calShiftYmd(y, m, d, days) {
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  return { y: dt.getUTCFullYear(), m: dt.getUTCMonth() + 1, d: dt.getUTCDate() };
+}
+
+function calDateKey(y, m, d) {
+  return `${y}${calPad2(m)}${calPad2(d)}`;
+}
+
+function calLocalTimeStamp(y, m, d, minutes) {
+  const dayOffset = Math.floor(minutes / 1440);
+  const day = calShiftYmd(y, m, d, dayOffset);
+  const mins = ((minutes % 1440) + 1440) % 1440;
+  return `${calDateKey(day.y, day.m, day.d)}T${calPad2(Math.floor(mins / 60))}${calPad2(mins % 60)}00`;
+}
+
+// 解析音乐节时段：18:20-19:00 / 18:20~19:00 / 19:30 / 19:30 开场
+function parseShowSlotRange(raw) {
+  const text = String(raw == null ? '' : raw)
+    .replace(/[：]/g, ':')
+    .replace(/[–—−－﹣]/g, '-')
+    .replace(/[～]/g, '~')
+    .trim();
+  if (!text) return null;
+  const toMinutes = (h, m) => Number(h) * 60 + Number(m);
+  const valid = (h, m) => Number(h) >= 0 && Number(h) <= 23 && Number(m) >= 0 && Number(m) <= 59;
+  const range = text.match(/(\d{1,2}):(\d{2})\s*(?:-|~|至|到)\s*(?:次日\s*)?(\d{1,2}):(\d{2})/);
+  if (range && valid(range[1], range[2]) && valid(range[3], range[4])) {
+    const startMin = toMinutes(range[1], range[2]);
+    let endMin = toMinutes(range[3], range[4]);
+    if (endMin <= startMin) endMin += 1440;
+    return { startMin, endMin, hasEnd: true, raw: `${calPad2(range[1])}:${range[2]}-${calPad2(range[3])}:${range[4]}` };
+  }
+  const single = text.match(/(\d{1,2}):(\d{2})/);
+  if (single && valid(single[1], single[2])) {
+    const startMin = toMinutes(single[1], single[2]);
+    return { startMin, endMin: startMin + 120, hasEnd: false, raw: `${calPad2(single[1])}:${single[2]}` };
+  }
+  return null;
+}
+
+function showCalendarDateInfo(item) {
+  const raw = String((item && (item.show_date || item.showDate || item.date || item.ticket_time)) || '').trim();
+  const m = raw.match(/(\d{4})[-\/.年](\d{1,2})[-\/.月](\d{1,2})/);
+  if (!m) return null;
+  const afterDate = raw.slice((m.index || 0) + m[0].length);
+  const inlineTime = afterDate.match(/(\d{1,2})[:：](\d{2})/);
+  return {
+    y: Number(m[1]),
+    m: Number(m[2]),
+    d: Number(m[3]),
+    dateKey: `${m[1]}-${calPad2(m[2])}-${calPad2(m[3])}`,
+    inlineTime: inlineTime ? `${calPad2(inlineTime[1])}:${inlineTime[2]}` : '',
+    inlineTimeText: afterDate.replace(/^[\sT]+/, '').trim()
+  };
+}
+
+function buildShowCalendarModel(item) {
+  const date = showCalendarDateInfo(item);
+  if (!date) return null;
+  const timeText = item.slot || item.timeSlot || item.time_slot || item.schedule_time
+    || item.stage_time || item.performance_time || item.show_time || item.showTime || item.time || date.inlineTimeText || date.inlineTime || '';
+  const parsed = parseShowSlotRange(timeText);
+  const title = String(item.city || item.title || item.venue || 'ONERLAND 演出');
+  if (!parsed) {
+    const next = calShiftYmd(date.y, date.m, date.d, 1);
+    return {
+      allDay: true,
+      dateKey: calDateKey(date.y, date.m, date.d),
+      endDateKey: calDateKey(next.y, next.m, next.d),
+      timeLabel: '全天',
+      label: '演出（全天）',
+      summaryTitle: title
+    };
+  }
+  return {
+    allDay: false,
+    start: calLocalTimeStamp(date.y, date.m, date.d, parsed.startMin),
+    end: calLocalTimeStamp(date.y, date.m, date.d, parsed.endMin),
+    dateKey: calDateKey(date.y, date.m, date.d),
+    timeLabel: parsed.raw,
+    label: `演出 ${parsed.raw}`,
+    summaryTitle: title
+  };
+}
+
+function buildShowCalendarICS(item, model) {
+  if (!item || !model) return '';
+  const summary = `🎫 ONERLAND提醒：${model.summaryTitle} - ${model.label}`;
+  const uidSeed = String(item.cloudId || `${model.dateKey}-${item.venue || item.city || ''}`)
+    .replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80) || 'local';
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//ONERLAND//Calendar//CN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    `X-WR-TIMEZONE:${SHOW_CAL_TZID}`
+  ];
+  if (!model.allDay) {
+    lines.push(
+      'BEGIN:VTIMEZONE',
+      `TZID:${SHOW_CAL_TZID}`,
+      'BEGIN:STANDARD',
+      'DTSTART:19700101T000000',
+      'TZOFFSETFROM:+0800',
+      'TZOFFSETTO:+0800',
+      'TZNAME:CST',
+      'END:STANDARD',
+      'END:VTIMEZONE'
+    );
+  }
+  lines.push(
+    'BEGIN:VEVENT',
+    `UID:onerland-${uidSeed}-show@onerland.pages.dev`,
+    `DTSTAMP:${calIcsStamp(new Date())}`
+  );
+  if (model.allDay) {
+    lines.push(`DTSTART;VALUE=DATE:${model.dateKey}`, `DTEND;VALUE=DATE:${model.endDateKey}`);
+  } else {
+    lines.push(`DTSTART;TZID=${SHOW_CAL_TZID}:${model.start}`, `DTEND;TZID=${SHOW_CAL_TZID}:${model.end}`);
+  }
+  lines.push(
+    `SUMMARY:${calIcsEsc(summary)}`,
+    `LOCATION:${calIcsEsc(item.venue || item.city || '')}`,
+    `DESCRIPTION:${calIcsEsc(`艺人：${item.artist || ''}\n地点：${item.venue || ''}\n日期：${String(model.dateKey).replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3')}\n时段：${model.timeLabel}`)}`,
+    'TRANSP:OPAQUE',
+    'BEGIN:VALARM',
+    'TRIGGER:-PT60M',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${calIcsEsc('还有 1 小时开场，记得准备出发')}`,
+    'END:VALARM',
+    'BEGIN:VALARM',
+    'TRIGGER:-PT2H',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${calIcsEsc('还有 2 小时开场，出发啦！')}`,
+    'END:VALARM',
+    'BEGIN:VALARM',
+    'TRIGGER:-P1D',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${calIcsEsc('明天就是演出啦，记得确认行程')}`,
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  );
+  return lines.join('\r\n') + '\r\n';
+}
+
+// 保留抢票提醒能力：mode=auto 时仍优先未来开票轮次；演出日历入口固定 mode=show
+function buildShowICS(item, state, label, start, end) {
+  const escIcs = calIcsEsc;
   const summary = `🎫 ONERLAND提醒：${item.city} - ${label}`;
   const lines = [
     'BEGIN:VCALENDAR',
@@ -389,16 +548,21 @@ function buildShowICS(item, state, label, start, end) {
     `DTEND:${calIcsStamp(end)}`,
     `SUMMARY:${escIcs(summary)}`,
     `LOCATION:${escIcs(item.venue || item.city || '')}`,
-    `DESCRIPTION:${escIcs(`艺人：${item.artist || ''}\n地点：${item.venue || ''}\n场次：${item.show_date || ''} ${item.show_time || ''}`)}`,
+    `DESCRIPTION:${escIcs(`艺人：${item.artist || ''}\n地点：${item.venue || ''}\n场次：${item.show_date || item.showDate || ''} ${item.show_time || item.showTime || ''}`)}`,
     'BEGIN:VALARM',
-    'TRIGGER:-P1D',
+    'TRIGGER:-PT60M',
     'ACTION:DISPLAY',
-    `DESCRIPTION:${escIcs('明天就是 ' + label + ' 啦，记得确认行程')}`,
+    `DESCRIPTION:${escIcs('还有 1 小时开始，记得准备')}`,
     'END:VALARM',
     'BEGIN:VALARM',
     'TRIGGER:-PT2H',
     'ACTION:DISPLAY',
-    `DESCRIPTION:${escIcs('还有 2 小时开场，出发啦！')}`,
+    `DESCRIPTION:${escIcs('还有 2 小时开始，准备出发')}`,
+    'END:VALARM',
+    'BEGIN:VALARM',
+    'TRIGGER:-P1D',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${escIcs('明天就是 ' + label + ' 啦，记得确认行程')}`,
     'END:VALARM',
     'END:VEVENT',
     'END:VCALENDAR'
@@ -406,54 +570,106 @@ function buildShowICS(item, state, label, start, end) {
   return lines.join('\r\n') + '\r\n';
 }
 
-function exportShowICS(cloudId) {
-  const item = AppState.cloudTickets.find(t => String(t.cloudId) === String(cloudId));
-  if (!item) return;
-  const state = getEventStatus(item);
-  // 优先用未来最近一轮开票时间；没有则回退到演出开始时间
-  const firstRound = state.nextRound;
-  const targetTs = firstRound ? firstRound.ts : state.showTs;
-  if (isNaN(targetTs)) return alert('该场次暂无精确时间，无法生成日历');
-  const start = new Date(targetTs);
-  const end = new Date(start.getTime() + 45 * 60000);
-  const label = firstRound ? `抢票(${firstRound.round_name})` : '演出开演';
-  const ics = buildShowICS(item, state, label, start, end);
-  const fileName = `${String(item.city || 'ONERLAND')}-${label}.ics`;
-  const ua = navigator.userAgent || '';
+function findShowRecordById(cloudId) {
+  const id = String(cloudId == null ? '' : cloudId).trim();
+  if (!id) return null;
+  const state = (typeof AppState !== 'undefined' && AppState) || {};
+  const groups = [state.cloudTickets, state.cloudArchives, state.footprints];
+  for (const list of groups) {
+    if (!Array.isArray(list)) continue;
+    const hit = list.find(item => String(item && (item.cloudId == null ? '' : item.cloudId)) === id
+      || (item && item.id != null && `fp-${item.id}` === id));
+    if (hit) return hit;
+  }
+  return null;
+}
 
-  // 1) 微信 / 微博内置浏览器：无法唤起系统日历，给出手动打开提示
+// 日期行与时间胶囊共用同一个日历入口
+function handleShowCalendarClick(cloudId, fallbackItem) {
+  try {
+    return exportShowICS(cloudId, { mode: 'show', fallbackItem: fallbackItem || null });
+  } catch (e) {
+    if (typeof toastError === 'function') toastError(`日历生成失败：${e.message || '未知错误'}`);
+    return 'error';
+  }
+}
+
+function exportShowICS(cloudId, options) {
+  const opts = options || {};
+  const item = findShowRecordById(cloudId) || opts.fallbackItem || null;
+  if (!item) {
+    if (typeof toastError === 'function') toastError('未找到该场次，无法生成日历');
+    return 'missing';
+  }
+
+  let ics = '';
+  let label = '';
+  let isAllDay = false;
+  if (opts.mode === 'show') {
+    const model = buildShowCalendarModel(item);
+    if (!model) {
+      if (typeof toastError === 'function') toastError('该场次暂无可用日期，无法生成日历');
+      return 'missing-date';
+    }
+    ics = buildShowCalendarICS(item, model);
+    label = model.label;
+    isAllDay = model.allDay;
+  } else {
+    const state = getEventStatus(item);
+    const firstRound = state.nextRound;
+    if (firstRound) {
+      const start = new Date(firstRound.ts);
+      const end = new Date(start.getTime() + 45 * 60000);
+      label = `抢票(${firstRound.round_name || '开票'})`;
+      ics = buildShowICS(item, state, label, start, end);
+    } else {
+      const model = buildShowCalendarModel(item);
+      if (!model) {
+        if (typeof toastError === 'function') toastError('该场次暂无精确时间，无法生成日历');
+        return 'missing-time';
+      }
+      ics = buildShowCalendarICS(item, model);
+      label = model.label;
+      isAllDay = model.allDay;
+    }
+  }
+
+  const ua = navigator.userAgent || '';
+  // 微信 / 微博内置浏览器无法唤起系统日历，先给出明确的跳出路径
   if (/MicroMessenger|Weibo/i.test(ua)) {
-    showToast('📱 微信内无法直接唤起系统日历，请点击右上角 ⋯ 选择「在 Safari / 默认浏览器中打开」后再点日期即可一键联动日历');
+    showToast('📱 当前为微信/微博内置浏览器，无法直接唤起系统日历。请点击右上角「⋯」选择「在默认浏览器 / Safari 打开」，再点日期或时间胶囊即可一键加入系统日历');
     return 'inline-browser';
   }
 
-  // 2) 手机端：不用 download / blob（会存进文件管理器），data URI 直连唤起系统日历
-  if (/iPhone|iPad|iPod|Android/i.test(ua)) {
-    const dataUri = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
-    try {
-      const a = document.createElement('a');
-      a.href = dataUri;
-      a.rel = 'noopener';
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    } catch (e) {
-      window.location.href = dataUri;
-    }
-    showToast('📅 正在唤起系统日历，请确认添加并允许提醒');
+  const safeBase = String(`${item.city || item.title || 'ONERLAND'}-${label}`)
+    .replace(/[\\/:*?"<>|\r\n]/g, '-').replace(/\s+/g, ' ').trim().slice(0, 80) || 'ONERLAND-演出';
+  const fileName = `${safeBase}.ics`;
+
+  // 必须在点击事件的同步调用栈内生成 Blob 与 URL，避免 Safari 丢失用户手势
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const isIOS = /iPhone|iPad|iPod/i.test(ua)
+    || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+
+  if (isIOS) {
+    // iOS Safari 直接打开 text/calendar Blob，会弹出原生「添加到日历」确认
+    window.location.href = url;
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    showToast(isAllDay ? '📅 正在打开系统日历：全天日程，请确认添加' : '📅 正在打开系统日历，请确认添加并允许提醒');
     return 'system-calendar';
   }
 
-  // 3) 电脑端：沿用 blob + download 下载 .ics
-  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
+  // 桌面端 / Android Chrome：标准 download 触发下载或交给系统日历接管
   const a = document.createElement('a');
   a.href = url;
   a.download = fileName;
+  a.rel = 'noopener';
+  a.style.display = 'none';
+  document.body.appendChild(a);
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
-  showToast('已生成日历文件 .ics，双击即可导入系统日历');
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  showToast(isAllDay ? '已生成全天日程 .ics，打开即可导入系统日历' : '已生成日历文件 .ics，打开即可导入系统日历');
   return 'downloaded';
 }
 
@@ -473,11 +689,17 @@ function toggleSlotPopover(id) {
   else el.classList.add('hidden');
 }
 
-function buildSlotHoverBadgeHTML(slotText, scheduleImgs, popoverId, titleLabel) {
+function buildSlotHoverBadgeHTML(slotText, scheduleImgs, popoverId, titleLabel, calendarOpts) {
   const imgs = Array.isArray(scheduleImgs) ? scheduleImgs : [];
   if (!slotText && !imgs.length) return '';
   const hasImgs = imgs.length > 0;
   const safeTitle = String(titleLabel || '').replace(/['"<>]/g, '');
+  const calendar = calendarOpts || {};
+  const calId = String(calendar.cloudId == null ? '' : calendar.cloudId).replace(/['"<>]/g, '');
+  const canCalendar = Boolean(calId);
+  const badgeClick = canCalendar
+    ? `event.stopPropagation(); handleShowCalendarClick('${calId}')`
+    : (hasImgs ? `event.stopPropagation(); toggleSlotPopover('${popoverId}')` : '');
 
   const popoverHtml = hasImgs ? `
     <div id="${popoverId}"
@@ -503,10 +725,11 @@ function buildSlotHoverBadgeHTML(slotText, scheduleImgs, popoverId, titleLabel) 
   return `
     <div class="relative inline-block"
       ${hasImgs ? `onmouseenter="openSlotPopover('${popoverId}')" onmouseleave="scheduleCloseSlotPopover('${popoverId}')"` : ''}>
-      <span ${hasImgs ? `onclick="event.stopPropagation(); toggleSlotPopover('${popoverId}')"` : ''}
-        class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-slate-100 border border-slate-300 text-slate-800 font-medium ${hasImgs ? 'cursor-pointer hover:bg-slate-200' : ''}">
-        <span>🗓️ ${slotText || '音乐节时间表'}</span>
-        ${hasImgs ? `<span class="text-[10px] px-1 rounded bg-white border border-slate-300">×${imgs.length}</span>` : ''}
+      <span ${badgeClick ? `onclick="${badgeClick}"` : ''}
+        ${canCalendar ? `title="点击添加到日历提醒${hasImgs ? '；点 ×N 查看时间表' : ''}"` : (hasImgs ? 'title="点击查看音乐节时间表"' : '')}
+        class="slot-hover-badge inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-slate-100 border border-slate-300 text-slate-800 font-medium ${badgeClick ? 'cursor-pointer hover:bg-slate-200' : ''} ${canCalendar ? 'is-calendar-link' : ''}">
+        <span>${slotText ? '⏰' : '🗓️'} ${slotText || '音乐节时间表'}</span>
+        ${hasImgs ? `<button type="button" onclick="event.stopPropagation(); toggleSlotPopover('${popoverId}')" class="text-[10px] px-1 rounded bg-white border border-slate-300" title="查看音乐节时间表">×${imgs.length}</button>` : ''}
       </span>
       ${popoverHtml}
     </div>
@@ -2274,13 +2497,13 @@ function renderTourCards() {
             ${canEditContent() ? `<div class="show-card-quick-row">
               <button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="ticket" data-edit-title="${safeCity.replace(/"/g, '&quot;')}" data-edit-date="${String(item.show_date || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini edit-soft-btn">✏️ 编辑</button>
             </div>` : ''}
-            <p class="show-card-meta text-xs text-slate-500"><span>📍 ${item.venue}</span><span class="meta-sep"> ｜ </span><button type="button" class="meta-date-ics" title="点击添加到日历提醒" onclick="event.stopPropagation(); exportShowICS('${String(item.cloudId == null ? '' : item.cloudId).replace(/["'<>]/g, '')}')">🗓️ ${item.show_date}</button></p>
+            <p class="show-card-meta text-xs text-slate-500"><span>📍 ${item.venue}</span><span class="meta-sep"> ｜ </span><button type="button" class="meta-date-ics" title="点击添加到日历提醒" onclick="event.stopPropagation(); handleShowCalendarClick('${String(item.cloudId == null ? '' : item.cloudId).replace(/["'<>]/g, '')}')">📅 ${item.show_date}</button></p>
             ${item.prices ? `<p class="text-[11px] text-slate-600">💰 ${item.prices}</p>` : ''}
             ${safeBooth ? `<p class="text-[11px] text-slate-500 truncate" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</p>` : ''}
             <div class="flex items-center gap-1.5 flex-wrap">
               ${(seatUrl || item.hasSeatMap) ? `<button type="button" onclick="openSeatMapForShow('${item.cloudId || ''}', this.dataset.seatUrl || '', '座位图')" data-seat-url="${seatUrl}" class="tour-action-btn tour-action-btn--mini">💺 查看座位图</button>` : ''}
               <button type="button" onclick="requestExternalToolJump('${shiyeLiveUrl}', '视野 live（非官方座位视野工具站）', '${cleanVenue || safeCity}')" class="tour-action-btn tour-action-btn--mini">🔭 视野 live ↗</button>
-              ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeCity)}
+              ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeCity, { cloudId: item.cloudId })}
             </div>
           </div>
         </div>
@@ -2660,10 +2883,10 @@ function renderArchiveTimeline() {
               </div>
               <span class="archive-strip-title font-bold text-sm text-slate-900 leading-snug">${safeTitle}</span>
               ${(item.slot || (item.scheduleImgs && item.scheduleImgs.length) || safeBooth) ? `<div class="archive-badge-row">
-                ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeTitle)}
+                ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeTitle, { cloudId: item.cloudId })}
                 ${safeBooth ? `<span class="text-[10px] px-2 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-700 font-medium" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</span>` : ''}
               </div>` : ''}
-              <p class="archive-date-row text-xs text-slate-500">🗓️ ${item.showDate}${item.showTime ? ` ${item.showTime}` : ''} ｜ 📍 ${item.venue}</p>
+              <p class="archive-date-row text-xs text-slate-500"><button type="button" class="archive-date-ics meta-date-ics" title="点击添加到日历提醒" onclick="event.stopPropagation(); handleShowCalendarClick('${String(item.cloudId == null ? '' : item.cloudId).replace(/['"<>]/g, '')}')">📅 ${item.showDate}${item.showTime ? ` ${item.showTime}` : ''}</button> ｜ 📍 ${item.venue}</p>
             </div>
           </div>
           <div class="flex items-center gap-1.5 flex-wrap justify-start sm:justify-end w-full sm:w-auto sm:shrink-0">
@@ -2689,3 +2912,5 @@ function renderArchiveTimeline() {
 window.openShowFeatureModal = openShowFeatureModal;
 window.closeShowFeatureModal = closeShowFeatureModal;
 window.openCardFeatureModal = openCardFeatureModal;
+window.exportShowICS = exportShowICS;
+window.handleShowCalendarClick = handleShowCalendarClick;
