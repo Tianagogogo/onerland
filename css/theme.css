@@ -4124,3 +4124,224 @@ input.seat-select { background-image: none; }
     flex-shrink: 0;
   }
 }
+
+/* ================= 🍜 同款打卡 v2：成员检索 / 投稿表单 / 静默审核 ================= */
+.checkin-section-head {
+  font-size: 11px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 6px;
+}
+.checkin-section-head span { font-weight: 500; color: #94a3b8; font-size: 10px; }
+
+.checkin-member-bar {
+  padding: 8px 9px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+  margin-bottom: 8px;
+}
+.checkin-member-title { font-size: 11px; font-weight: 700; color: #334155; margin-bottom: 6px; }
+.checkin-member-sub { font-weight: 500; color: #94a3b8; font-size: 10px; }
+.checkin-chip-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.checkin-chip {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11px;
+  line-height: 1.4;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s ease;
+}
+.checkin-chip.is-active {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #f8fafc;
+  font-weight: 600;
+}
+.checkin-chip.is-hint { box-shadow: 0 0 0 3px rgba(15, 23, 42, .12); }
+
+.checkin-keyword {
+  margin-top: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 7px;
+  padding: 4px 7px;
+  word-break: break-all;
+}
+.checkin-member-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+.checkin-action-primary,
+.checkin-action-ghost {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.checkin-action-primary { background: #334155; color: #f8fafc; border: 1px solid #334155; }
+.checkin-action-ghost { background: #ffffff; color: #334155; border: 1px solid #cbd5e1; }
+
+.checkin-list-head {
+  font-size: 10.5px;
+  color: #64748b;
+  font-weight: 600;
+  margin: 4px 0 5px;
+}
+.checkin-list { display: flex; flex-direction: column; gap: 5px; }
+.checkin-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+.checkin-row.is-pending { border-color: #fcd34d; background: #fffbeb; }
+.checkin-main { min-width: 0; flex: 1 1 auto; }
+.checkin-name { font-size: 11.5px; font-weight: 700; color: #0f172a; word-break: break-word; }
+.checkin-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+.checkin-tag {
+  font-size: 9.5px;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+.checkin-tag.is-member { background: #fff1f2; border-color: #fecdd3; color: #9f1239; font-weight: 600; }
+.checkin-note { font-size: 10.5px; color: #64748b; margin-top: 3px; word-break: break-word; }
+.checkin-side { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; flex-shrink: 0; }
+.checkin-mini-btn {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.checkin-mini-btn.is-ok { border-color: #10b981; color: #047857; background: #ecfdf5; }
+.checkin-mini-btn.is-danger { border-color: #fca5a5; color: #b91c1c; background: #fef2f2; }
+
+.checkin-empty {
+  font-size: 10.5px;
+  color: #94a3b8;
+  padding: 6px 4px;
+}
+
+.checkin-toggle-form {
+  width: 100%;
+  margin-top: 8px;
+  border: 1px dashed #94a3b8;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 9px;
+  padding: 7px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.checkin-form {
+  margin-top: 8px;
+  padding: 9px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.checkin-form-row { display: flex; gap: 6px; }
+.checkin-form-row .checkin-input { flex: 1 1 0; min-width: 0; }
+.checkin-input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 11px;
+  color: #0f172a;
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+.checkin-input:focus { outline: none; border-color: #64748b; background: #ffffff; }
+.checkin-form-label { font-size: 10px; color: #64748b; font-weight: 600; margin-bottom: 4px; }
+.checkin-form-block { min-width: 0; }
+.checkin-proof-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.checkin-upload-btn {
+  border: 1px solid #cbd5e1;
+  background: #f1f5f9;
+  color: #334155;
+  border-radius: 8px;
+  padding: 5px 9px;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.checkin-proof-tip { font-size: 10px; color: #047857; }
+.checkin-link-btn {
+  border: none;
+  background: none;
+  color: #b91c1c;
+  font-size: 10px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.checkin-proof-thumb {
+  width: 100%;
+  max-width: 150px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  cursor: zoom-in;
+  display: block;
+  margin-top: 4px;
+}
+.checkin-form-actions { display: flex; justify-content: flex-end; }
+.checkin-submit {
+  border: 1px solid #0f172a;
+  background: linear-gradient(135deg, #334155 0%, #0f172a 100%);
+  color: #f8fafc;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.checkin-submit:disabled { opacity: .6; cursor: default; }
+
+.checkin-admin { margin-top: 10px; border-top: 1px dashed #e2e8f0; padding-top: 8px; }
+.checkin-admin-head {
+  width: 100%;
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+  border-radius: 9px;
+  padding: 6px 9px;
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+}
+.checkin-admin-head span { float: right; opacity: .7; }
+@media (max-width: 420px) {
+  .checkin-form-row { flex-direction: column; }
+  .checkin-member-actions { flex-direction: column; }
+  .checkin-action-primary, .checkin-action-ghost { width: 100%; }
+}

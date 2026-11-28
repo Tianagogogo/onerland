@@ -130,74 +130,508 @@ function hotelSearchLinks(city, keyword) {
   ];
 }
 
-// ===== 🍜 演出地美食 & 同款打卡 =====
-const FOOD_SPOTS_KEY = 'onerland_food_spots_v1';
+// ===== 🍜 演出地美食 & 同款打卡（成员分流检索 + 访客投稿 + 静默审核） =====
+const CHECKIN_MEMBERS = ['ONER全员', '岳岳', '木子洋', '灵超'];
+const CHECKIN_CATEGORIES = ['🍜 餐厅美食', '☕ 咖啡甜品', '📸 拍照地标'];
+const CHECKIN_PAGE_SIZE_LIMIT = 60;
 
-function readFoodSpots() {
+const checkinState = {
+  city: '',
+  spots: [],
+  pending: [],
+  loading: false,
+  loaded: false,
+  failed: false,
+  formOpen: false,
+  category: CHECKIN_CATEGORIES[0],
+  members: ['ONER全员'],
+  proofData: '',
+  proofKb: 0,
+  pendingOpen: false,
+  memberFilter: 'ONER全员'
+};
+
+function checkinIsAdmin() {
   try {
-    const raw = localStorage.getItem(FOOD_SPOTS_KEY);
-    const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr : [];
-  } catch (e) { return []; }
+    return Boolean(typeof canEditContent === 'function' ? canEditContent() : (typeof AppState !== 'undefined' && (AppState.isAdminPasswordVerified || AppState.isAdmin)));
+  } catch (e) { return false; }
 }
 
-function saveFoodSpots(list) {
-  try { localStorage.setItem(FOOD_SPOTS_KEY, JSON.stringify(list.slice(0, 200))); } catch (e) {}
+async function checkinRpc(fnName, params) {
+  if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) throw new Error('offline');
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
+    method: 'POST',
+    headers: { ...SB_HEADERS, 'Content-Type': 'application/json' },
+    body: JSON.stringify(params || {})
+  });
+  if (!res.ok) throw new Error('rpc-failed-' + res.status);
+  return res.json().catch(() => null);
 }
 
-function getFoodSpotsForCity(city) {
-  const key = String(city || '').trim();
-  return readFoodSpots().filter(s => String(s.city || '').trim() === key);
+// 📷 浏览器端大图压缩：最长边 ≤960px，Base64 ≤220000 字符，体积目标 <150KB
+function compressCheckinImage(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) return reject(new Error('未选择图片'));
+    if (!/^image\//.test(String(file.type || ''))) return reject(new Error('请选择图片文件'));
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('图片读取失败'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('图片解析失败'));
+      img.onload = () => {
+        const maxSide = 960;
+        let w = img.naturalWidth || img.width;
+        let h = img.naturalHeight || img.height;
+        if (!w || !h) return reject(new Error('图片尺寸异常'));
+        const scale = Math.min(1, maxSide / Math.max(w, h));
+        const cw = Math.max(1, Math.round(w * scale));
+        const ch = Math.max(1, Math.round(h * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = cw;
+        canvas.height = ch;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('浏览器不支持图片压缩'));
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, cw, ch);
+        ctx.drawImage(img, 0, 0, cw, ch);
+        const qualities = [0.78, 0.62, 0.50, 0.42, 0.35];
+        let dataUrl = '';
+        for (let i = 0; i < qualities.length; i++) {
+          dataUrl = canvas.toDataURL('image/jpeg', qualities[i]);
+          if (dataUrl.length <= 220000) break;
+        }
+        if (dataUrl.length > 280000) {
+          // 极端长图再降一档分辨率兜底
+          const canvas2 = document.createElement('canvas');
+          const w2 = Math.max(1, Math.round(cw * 0.75));
+          const h2 = Math.max(1, Math.round(ch * 0.75));
+          canvas2.width = w2;
+          canvas2.height = h2;
+          const ctx2 = canvas2.getContext('2d');
+          ctx2.fillStyle = '#ffffff';
+          ctx2.fillRect(0, 0, w2, h2);
+          ctx2.drawImage(canvas, 0, 0, w2, h2);
+          dataUrl = canvas2.toDataURL('image/jpeg', 0.42);
+        }
+        const base64 = dataUrl.split(',')[1] || '';
+        const bytes = Math.round(base64.length * 0.75);
+        resolve({ dataUrl, bytes, kb: Math.max(1, Math.round(bytes / 1024)), length: dataUrl.length });
+      };
+      img.src = String(reader.result || '');
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
-function addFoodSpot() {
-  const cityEl = document.getElementById('food-spot-city');
-  const nameEl = document.getElementById('food-spot-name');
-  const noteEl = document.getElementById('food-spot-note');
-  const city = (cityEl ? cityEl.value : '').trim();
-  const name = (nameEl ? nameEl.value : '').trim();
-  const note = (noteEl ? noteEl.value : '').trim();
-  if (!city || !name) return toastError('请填写城市和打卡地点名称');
-  const list = readFoodSpots();
-  list.unshift({ id: Date.now(), city, name, note, createdAt: new Date().toLocaleDateString() });
-  saveFoodSpots(list);
-  if (typeof showToast === 'function') showToast('✅ 已添加同款打卡点');
-  renderTravelHelper();
+function checkinMembersText(members) {
+  const list = Array.isArray(members) ? members.filter(Boolean) : [];
+  if (!list.length) return 'ONER全员';
+  if (list.includes('ONER全员')) return 'ONER全员';
+  return list.join(' · ');
 }
 
-function removeFoodSpot(id) {
-  saveFoodSpots(readFoodSpots().filter(s => String(s.id) !== String(id)));
-  renderTravelHelper();
+function checkinCategoryIcon(category) {
+  const s = String(category || '');
+  if (s.indexOf('咖啡') >= 0) return '☕';
+  if (s.indexOf('拍照') >= 0 || s.indexOf('地标') >= 0) return '📸';
+  return '🍜';
 }
 
-function buildFoodExtraHtml(city, venue) {
-  const c = String(city || '').replace(/[省市]$/g, '');
-  const spots = getFoodSpotsForCity(c);
-  const isAdmin = typeof AppState !== 'undefined' && AppState.isAdminPasswordVerified;
+function checkinProofIsImage(proof) {
+  return /^data:image\//i.test(String(proof || ''));
+}
+
+function checkinProofIsLink(proof) {
+  return /^https?:\/\//i.test(String(proof || ''));
+}
+
+// 成员分流检索：自动拼精准搜索词
+function checkinMemberKeyword(city, member) {
+  const c = String(city || '').trim();
+  const m = String(member || 'ONER全员').trim();
+  return `${m} ${c} 同款 探店`.replace(/\s+/g, ' ');
+}
+
+function setCheckinMemberFilter(member) {
+  checkinState.memberFilter = CHECKIN_MEMBERS.includes(member) ? member : 'ONER全员';
+  renderCheckinSection();
+}
+
+function copyCheckinMemberKeyword() {
+  const text = checkinMemberKeyword(checkinState.city, checkinState.memberFilter);
+  const ok = () => showToast(`已复制：${text}`);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(ok).catch(() => fallbackCopy());
+  } else fallbackCopy();
+  function fallbackCopy() {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const done = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (done) ok(); else toastError('复制失败，请手动选择文字复制');
+    } catch (e) { toastError('复制失败，请手动选择文字复制'); }
+  }
+}
+
+function toggleCheckinForm() {
+  checkinState.formOpen = !checkinState.formOpen;
+  if (!checkinState.formOpen) {
+    checkinState.members = ['ONER全员'];
+    checkinState.category = CHECKIN_CATEGORIES[0];
+    checkinState.proofData = '';
+    checkinState.proofKb = 0;
+  }
+  renderCheckinSection();
+}
+
+function setCheckinCategory(category) {
+  checkinState.category = CHECKIN_CATEGORIES.includes(category) ? category : CHECKIN_CATEGORIES[0];
+  renderCheckinSection();
+}
+
+function toggleCheckinMember(member) {
+  if (!CHECKIN_MEMBERS.includes(member)) return;
+  if (member === 'ONER全员') {
+    checkinState.members = ['ONER全员'];
+  } else {
+    const rest = checkinState.members.filter(m => m !== 'ONER全员');
+    const next = rest.includes(member) ? rest.filter(m => m !== member) : rest.concat(member);
+    checkinState.members = next.length ? next : ['ONER全员'];
+  }
+  renderCheckinSection();
+}
+
+async function handleCheckinImage(input) {
+  const file = input && input.files && input.files[0];
+  if (!file) return;
+  try {
+    showToast('🖼️ 正在压缩图片…');
+    const out = await compressCheckinImage(file);
+    checkinState.proofData = out.dataUrl;
+    checkinState.proofKb = out.kb;
+    renderCheckinSection();
+    showToast(`✅ 已自动压缩至 ${out.kb} KB`);
+  } catch (e) {
+    toastError(`图片处理失败：${e.message}`);
+  } finally {
+    if (input) input.value = '';
+  }
+}
+
+function clearCheckinProof() {
+  checkinState.proofData = '';
+  checkinState.proofKb = 0;
+  renderCheckinSection();
+}
+
+async function loadCheckinSpots(city, force) {
+  const c = String(city || '').trim();
+  if (!c) return;
+  if (checkinState.loading) return;
+  if (checkinState.loaded && !force && checkinState.city === c) return;
+  checkinState.city = c;
+  checkinState.loading = true;
+  checkinState.failed = false;
+  renderCheckinSection();
+  try {
+    const data = await checkinRpc('get_approved_checkin_spots', { p_city: c });
+    const list = Array.isArray(data) ? data : [];
+    checkinState.spots = list.slice(0, CHECKIN_PAGE_SIZE_LIMIT);
+    if (checkinIsAdmin()) await loadCheckinPending();
+  } catch (e) {
+    checkinState.failed = true;
+    checkinState.spots = [];
+  }
+  checkinState.loading = false;
+  checkinState.loaded = true;
+  renderCheckinSection();
+}
+
+async function loadCheckinPending() {
+  if (!checkinIsAdmin()) { checkinState.pending = []; return; }
+  const key = String(typeof getSecurityAdminKey === 'function' ? getSecurityAdminKey() : '').trim();
+  if (!key) { checkinState.pending = []; return; }
+  try {
+    const data = await checkinRpc('admin_get_pending_checkin_spots', { p_admin_key: key });
+    checkinState.pending = Array.isArray(data) ? data : [];
+  } catch (e) { checkinState.pending = []; }
+}
+
+async function submitCheckinSpot() {
+  const isAdmin = checkinIsAdmin();
+  const cityEl = document.getElementById('ci-city');
+  const nameEl = document.getElementById('ci-name');
+  const noteEl = document.getElementById('ci-note');
+  const linkEl = document.getElementById('ci-link');
+  const city = String((cityEl && cityEl.value) || checkinState.city || '').trim();
+  const name = String((nameEl && nameEl.value) || '').trim();
+  const note = String((noteEl && noteEl.value) || '').trim();
+  const link = String((linkEl && linkEl.value) || '').trim();
+  if (!city) return toastError('请填写所属城市');
+  if (!name) return toastError('请填写餐厅 / 地标名称');
+  if (name.length > 30) return toastError('名称请控制在 30 字以内');
+  if (note.length > 60) return toastError('备注请控制在 60 字以内');
+  let proof = checkinState.proofData;
+  if (!proof && isAdmin && link) {
+    if (!checkinProofIsLink(link)) return toastError('出处链接需以 http(s):// 开头');
+    proof = link;
+  }
+  if (proof && !checkinProofIsImage(proof) && !checkinProofIsLink(proof)) return toastError('出处格式不正确');
+  if (proof.length > 280000) return toastError('图片过大，请重新压缩后再提交');
+  const deviceId = String(typeof getDeviceId === 'function' ? getDeviceId() : 'local-device');
+  const btn = document.getElementById('ci-submit-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 提交中…'; }
+  try {
+    if (isAdmin) {
+      const adminKey = String(typeof getSecurityAdminKey === 'function' ? getSecurityAdminKey() : '').trim();
+      if (!adminKey) throw new Error('管理员口令已失效，请重新解锁');
+      await checkinRpc('admin_create_checkin_spot', {
+        p_city: city,
+        p_members: checkinState.members,
+        p_category: checkinState.category,
+        p_spot_name: name,
+        p_note: note,
+        p_proof_data: proof,
+        p_device_id: deviceId,
+        p_admin_key: adminKey
+      });
+      showToast('✅ 已免审直发，立即公开展示');
+    } else {
+      await checkinRpc('submit_checkin_spot', {
+        p_city: city,
+        p_members: checkinState.members,
+        p_category: checkinState.category,
+        p_spot_name: name,
+        p_note: note,
+        p_proof_data: proof,
+        p_device_id: deviceId
+      });
+      showToast('🎉 投稿成功！站长审核通过后将在列表公开展示');
+    }
+    checkinState.formOpen = false;
+    checkinState.proofData = '';
+    checkinState.proofKb = 0;
+    checkinState.members = ['ONER全员'];
+    checkinState.category = CHECKIN_CATEGORIES[0];
+    await loadCheckinSpots(city, true);
+  } catch (e) {
+    const msg = String(e && e.message || '');
+    toastError(msg.indexOf('rpc-failed') >= 0 ? '提交失败：后台接口未就绪或已达投稿上限' : `提交失败：${msg}`);
+    if (btn) { btn.disabled = false; btn.textContent = isAdmin ? '➕ 免审发布' : '📮 提交审核'; }
+  }
+}
+
+function openCheckinProof(spotId) {
+  const spot = checkinState.spots.concat(checkinState.pending).find(sp => String(sp.id) === String(spotId));
+  if (!spot) return;
+  const proof = String(spot.proof_data || '');
+  if (checkinProofIsImage(proof)) {
+    if (typeof openPosterLightbox === 'function') openPosterLightbox(proof, '👀 同款出处');
+    else window.open(proof, '_blank', 'noopener');
+  } else if (checkinProofIsLink(proof)) {
+    window.open(proof, '_blank', 'noopener,noreferrer');
+  } else {
+    toastError('该打卡点暂无出处');
+  }
+}
+
+function toggleCheckinPending() {
+  checkinState.pendingOpen = !checkinState.pendingOpen;
+  renderCheckinSection();
+}
+
+async function adminReviewCheckin(spotId) {
+  const adminKey = String(typeof getSecurityAdminKey === 'function' ? getSecurityAdminKey() : '').trim();
+  if (!adminKey) return toastError('管理员口令已失效，请重新解锁');
+  try {
+    await checkinRpc('admin_review_checkin_spot', { p_id: String(spotId), p_action: 'approve', p_admin_key: adminKey });
+    showToast('✅ 已通过并公开');
+    await loadCheckinSpots(checkinState.city, true);
+  } catch (e) {
+    toastError('审核失败，请稍后重试');
+  }
+}
+
+async function adminRejectCheckin(spotId) {
+  const adminKey = String(typeof getSecurityAdminKey === 'function' ? getSecurityAdminKey() : '').trim();
+  if (!adminKey) return toastError('管理员口令已失效，请重新解锁');
+  try {
+    await checkinRpc('admin_review_checkin_spot', { p_id: String(spotId), p_action: 'reject', p_admin_key: adminKey });
+    checkinState.pending = checkinState.pending.filter(sp => String(sp.id) !== String(spotId));
+    renderCheckinSection();
+    showToast('🗑️ 已驳回并彻底删除');
+  } catch (e) {
+    toastError('驳回失败，请稍后重试');
+  }
+}
+
+async function deleteApprovedCheckin(spotId) {
+  const adminKey = String(typeof getSecurityAdminKey === 'function' ? getSecurityAdminKey() : '').trim();
+  if (!adminKey) return toastError('管理员口令已失效，请重新解锁');
+  try {
+    await checkinRpc('admin_review_checkin_spot', { p_id: String(spotId), p_action: 'delete', p_admin_key: adminKey });
+    checkinState.spots = checkinState.spots.filter(sp => String(sp.id) !== String(spotId));
+    renderCheckinSection();
+    showToast('🗑️ 已删除该打卡点');
+  } catch (e) {
+    toastError('删除失败，请稍后重试');
+  }
+}
+
+function checkinRowsHtml(list, adminSide) {
+  if (!list.length) return '';
+  return list.map(sp => {
+    const proof = String(sp.proof_data || '');
+    const hasProof = checkinProofIsImage(proof) || checkinProofIsLink(proof);
+    const members = checkinMembersText(sp.members);
+    return `
+      <div class="checkin-row">
+        <div class="checkin-main">
+          <div class="checkin-name">${checkinCategoryIcon(sp.category)} ${travelEsc(sp.spot_name || '未命名打卡点')}</div>
+          <div class="checkin-tags">
+            <span class="checkin-tag is-member">${travelEsc(members)}</span>
+            <span class="checkin-tag">${travelEsc(sp.category || '🍜 餐厅美食')}</span>
+          </div>
+          ${sp.note ? `<div class="checkin-note">${travelEsc(sp.note)}</div>` : ''}
+        </div>
+        <div class="checkin-side">
+          ${hasProof ? `<button type="button" class="checkin-mini-btn" onclick="openCheckinProof('${travelEsc(sp.id)}')">👀 查看出处</button>` : ''}
+          ${adminSide ? `<button type="button" class="checkin-mini-btn is-danger" onclick="${adminSide === 'pending' ? 'adminRejectCheckin' : 'deleteApprovedCheckin'}('${travelEsc(sp.id)}')">🗑️ ${adminSide === 'pending' ? '驳回删除' : '删除'}</button>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function buildCheckinFormHtml(isAdmin, city) {
+  if (!checkinState.formOpen) return '';
+  const proof = checkinState.proofData;
+  const cats = CHECKIN_CATEGORIES.map(cat =>
+    `<button type="button" class="checkin-chip ${checkinState.category === cat ? 'is-active' : ''}" onclick="setCheckinCategory('${travelEsc(cat)}')">${travelEsc(cat)}</button>`
+  ).join('');
+  const mems = CHECKIN_MEMBERS.map(m =>
+    `<button type="button" class="checkin-chip ${checkinState.members.includes(m) ? 'is-active' : ''}" onclick="toggleCheckinMember('${travelEsc(m)}')">${travelEsc(m)}</button>`
+  ).join('');
+  return `
+    <div class="checkin-form">
+      <div class="checkin-form-row">
+        <input id="ci-city" class="checkin-input" type="text" maxlength="12" value="${travelEsc(city)}" placeholder="所属城市" />
+        <input id="ci-name" class="checkin-input" type="text" maxlength="30" placeholder="餐厅 / 地标名称（必填，30 字内）" />
+      </div>
+      <div class="checkin-form-block">
+        <div class="checkin-form-label">关联成员（可多选）</div>
+        <div class="checkin-chip-row">${mems}</div>
+      </div>
+      <div class="checkin-form-block">
+        <div class="checkin-form-label">分类</div>
+        <div class="checkin-chip-row">${cats}</div>
+      </div>
+      <input id="ci-note" class="checkin-input" type="text" maxlength="60" placeholder="备注说明（选填，60 字内，如：必点菜 / 拍照机位）" />
+      <div class="checkin-proof-box">
+        <label class="checkin-upload-btn">
+          📷 上传同款截图（自动压缩）
+          <input type="file" accept="image/*" class="hidden" onchange="handleCheckinImage(this)" />
+        </label>
+        ${checkinState.proofKb ? `<span class="checkin-proof-tip">✅ 已自动压缩至 ${checkinState.proofKb} KB <button type="button" class="checkin-link-btn" onclick="clearCheckinProof()">移除</button></span>` : ''}
+        ${proof && checkinProofIsImage(proof) ? `<img src="${proof}" alt="同款截图预览" class="checkin-proof-thumb" onclick="openCheckinProofPreview()" />` : ''}
+      </div>
+      ${isAdmin ? `<input id="ci-link" class="checkin-input" type="url" maxlength="300" placeholder="或填写外部视频出处链接（选填，https:// 开头）" />` : ''}
+      <div class="checkin-form-actions">
+        <button type="button" id="ci-submit-btn" class="checkin-submit" onclick="submitCheckinSpot()">${isAdmin ? '➕ 免审发布' : '📮 提交审核'}</button>
+      </div>
+    </div>`;
+}
+
+function openCheckinProofPreview() {
+  if (checkinState.proofData && typeof openPosterLightbox === 'function') {
+    openPosterLightbox(checkinState.proofData, '👀 同款截图预览');
+  }
+}
+
+function renderCheckinSection() {
+  const box = document.getElementById('checkin-spots-box');
+  if (!box) return;
+  const isAdmin = checkinIsAdmin();
+  const city = String(checkinState.city || box.dataset.city || '').trim();
+  const spots = checkinState.spots;
+  const pending = isAdmin ? checkinState.pending : [];
+  const keyword = checkinMemberKeyword(city, checkinState.memberFilter);
+  const memberChips = CHECKIN_MEMBERS.map(m =>
+    `<button type="button" class="checkin-chip ${checkinState.memberFilter === m ? 'is-active' : ''}" onclick="setCheckinMemberFilter('${travelEsc(m)}')">${travelEsc(m)}</button>`
+  ).join('');
+
+  box.innerHTML = `
+    <div class="checkin-member-bar">
+      <div class="checkin-member-title">🔎 成员同款检索 <span class="checkin-member-sub">· 自动拼精准关键词</span></div>
+      <div class="checkin-chip-row">${memberChips}</div>
+      <div class="checkin-keyword">${travelEsc(keyword)}</div>
+      <div class="checkin-member-actions">
+        <a class="checkin-action-primary" href="https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(keyword)}" target="_blank" rel="noopener noreferrer">↗️ 跳转小红书搜索</a>
+        <button type="button" class="checkin-action-ghost" onclick="copyCheckinMemberKeyword()">📋 复制关键词</button>
+      </div>
+    </div>
+
+    <div class="checkin-list-head">
+      <span>📍 ${travelEsc(city)} · 已通过审核的同款打卡（${spots.length}）</span>
+    </div>
+    ${checkinState.loading
+      ? `<div class="checkin-empty">⏳ 正在加载同款打卡点…</div>`
+      : spots.length
+        ? `<div class="checkin-list">${checkinRowsHtml(spots, isAdmin ? 'approved' : '')}</div>`
+        : `<div class="checkin-empty">${checkinState.failed ? '暂时无法加载打卡点，稍后再看看～' : '还没有已通过审核的同款打卡点，欢迎下方投稿～'}</div>`}
+
+    <button type="button" class="checkin-toggle-form" onclick="toggleCheckinForm()">
+      ${checkinState.formOpen ? '✕ 收起表单' : (isAdmin ? '➕ 录入同款打卡点（免审直发）' : '➕ 推荐同款打卡点（需审核）')}
+    </button>
+    ${buildCheckinFormHtml(isAdmin, city)}
+
+    ${isAdmin ? `
+      <div class="checkin-admin">
+        <button type="button" class="checkin-admin-head" onclick="toggleCheckinPending()">
+          ⏳ 待审核同款投稿（${pending.length} 条） <span>${checkinState.pendingOpen ? '▴' : '▾'}</span>
+        </button>
+        ${checkinState.pendingOpen ? (pending.length
+          ? `<div class="checkin-list">${pending.map(sp => `
+              <div class="checkin-row is-pending">
+                <div class="checkin-main">
+                  <div class="checkin-name">${checkinCategoryIcon(sp.category)} ${travelEsc(sp.spot_name || '未命名')}</div>
+                  <div class="checkin-tags">
+                    <span class="checkin-tag is-member">${travelEsc(checkinMembersText(sp.members))}</span>
+                    <span class="checkin-tag">${travelEsc(sp.city || '')}</span>
+                    <span class="checkin-tag">${travelEsc(sp.category || '')}</span>
+                  </div>
+                  ${sp.note ? `<div class="checkin-note">${travelEsc(sp.note)}</div>` : ''}
+                  ${checkinProofIsImage(String(sp.proof_data || '')) ? `<img src="${sp.proof_data}" class="checkin-proof-thumb" alt="待审核截图" onclick="openCheckinProof('${travelEsc(sp.id)}')" />` : ''}
+                </div>
+                <div class="checkin-side">
+                  ${sp.proof_data ? `<button type="button" class="checkin-mini-btn" onclick="openCheckinProof('${travelEsc(sp.id)}')">👀 查看</button>` : ''}
+                  <button type="button" class="checkin-mini-btn is-ok" onclick="adminReviewCheckin('${travelEsc(sp.id)}')">✅ 通过并公开</button>
+                  <button type="button" class="checkin-mini-btn is-danger" onclick="adminRejectCheckin('${travelEsc(sp.id)}')">🗑️ 驳回删除</button>
+                </div>
+              </div>`).join('')}</div>`
+          : `<div class="checkin-empty">暂无待审核投稿</div>`) : ''}
+      </div>` : ''}
+  `;
+}
+
+// 兼容旧入口：白框内不再重复放小胶囊按钮
+function buildFoodExtraHtml(city) {
+  const c = String(city || '').trim();
+  checkinState.city = c;
+  checkinState.loaded = false;
+  setTimeout(() => {
+    loadCheckinSpots(c, true);
+  }, 60);
   return `
     <div class="food-spot-box">
-      <div class="text-[11px] font-semibold text-slate-700 mb-1.5">🍜 ${travelEsc(c)} 必吃榜 & 同款打卡</div>
-      <div class="flex flex-wrap gap-1.5 mb-2">
-        <a class="travel-hot-chip" href="https://www.dianping.com/search/keyword/0/0_${encodeURIComponent(c + ' 必吃榜')}" target="_blank" rel="noopener noreferrer">大众点评 · 必吃榜 ↗</a>
-        <a class="travel-hot-chip" href="https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(c + ' 必吃')}" target="_blank" rel="noopener noreferrer">小红书 · 城市美食 ↗</a>
-        <a class="travel-hot-chip" href="https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent('ONER ' + c + ' 同款打卡')}" target="_blank" rel="noopener noreferrer">成员同款打卡 ↗</a>
+      <div class="checkin-section-head">🍜 同款打卡点 <span>· 站长审核后公开</span></div>
+      <div id="checkin-spots-box" data-city="${travelEsc(c)}">
+        <div class="checkin-empty">⏳ 正在加载同款打卡点…</div>
       </div>
-      ${spots.length ? `<div class="space-y-1">${spots.map(sp => `
-        <div class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[11px] flex items-start justify-between gap-2">
-          <div class="min-w-0">
-            <div class="font-semibold text-slate-800">📍 ${travelEsc(sp.name)}</div>
-            ${sp.note ? `<div class="text-slate-500 mt-0.5">${travelEsc(sp.note)}</div>` : ''}
-          </div>
-          ${isAdmin ? `<button type="button" class="text-[10px] text-rose-600 shrink-0" onclick="removeFoodSpot('${travelEsc(sp.id)}')">删除</button>` : ''}
-        </div>`).join('')}</div>`
-        : `<div class="text-[11px] text-slate-400">还没有管理员录入的同款打卡点。</div>`}
-      ${isAdmin ? `
-        <div class="food-admin-form mt-2">
-          <input id="food-spot-city" type="text" value="${travelEsc(c)}" placeholder="城市" maxlength="10" />
-          <input id="food-spot-name" type="text" placeholder="餐厅 / 地标名称" maxlength="24" />
-          <input id="food-spot-note" type="text" placeholder="备注（成员同款菜 / 打卡点，可留空）" maxlength="40" />
-          <button type="button" class="travel-hot-chip" onclick="addFoodSpot()">➕ 添加打卡点</button>
-        </div>` : ''}
     </div>
   `;
 }
@@ -289,7 +723,7 @@ function buildTravelGroups() {
         links: [
           { label: '大众点评 · 城市必吃榜', desc: `${dest.city} 本地特色美食排行`, url: `https://www.dianping.com/search/keyword/0/0_${enc(`${dest.city} 必吃榜`)}` },
           { label: '小红书 · 城市美食', desc: `${dest.city} 探店与排队攻略`, url: `https://www.xiaohongshu.com/search_result?keyword=${enc(`${dest.city} 必吃`)}` },
-          { label: '小红书 · 成员同款打卡', desc: `ONER 去过的店 / 地标`, url: `https://www.xiaohongshu.com/search_result?keyword=${enc(`ONER ${dest.city} 同款打卡`)}` }
+          { label: '小红书 · 成员同款打卡', desc: '按成员分流检索同款探店', url: `https://www.xiaohongshu.com/search_result?keyword=${enc(`ONER ${dest.city} 同款 探店`)}`, memberSearch: true }
         ],
         extraHtml: buildFoodExtraHtml(dest.city, venue)
       }
@@ -304,7 +738,7 @@ function travelLinkButtons(list) {
     (item.extraLinks || []).forEach(x => flat.push({ label: x.platform, desc: '同关键词 · 低价优先', url: x.url }));
   });
   return flat.map(item => `
-    <a class="travel-link" href="${travelEsc(item.url)}" target="_blank" rel="noopener noreferrer">
+    <a class="travel-link" href="${travelEsc(item.url)}" ${item.memberSearch ? 'data-travel-member="1"' : ''} target="_blank" rel="noopener noreferrer">
       <span class="travel-link-label">${travelEsc(item.label)} <span class="travel-link-arrow">↗</span></span>
       <span class="travel-link-desc">${travelEsc(item.desc)}</span>
     </a>
@@ -444,6 +878,24 @@ function renderTravelHelper() {
     });
   });
 
+  body.querySelectorAll('[data-travel-member]').forEach(link => {
+    link.addEventListener('click', ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const box = document.getElementById('checkin-spots-box');
+      if (box && box.scrollIntoView) {
+        try { box.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { /* ignore */ }
+      }
+      const bar = document.querySelector('.checkin-member-bar');
+      if (bar && bar.scrollIntoView) {
+        try { bar.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { /* ignore */ }
+      }
+      const first = document.querySelector('.checkin-member-bar .checkin-chip');
+      if (first) first.classList.add('is-hint');
+      setTimeout(() => { if (first) first.classList.remove('is-hint'); }, 1200);
+    });
+  });
+
   const originSelectEl = modal.querySelector('#travel-origin');
   if (originSelectEl) originSelectEl.value = travelHelperState.origin;
   modal.querySelectorAll('[data-hot-city]').forEach(chip => {
@@ -573,3 +1025,19 @@ window.openTravelHelperFromButton = openTravelHelperFromButton;
 window.closeTravelHelper = closeTravelHelper;
 window.toggleTravelGroup = toggleTravelGroup;
 window.copyTravelKeywords = copyTravelKeywords;
+window.compressCheckinImage = compressCheckinImage;
+window.toggleCheckinForm = toggleCheckinForm;
+window.setCheckinCategory = setCheckinCategory;
+window.toggleCheckinMember = toggleCheckinMember;
+window.handleCheckinImage = handleCheckinImage;
+window.clearCheckinProof = clearCheckinProof;
+window.submitCheckinSpot = submitCheckinSpot;
+window.openCheckinProof = openCheckinProof;
+window.openCheckinProofPreview = openCheckinProofPreview;
+window.setCheckinMemberFilter = setCheckinMemberFilter;
+window.copyCheckinMemberKeyword = copyCheckinMemberKeyword;
+window.toggleCheckinPending = toggleCheckinPending;
+window.adminReviewCheckin = adminReviewCheckin;
+window.adminRejectCheckin = adminRejectCheckin;
+window.deleteApprovedCheckin = deleteApprovedCheckin;
+window.renderCheckinSection = renderCheckinSection;
