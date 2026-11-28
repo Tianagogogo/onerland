@@ -85,6 +85,7 @@ const chantState = {
 let chantRemoteSongs = [];
 let chantLoadedFromRemote = false;
 let chantLoadPromise = null;
+let chantImportDrafts = [];
 
 function chantIsAdmin() {
   return typeof canEditContent === 'function'
@@ -818,52 +819,203 @@ async function chantParseDocx(file) {
   return Array.from(doc.querySelectorAll('p, li')).map(chantDocxHtmlPara).filter(Boolean).join('\n');
 }
 
-async function chantParsePdf(file) {
+const CHANT_PDF_RADICAL_MAP = {
+  '⺦': '丬', '⺰': '纟', '⻅': '见', '⻈': '讠', '⻉': '贝', '⻋': '车', '⻐': '钅', '⻓': '长',
+  '⻔': '门', '⻙': '韦', '⻚': '页', '⻛': '风', '⻜': '飞', '⻠': '饣', '⻢': '马', '⻥': '鱼',
+  '⻦': '鸟', '⻧': '卤', '⻨': '麦', '⻩': '黄', '⻪': '黾', '⻫': '齐', '⻬': '齐', '⻭': '齿',
+  '⻮': '齿', '⻯': '龙', '⻰': '龙', '⻲': '龟', '⻳': '龟'
+};
+
+function chantNormalizePdfText(raw) {
+  let line = String(raw || '');
+  try { line = line.normalize('NFKC'); } catch (e) { /* ignore */ }
+  line = line.replace(/[\u2e80-\u2eff]/g, ch => CHANT_PDF_RADICAL_MAP[ch] || ch);
+  line = line.replace(/\s+/g, ' ').trim();
+  // PDF 常把每个汉字拆成独立文本项，合并汉字之间的空格（含部首区异体字）
+  for (let i = 0; i < 3; i += 1) {
+    line = line.replace(/([\u3400-\u9fff\u3005-\u3007\u2e80-\u2eff])\s+(?=[\u3400-\u9fff\u3005-\u3007\u2e80-\u2eff])/g, '$1');
+  }
+  const letters = line.replace(/[^A-Za-z]/g, '').toUpperCase();
+  if (letters === 'TOTHETOP') return 'TO THE TOP';
+  if (letters === 'ONER') return 'ONER';
+  if (letters === 'ONERLAND') return 'ONERLAND';
+  return line;
+}
+
+function chantCleanPdfLine(raw) {
+  let line = chantNormalizePdfText(raw);
+  if (!line) return '';
+  if (/^[★☆✦✧✩✪✫✬✭✮✯✰·•●○◇◆\s]+$/.test(line)) return '';
+  if (/^(TO\s+THE\s+TOP|ONER|ONERLAND|ONER\s*LAND|应援词典|歌词本|歌单|目录)$/i.test(line)) return '';
+  const headerLetters = line.replace(/[^A-Za-z]/g, '').toUpperCase();
+  if (!/[\u3400-\u9fff]/.test(line) && /^(ONER|ONERLAND|TOTHETOP){1,3}$/.test(headerLetters) && headerLetters.length >= 4) return '';
+  if (/^\d{1,3}$/.test(line)) return '';
+  if (/^第?\s*\d+\s*页$/.test(line) || /^PAGE\s*\d+(\s*\/\s*\d+)?$/i.test(line)) return '';
+  return line;
+}
+
+function chantCleanImportedTitle(raw) {
+  let title = chantNormalizePdfText(raw);
+  const quoted = title.match(/[《〈]([^》〉]+)[》〉]/);
+  if (quoted) title = quoted[1];
+  title = title
+    .replace(/^[★☆✦✧✩✪✫✬✭✮✯✰\s]+/, '')
+    .replace(/[★☆✦✧✩✪✫✬✭✮✯✰\s]+$/, '')
+    .replace(/^[#＃\d０-９]+\s*[.、)）]?\s*/, '')
+    .replace(/^第\s*[\d０-９]+\s*[首曲页]\s*[·:：-]?\s*/, '')
+    .trim();
+  return title.slice(0, 60);
+}
+
+function chantPickPdfTitle(rows) {
+  const cleanRows = (rows || []).filter(row => row.text);
+  if (!cleanRows.length) return '';
+  const maxSize = cleanRows.reduce((max, row) => Math.max(max, Number(row.size || 0)), 0);
+  let firstUsable = '';
+  for (let i = 0; i < Math.min(cleanRows.length, 8); i += 1) {
+    const row = cleanRows[i];
+    const title = chantCleanImportedTitle(row.text);
+    if (!title || title.length < 2 || title.length > 36) continue;
+    if (chantLooksLikeSlogan(title)) continue;
+    if (/^(歌词|应援词|应援|目录|歌单|曲目|正文)$/i.test(title)) continue;
+    if (/[。；;]$/.test(title) && title.length > 12) continue;
+    if (!firstUsable) firstUsable = title;
+    if (maxSize && Number(row.size || 0) >= maxSize * 0.82) return title;
+  }
+  return firstUsable;
+}
+
+// 多页 PDF：逐页独立解析成歌曲草稿，绝不把整本混成一条
+async function chantParsePdfPages(file) {
   const pdfjs = await loadChantPdfJs();
   if (!pdfjs) throw new Error('PDF 解析库未就绪');
   const buffer = await file.arrayBuffer();
   const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
   const pages = [];
-  const total = Math.min(pdf.numPages, 40);
+  const total = Math.min(pdf.numPages, 60);
   for (let i = 1; i <= total; i += 1) {
     const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
+    const textContent = await page.getTextContent();
     const rows = [];
-    (content.items || []).forEach(item => {
+    (textContent.items || []).forEach(item => {
       if (!item || !String(item.str || '').trim()) return;
       const tr = item.transform || [];
       const x = Number(tr[4] || 0);
       const y = Number(tr[5] || 0);
       let row = rows.find(r => Math.abs(r.y - y) <= 3);
-      if (!row) { row = { y, items: [] }; rows.push(row); }
+      if (!row) { row = { y, items: [], size: 0 }; rows.push(row); }
       row.items.push({ x, str: String(item.str) });
+      row.size = Math.max(row.size, Number(item.height || 0));
     });
     rows.sort((a, b) => b.y - a.y);
-    const pageText = rows.map(row => row.items
-      .sort((a, b) => a.x - b.x)
-      .map(it => it.str)
-      .join(' ')
-      .replace(/([\u4e00-\u9fa5])\s+(?=[\u4e00-\u9fa5])/g, '$1')
-      .replace(/\s+/g, ' ')
-      .trim()
-    ).filter(Boolean).join('\n');
-    if (pageText) pages.push(pageText);
+    const cleanedRows = rows.map(row => {
+      const text = row.items
+        .sort((a, b) => a.x - b.x)
+        .map(it => it.str)
+        .join(' ')
+        .replace(/([\u4e00-\u9fa5])\s+(?=[\u4e00-\u9fa5])/g, '$1')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return { text: chantCleanPdfLine(text), size: row.size, y: row.y };
+    }).filter(row => row.text);
+    if (!cleanedRows.length) continue;
+
+    const title = chantPickPdfTitle(cleanedRows);
+    const titleIndex = cleanedRows.findIndex(row => chantCleanImportedTitle(row.text) === title);
+    const bodyRows = cleanedRows.filter((row, idx) => idx !== titleIndex && row.text);
+    const content = chantNormalizeImportedText(bodyRows.map(row => row.text).join('\n'));
+    if (!content.trim()) continue;
+    pages.push({
+      pageNo: i,
+      title: title || `第 ${i} 页曲目`,
+      content
+    });
   }
-  return pages.join('\n');
+  return pages;
+}
+
+async function chantParsePdf(file) {
+  const pages = await chantParsePdfPages(file);
+  if (!pages.length) return '';
+  if (pages.length === 1) return `${pages[0].title}\n${pages[0].content}`;
+  return pages.map(p => `${p.title}\n${p.content}`).join('\n\n');
 }
 
 function chantMemberNameCount(text) {
   return CHANT_MEMBER_ALIASES.filter(item => new RegExp(item.alias, 'i').test(text)).length;
 }
 
+const CHANT_IMPORT_TOKEN_RE = /O[\s\-－]*N[\s\-－]*E[\s\-－]*R(?![A-Za-z])|PINKRAY(?![A-Za-z])|KWIN(?![A-Za-z])|D[\s\-－]*I[\s\-－]*D[\s\-－]*I(?![A-Za-z])|岳明辉|木子洋|灵超鹅|灵超|李振洋|李英超|万能人/gi;
+
+function chantTokenMatches(text) {
+  const re = new RegExp(CHANT_IMPORT_TOKEN_RE.source, 'gi');
+  const matches = [];
+  let m;
+  while ((m = re.exec(text))) {
+    if (m[0]) matches.push({ start: m.index, end: m.index + m[0].length, text: m[0] });
+  }
+  return matches;
+}
+
 function chantLooksLikeSlogan(line) {
   const text = String(line || '').trim();
   if (!text || /[\[\]【】]/.test(text)) return false;
   if (text.length > 50) return false;
-  const memberCount = chantMemberNameCount(text);
-  const hasGroup = /ONER/i.test(text);
+  const compact = text.replace(/[\s\-·・_—–－]/g, '');
+  const matches = chantTokenMatches(text);
+  const memberCount = chantMemberNameCount(compact);
+  const hasGroup = /ONER/i.test(compact);
+  const hasFandom = /万能人|万能人们/.test(compact);
   const hasCheer = /(hey|oh|go|come\s*on|加油|应援)/i.test(text);
-  return (hasGroup && memberCount >= 1) || memberCount >= 2 || ((hasGroup || memberCount >= 1) && hasCheer);
+  const repeated = matches.length >= 2;
+  const stripped = compact
+    .toUpperCase()
+    .replace(/ONER|PINKRAY|KWIN|DIDI|岳明辉|木子洋|灵超鹅|灵超|李振洋|李英超|万能人/g, '')
+    .replace(/[!！?？,，、.。~～…\s]/g, '');
+  const nameOnly = stripped.length <= 2 && (hasGroup || memberCount > 0 || hasFandom);
+  return (hasGroup && memberCount >= 1)
+    || memberCount >= 2
+    || hasFandom
+    || ((hasGroup || memberCount >= 1 || hasFandom) && (hasCheer || /[!！]/.test(text) || nameOnly || repeated))
+    || nameOnly;
+}
+
+// 混合歌词行只包裹真正的人名 / 口号片段，避免整行歌词都被染红
+function chantWrapDetectedChants(line) {
+  const text = String(line || '').trim();
+  if (!text || /[\[\]【】]/.test(text)) return text;
+  const matches = chantTokenMatches(text);
+  if (!matches.length) return text;
+  const merged = [];
+  matches.forEach(match => {
+    const last = merged[merged.length - 1];
+    if (last && /^[\s!！?？、,，.。~～…·・-]*$/.test(text.slice(last.end, match.start))) {
+      last.end = match.end;
+      last.text = text.slice(last.start, last.end);
+    } else {
+      merged.push({ ...match });
+    }
+  });
+  merged.forEach(m => {
+    while (m.end < text.length && /[!！?？~～…]/.test(text[m.end])) m.end += 1;
+    m.text = text.slice(m.start, m.end);
+  });
+  const leftover = merged.reduce((acc, m, idx) => {
+    const prevEnd = idx === 0 ? 0 : merged[idx - 1].end;
+    return acc + text.slice(prevEnd, m.start);
+  }, '') + text.slice(merged[merged.length - 1].end);
+  if (!leftover.replace(/[\s!！?？、,，.。~～…·・-]/g, '')) {
+    return `[${text}]`;
+  }
+  let out = '';
+  let cursor = 0;
+  merged.forEach(m => {
+    out += text.slice(cursor, m.start);
+    out += `[${text.slice(m.start, m.end).trim()}]`;
+    cursor = m.end;
+  });
+  out += text.slice(cursor);
+  return out;
 }
 
 // 把识别出的纯文本规范成 [应援内容] 结构
@@ -877,7 +1029,8 @@ function chantNormalizeImportedText(text) {
         .replace(/^(?:应援|喊|口号)\s*[:：]\s*(.+)$/i, '[$1]')
         .replace(/\s+/g, ' ');
       if (!line) return '';
-      if (!/[\[\]【】]/.test(line) && chantLooksLikeSlogan(line)) line = `[${line}]`;
+      line = chantNormalizePdfText(line);
+      if (!/[\[\]【】]/.test(line) && chantLooksLikeSlogan(line)) line = chantWrapDetectedChants(line);
       return line;
     })
     .filter(Boolean)
@@ -915,13 +1068,169 @@ async function handleChantImportFile(input) {
   const label = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 正在解析…'; }
   try {
-    const text = name.endsWith('.pdf') ? await chantParsePdf(file) : await chantParseDocx(file);
-    chantApplyImportedText(text);
+    if (name.endsWith('.pdf')) {
+      const pages = await chantParsePdfPages(file);
+      if (!pages.length) throw new Error('未提取到可用歌词');
+      if (pages.length > 1) {
+        chantShowImportPreview(pages);
+      } else {
+        chantApplyImportedText(`${pages[0].title}\n${pages[0].content}`);
+      }
+    } else {
+      const text = await chantParseDocx(file);
+      chantApplyImportedText(text);
+    }
   } catch (e) {
     if (typeof toastError === 'function') toastError(`解析失败：${e && e.message ? e.message : '请检查文件或网络后重试'}`);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = label || '📄 导入 Word / PDF 自动识别'; }
     input.value = '';
+  }
+}
+
+// ===== 多页 PDF 拆分预览 / 批量入库 =====
+function chantImportPreviewHtml() {
+  if (!chantImportDrafts.length) return '';
+  const selected = chantImportDrafts.filter(d => d.selected).length;
+  return `
+    <div class="chant-import-preview">
+      <div class="chant-import-preview-head">
+        <div class="chant-import-preview-title">📚 逐页拆分确认</div>
+        <div class="chant-import-preview-sub">共识别出 <b>${chantImportDrafts.length}</b> 首歌曲，每页对应 1 首 · 已选 <b>${selected}</b> 首</div>
+      </div>
+      <div class="chant-import-preview-list">
+        ${chantImportDrafts.map((draft, idx) => `
+          <label class="chant-import-draft ${draft.selected ? 'is-selected' : ''}">
+            <input type="checkbox" class="chant-import-draft-check" ${draft.selected ? 'checked' : ''}
+              onchange="toggleChantImportDraft(${idx}, this.checked)" />
+            <span class="chant-import-draft-page">P${draft.pageNo}</span>
+            <input type="text" class="chant-import-draft-title" maxlength="60" value="${travelEsc(draft.title)}"
+              placeholder="第 ${draft.pageNo} 页曲名"
+              oninput="updateChantImportDraftTitle(${idx}, this.value)" />
+            <span class="chant-import-draft-meta">${draft.content.split('\n').length} 行 · ${draft.content.length} 字</span>
+          </label>`).join('')}
+      </div>
+      <div class="chant-import-preview-actions">
+        <button type="button" class="chant-action-btn is-primary" id="chant-batch-btn" onclick="submitChantBatchImport()">✅ 批量导入全部歌曲</button>
+        <button type="button" class="chant-action-btn" onclick="clearChantImportDrafts()">✕ 取消拆分</button>
+      </div>
+    </div>`;
+}
+
+function chantShowImportPreview(pages) {
+  chantImportDrafts = (pages || []).map(page => ({
+    pageNo: Number(page.pageNo || 0),
+    title: String(page.title || '').trim(),
+    content: String(page.content || '').trim(),
+    selected: true
+  }));
+  if (chantState.editorId === null) chantState.editorId = '';
+  renderChantPage();
+  const editor = document.getElementById('chant-editor-view');
+  if (editor && typeof editor.scrollIntoView === 'function') {
+    try { editor.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { /* ignore */ }
+  }
+  if (typeof showToast === 'function') showToast(`已按页拆分出 ${chantImportDrafts.length} 首歌曲，请核对后批量导入`);
+}
+
+function updateChantImportDraftTitle(index, value) {
+  const draft = chantImportDrafts[index];
+  if (!draft) return;
+  draft.title = String(value || '');
+}
+
+function toggleChantImportDraft(index, checked) {
+  const draft = chantImportDrafts[index];
+  if (!draft) return;
+  draft.selected = Boolean(checked);
+  const row = document.querySelectorAll('.chant-import-draft')[index];
+  if (row) row.classList.toggle('is-selected', draft.selected);
+  const sub = document.querySelector('.chant-import-preview-sub');
+  if (sub) {
+    const selected = chantImportDrafts.filter(d => d.selected).length;
+    sub.innerHTML = `共识别出 <b>${chantImportDrafts.length}</b> 首歌曲，每页对应 1 首 · 已选 <b>${selected}</b> 首`;
+  }
+}
+
+function clearChantImportDrafts() {
+  chantImportDrafts = [];
+  renderChantPage();
+}
+
+async function chantBatchCreateOne(draft, category) {
+  const id = chantNewId();
+  const payload = {
+    title: String(draft.title || '').trim().slice(0, 60),
+    category,
+    album: '',
+    video_url: '',
+    content: String(draft.content || '').trim()
+  };
+  const record = normalizeChantRecord({ id, ...payload });
+  const remote = await chantAdminWrite('createChant', id, payload);
+  const store = readChantLocalStore();
+  if (remote.ok) {
+    const rows = Array.isArray(remote.data) ? remote.data : (remote.data ? [remote.data] : []);
+    const saved = rows.length ? normalizeChantRecord(rows[0]) : record;
+    const idx = chantRemoteSongs.findIndex(s => s.id === id);
+    if (idx >= 0) chantRemoteSongs[idx] = saved;
+    else chantRemoteSongs.push(saved);
+    store.created = store.created.filter(r => String(r.id) !== id);
+    delete store.overrides[id];
+    store.deleted = store.deleted.filter(x => x !== id);
+    writeChantLocalStore(store);
+    return { ok: true, remote: true };
+  }
+  store.created.push({ ...record });
+  writeChantLocalStore(store);
+  return { ok: true, remote: false };
+}
+
+async function submitChantBatchImport() {
+  if (!chantIsAdmin()) {
+    if (typeof toastError === 'function') toastError('管理员状态已失效，请重新解锁');
+    return;
+  }
+  const categoryEl = document.querySelector('input[name="chant-category"]:checked');
+  const category = categoryEl ? String(categoryEl.value || '') : '';
+  if (!CHANT_CATEGORIES.includes(category)) {
+    if (typeof toastError === 'function') toastError('请先选择分类归属');
+    return;
+  }
+  const drafts = chantImportDrafts.filter(d => d.selected);
+  if (!drafts.length) {
+    if (typeof toastError === 'function') toastError('请至少勾选一首歌曲');
+    return;
+  }
+  const invalid = drafts.find(d => !String(d.title || '').trim() || !String(d.content || '').trim());
+  if (invalid) {
+    if (typeof toastError === 'function') toastError(`第 ${invalid.pageNo} 页缺少歌名或正文，请补充后再导入`);
+    return;
+  }
+  const btn = document.getElementById('chant-batch-btn');
+  const label = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 正在批量入库…'; }
+
+  let remoteCount = 0;
+  let localCount = 0;
+  try {
+    for (const draft of drafts) {
+      const saved = await chantBatchCreateOne(draft, category);
+      if (saved.remote) remoteCount += 1;
+      else localCount += 1;
+    }
+    chantImportDrafts = [];
+    chantState.editorId = null;
+    chantState.activeId = '';
+    renderChantPage();
+    if (typeof showToast === 'function') {
+      showToast(localCount
+        ? `✅ 已导入 ${drafts.length} 首歌曲（其中 ${localCount} 首保存在本机）`
+        : `✅ 已批量导入 ${drafts.length} 首歌曲`);
+    }
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = label || '✅ 批量导入全部歌曲'; }
+    if (typeof toastError === 'function') toastError(`批量导入失败：${e && e.message ? e.message : '请稍后重试'}`);
   }
 }
 
@@ -936,7 +1245,7 @@ function renderChantEditor(songId) {
     return;
   }
   const category = song ? song.category : CHANT_CATEGORIES[0];
-  box.innerHTML = `
+  box.innerHTML = `${chantImportPreviewHtml()}
     <form class="chant-editor-card" onsubmit="event.preventDefault(); submitChantEditor();">
       <div class="chant-detail-head">
         <button type="button" class="chant-back-btn" onclick="closeChantEditor()">← 返回列表</button>
@@ -993,11 +1302,13 @@ function openChantEditor(songId) {
   }
   chantState.editorId = songId ? String(songId) : '';
   chantState.activeId = '';
+  chantImportDrafts = [];
   renderChantPage();
 }
 
 function closeChantEditor() {
   chantState.editorId = null;
+  chantImportDrafts = [];
   renderChantPage();
 }
 
@@ -1065,6 +1376,7 @@ async function submitChantEditor() {
   }
   chantState.editorId = null;
   chantState.activeId = finalId;
+  chantImportDrafts = [];
   renderChantPage();
 }
 
@@ -1578,6 +1890,10 @@ window.loadChantSongs = loadChantSongs;
 window.parseChantContent = parseChantContent;
 window.parseChantTokens = parseChantContent;
 window.handleChantImportFile = handleChantImportFile;
+window.submitChantBatchImport = submitChantBatchImport;
+window.updateChantImportDraftTitle = updateChantImportDraftTitle;
+window.toggleChantImportDraft = toggleChantImportDraft;
+window.clearChantImportDrafts = clearChantImportDrafts;
 window.CHANT_COLOR_TOKENS = CHANT_COLOR_TOKENS;
 
 loadChantSongs();

@@ -5650,3 +5650,74 @@ body.feature-modal-open { overflow: hidden; }
   /* 320 极窄屏：三个入口胶囊同排收进卡片内，不越界 */
   .chronicle-card .tour-action-btn--mini { font-size: 10px; padding: 0 7px; }
 }
+
+/* ================= 📚 多页 PDF 逐页拆分确认 ================= */
+.chant-import-preview {
+  margin-bottom: 10px;
+  padding: 11px;
+  border-radius: 14px;
+  border: 1px solid rgba(221, 5, 20, 0.2);
+  background:
+    radial-gradient(130% 100% at 100% 0%, rgba(221, 5, 20, 0.07), transparent 58%),
+    linear-gradient(155deg, #ffffff 0%, #fdf7f7 60%, #f7f9fc 100%);
+  box-shadow: 0 8px 22px rgba(141, 13, 14, 0.07);
+}
+.chant-import-preview-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.chant-import-preview-title { font-size: 12px; font-weight: 800; color: #7f1d1d; }
+.chant-import-preview-sub { font-size: 10px; color: #64748b; }
+.chant-import-preview-sub b { color: #B00814; }
+.chant-import-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 8px;
+  max-height: 264px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.chant-import-draft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  border: 1px solid #e6ebf2;
+  background: #ffffff;
+  cursor: pointer;
+}
+.chant-import-draft.is-selected { border-color: rgba(221, 5, 20, 0.3); background: #fffafa; }
+.chant-import-draft-check { flex: 0 0 auto; margin: 0; accent-color: #DD0514; }
+.chant-import-draft-page {
+  flex: 0 0 auto;
+  min-width: 25px;
+  padding: 1px 4px;
+  border-radius: 5px;
+  background: rgba(221, 5, 20, 0.09);
+  color: #B00814;
+  font-size: 9px;
+  font-weight: 800;
+  text-align: center;
+}
+.chant-import-draft-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 7px;
+  border-radius: 7px;
+  border: 1px solid #dbe2ea;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-family: inherit;
+}
+.chant-import-draft-title:focus { outline: none; border-color: #DD0514; box-shadow: 0 0 0 2px rgba(221, 5, 20, 0.1); }
+.chant-import-draft-meta { flex: 0 0 auto; font-size: 9px; color: #94a3b8; white-space: nowrap; }
+.chant-import-preview-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 9px; }
+.chant-import-preview-actions .chant-action-btn { flex: 0 0 auto; }
+
+@media (max-width: 480px) {
+  .chant-import-draft { flex-wrap: wrap; }
+  .chant-import-draft-title { flex: 1 1 calc(100% - 74px); }
+  .chant-import-draft-meta { width: 100%; text-align: right; }
+  .chant-import-preview-actions .chant-action-btn { flex: 1 1 auto; }
+}
