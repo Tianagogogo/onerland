@@ -1201,6 +1201,15 @@ function openSeriesModal(themeKey) {
               </div>
               <p class="text-slate-500">🗓️ ${s.date}${s.showTime ? ` ${s.showTime}` : ''}</p>
               <p class="text-slate-500 truncate">📍 ${s.venue}</p>
+              ${(() => {
+                const saved = typeof findFootprintIndex === 'function' && findFootprintIndex({
+                  showKey: typeof buildShowKey === 'function' ? buildShowKey(s.venue, safeTitle) : '',
+                  title: safeTitle,
+                  date: s.date,
+                  venue: s.venue
+                }) >= 0;
+                return `<button type="button" title="添加或查看该场足迹（仅存本机）" onclick="event.stopPropagation(); recordFootprintFromShow('${safeTitle}', '${s.date}', '${String(s.venue || '').replace(/['"<>]/g, '')}', '${String(s.artist || 'ONER').replace(/['"<>]/g, '')}')" class="plan-chip footprint-chip mt-0.5 ${saved ? 'is-active' : ''}">${saved ? '✓ 已点亮足迹' : '+ 足迹'}</button>`;
+              })()}
             </div>
           </div>
         `;
@@ -2002,7 +2011,8 @@ function renderTourCards() {
             <div class="show-card-quick-row">
               ${isUpcomingShow
                 ? `<button type="button" class="plan-chip ${plannedShow ? 'is-active' : ''}" aria-pressed="${plannedShow ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); togglePlannedShowFromCard(this, '${planKey.replace(/['"<>]/g, '')}')">${plannedShow ? '✓ 计划前往' : '🎫 计划前往'}</button>`
-                : `<button type="button" onclick="recordFootprintFromShow('${safeCity}', '${item.show_date}', '${cleanVenue}', '${item.artist}')" class="plan-chip ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已打卡' : '+ 足迹'}</button>`}
+                : ''}
+              <button type="button" title="添加或查看该场足迹（仅存本机）" onclick="event.stopPropagation(); recordFootprintFromShow('${safeCity}', '${item.show_date}', '${cleanVenue}', '${item.artist}')" class="plan-chip footprint-chip ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已点亮足迹' : '+ 足迹'}</button>
               ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="ticket" data-edit-title="${safeCity.replace(/"/g, '&quot;')}" data-edit-date="${String(item.show_date || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini edit-soft-btn">✏️ 编辑</button>` : ''}
             </div>
             <p class="show-card-meta text-xs text-slate-500"><span>📍 ${item.venue}</span><span class="meta-sep"> ｜ </span><button type="button" class="meta-date-ics" title="点击添加到日历提醒" onclick="event.stopPropagation(); exportShowICS('${String(item.cloudId == null ? '' : item.cloudId).replace(/["'<>]/g, '')}')">🗓️ ${item.show_date}</button></p>
@@ -2386,9 +2396,7 @@ function renderArchiveTimeline() {
             <button type="button" class="tour-action-btn tour-action-btn--mini" data-travel-btn data-city="${attrEsc(getArchiveCity(item) || '')}" data-venue="${attrEsc(item.venue || '')}" data-date="${attrEsc(String(item.showDate || '').slice(0, 10))}" data-title="${attrEsc(safeTitle)}" onclick="event.stopPropagation(); openTravelHelperFromButton(this)">🚄 出行比价</button>
             <button type="button" data-tour-toggle="vexp-arc-drawer-${idx}" class="tour-action-btn tour-action-btn--mini">📊 场馆体验<span class="hidden sm:inline text-[10px] opacity-70 ml-1">${venueStats.total}${venueStats.unlocked ? '' : '/5'}</span></button>
             ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="archive" data-edit-title="${safeTitle.replace(/"/g, '&quot;')}" data-edit-date="${String(item.showDate || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini edit-soft-btn">✏️ 编辑</button>` : ''}
-            ${(typeof isShowEnded === 'function' ? !isShowEnded(item) : (typeof isShowUpcomingOrToday === 'function' && isShowUpcomingOrToday(item.showDate)))
-              ? ''
-              : `<button type="button" onclick="recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="tour-action-btn tour-action-btn--mini ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已点亮足迹' : '+ 足迹'}</button>`}
+            <button type="button" title="添加或查看该场足迹（仅存本机）" onclick="recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="tour-action-btn tour-action-btn--mini footprint-chip ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已点亮足迹' : '+ 足迹'}</button>
           </div>
         </div>
 

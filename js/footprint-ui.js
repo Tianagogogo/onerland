@@ -138,6 +138,8 @@ function recordFootprintFromShow(title, date, venue, artist = 'ONER') {
   showToast(existed
     ? `「${title}」的足迹已更新（共 ${AppState.footprints.length} 面）`
     : `已将「${title}」记入本机观演足迹（第 ${AppState.footprints.length} 面）`);
+  // 预填「添加足迹 / 票根」表单，方便补录座位并可直接打卡
+  try { prefillFootprintComposer(title, date, venue); } catch (e) { /* ignore */ }
   renderAnniversaryCard();
   renderUpcomingMiniTimeline();
   if (!document.getElementById('view-footprint-page')?.classList.contains('hidden')) renderFootprintPage();
@@ -162,6 +164,30 @@ function getBuddyNicknameSuggestions() {
     });
   } catch (e) { /* ignore */ }
   return names;
+}
+
+// 打开并预填「添加足迹」表单（演出名称 / 日期 / 场馆），手机端也直接可用
+function prefillFootprintComposer(title, date, venue) {
+  const page = document.getElementById('view-footprint-page');
+  const onFootprintPage = page && !page.classList.contains('hidden');
+  if (!onFootprintPage && typeof switchMainTab === 'function') switchMainTab('footprint');
+  const d = String(date || '').slice(0, 10);
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  setVal('tk-show-name', String(title || ''));
+  setVal('tk-show-date', d);
+  setVal('tk-venue-info', String(venue || ''));
+  setVal('tk-seat-info', '');
+  if (typeof refreshTicketShowOptions === 'function') refreshTicketShowOptions();
+  const sel = document.getElementById('tk-show-pick');
+  if (sel && Array.isArray(ticketShowRecords)) {
+    const i = ticketShowRecords.findIndex(r => r.name === String(title || '') && (!d || r.date === d));
+    if (i >= 0) sel.value = String(i);
+  }
+  if (typeof renderTicketCanvasPreview === 'function') renderTicketCanvasPreview();
+  const target = document.getElementById('tk-show-name');
+  if (target && target.scrollIntoView) {
+    setTimeout(() => { try { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { /* ignore */ } }, 140);
+  }
 }
 
 function saveFootprintBuddy(id, name) {
