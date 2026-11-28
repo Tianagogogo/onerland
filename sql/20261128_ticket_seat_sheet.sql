@@ -82,43 +82,96 @@ update public.show_ticket_seats set seat_detail = '' where seat_detail is null;
 update public.show_ticket_seats set updated_at = now() where updated_at is null;
 update public.show_ticket_seats set platform = '坤音商城' where platform is null or platform = '';
 
+-- ⚠️ 关键：先移除四个 CHECK 约束，再做数据清洗，避免旧数据被旧约束拦截
+alter table public.show_ticket_seats drop constraint if exists show_ticket_seats_platform_chk;
+alter table public.show_ticket_seats drop constraint if exists show_ticket_seats_seconds_chk;
+alter table public.show_ticket_seats drop constraint if exists show_ticket_seats_zone_chk;
+alter table public.show_ticket_seats drop constraint if exists show_ticket_seats_seat_chk;
+
+-- 平台归一化：先去掉空格 / 全角空格 / 零宽字符，再按前缀归入白名单
+with cleaned as (
+  select id,
+         btrim(translate(coalesce(platform, ''), E' \t\r\n\u00a0\u3000\u200b\u200c\u200d\ufeff', '')) as p
+  from public.show_ticket_seats
+)
+update public.show_ticket_seats t
+   set platform = case
+     when c.p like '坤音%' then '坤音商城'
+     when c.p like '大麦%' then '大麦'
+     when c.p like '猫眼%' then '猫眼'
+     when c.p like '纷玩%' then '纷玩岛'
+     when c.p like '票星球%' then '票星球'
+     when c.p like '秀动%' then '秀动'
+     else '坤音商城'
+   end
+  from cleaned c
+ where t.id = c.id;
+
+-- 区域归一化：旧格式「内场B区 / 一层看台（前区/正对）」→ 新枚举「大类 · 区号」
+with parsed as (
+  select id,
+         case
+           when btrim(zone) like '内场%' then '内场'
+           when btrim(zone) like '一层%' then '一层看台'
+           when btrim(zone) like '二层%' then '二层看台'
+           when btrim(zone) like '三层%' then '三层看台'
+           when btrim(zone) like '包厢%' then '包厢区'
+           when btrim(zone) ~ '站区|音乐节|前区近距离|后区' then '音乐节站区'
+           else '内场'
+         end as main,
+         (regexp_match(btrim(zone), '([A-F]区|[A-D][1-4]区|C[12]区|D[12]区|VIP区|[123](0[1-9]|1[0-9]|2[0-5])区)$'))[1] as sub
+    from public.show_ticket_seats
+)
+update public.show_ticket_seats t
+   set zone = case when p.sub is null then p.main else p.main || ' · ' || p.sub end
+  from parsed p
+ where t.id = p.id
+   and not (
+     coalesce(t.zone, '') ~ '^(内场|一层看台|二层看台|三层看台|包厢区|音乐节站区)$'
+     or coalesce(t.zone, '') ~ '^(内场|一层看台|二层看台|三层看台|包厢区|音乐节站区) · (无细分区|VIP区|[A-F]区|[A-D][1-4]区|C[12]区|D[12]区|[123](0[1-9]|1[0-9]|2[0-5])区)$'
+   );
+
+-- 排座归一化：旧格式「9-15排（中区） · 中间号段」→ 新枚举「N排」或「N排 M号」
+with parsed as (
+  select id, btrim(coalesce(seat_detail, '')) as s
+    from public.show_ticket_seats
+)
+update public.show_ticket_seats t
+   set seat_detail = case
+     when p.s ~ '站区|音乐节|无排号|自由站' then '站区/无排号'
+     when p.s ~ '^([1-9]|[12][0-9]|3[0-5])-' then
+       substring(p.s from '^([1-9]|[12][0-9]|3[0-5])') || '排'
+     when p.s ~ '([1-9]|[12][0-9]|3[0-5])排' then
+       substring(p.s from '([1-9]|[12][0-9]|3[0-5])排') || '排'
+       || coalesce(' ' || (regexp_match(p.s, '([1-9]|[1-4][0-9]|50)号'))[1], '')
+     else '站区/无排号'
+   end
+  from parsed p
+ where t.id = p.id
+   and not (
+     coalesce(t.seat_detail, '') = '站区/无排号'
+     or coalesce(t.seat_detail, '') ~ '^([1-9]|[12][0-9]|3[0-5])排$'
+     or coalesce(t.seat_detail, '') ~ '^([1-9]|[12][0-9]|3[0-5])排 ([1-9]|[1-4][0-9]|50)号$'
+   );
+
+update public.show_ticket_seats set pay_seconds = 0 where pay_seconds is null;
+update public.show_ticket_seats set pay_seconds = 0 where pay_seconds < 0 or pay_seconds > 600;
+
+-- 清理无法归属场次 / 设备的脏行，并合并同场同设备的重复行（保留最新一条）
+delete from public.show_ticket_seats
+ where coalesce(btrim(show_id), '') = ''
+    or coalesce(btrim(device_id), '') = '';
+
+delete from public.show_ticket_seats a
+ using public.show_ticket_seats b
+ where a.show_id = b.show_id
+   and a.device_id = b.device_id
+   and (coalesce(a.updated_at, a.created_at, now()) < coalesce(b.updated_at, b.created_at, now())
+        or (coalesce(a.updated_at, a.created_at, now()) = coalesce(b.updated_at, b.created_at, now()) and a.id < b.id));
+
 alter table public.show_ticket_seats alter column show_id set not null;
 alter table public.show_ticket_seats alter column device_id set not null;
 alter table public.show_ticket_seats alter column platform set not null;
-
--- 旧版「其他官方平台」等非白名单值统一归入官方商城
-update public.show_ticket_seats
-   set platform = '坤音商城'
- where platform not in ('坤音商城', '大麦', '猫眼', '纷玩岛', '票星球', '秀动');
-
--- 旧版区域 / 排座文案归一化到新枚举（否则下面新增的 CHECK 约束会失败）
-update public.show_ticket_seats
-   set zone = case
-     when zone ~ '^内场' then '内场'
-     when zone ~ '^一层' then '一层看台'
-     when zone ~ '^二层' then '二层看台'
-     when zone ~ '^三层' then '三层看台'
-     when zone ~ '^包厢' then '包厢区'
-     when zone ~ '站区|音乐节|前区近距离|后区自由站' then '音乐节站区'
-     else '内场'
-   end
- where not (
-   zone ~ '^(内场|一层看台|二层看台|三层看台|包厢区|音乐节站区)$'
-   or zone ~ '^(内场|一层看台|二层看台|三层看台|包厢区|音乐节站区) · (无细分区|VIP区|[A-F]区|[A-D][1-4]区|C[12]区|D[12]区|[123](0[1-9]|1[0-9]|2[0-5])区)$'
- );
-
-update public.show_ticket_seats
-   set seat_detail = case
-     when seat_detail ~ '^(站区/无排号|[1-9]|[12][0-9]|3[0-5])排( ([1-9]|[1-4][0-9]|50)号)?$' then seat_detail
-     when seat_detail ~ '([1-9]|[12][0-9]|3[0-5])排' then substring(seat_detail from '([1-9]|[12][0-9]|3[0-5])排') || '排'
-     when seat_detail ~ '站区|音乐节' then '站区/无排号'
-     else split_part(seat_detail, ' · ', 1)
-   end
- where not (
-   seat_detail = '站区/无排号'
-   or seat_detail ~ '^([1-9]|[12][0-9]|3[0-5])排$'
-   or seat_detail ~ '^([1-9]|[12][0-9]|3[0-5])排 ([1-9]|[1-4][0-9]|50)号$'
- );
 
 -- 同一场演出、同一台设备只允许 1 条
 create unique index if not exists show_ticket_seats_show_device_uidx
