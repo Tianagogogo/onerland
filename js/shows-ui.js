@@ -105,7 +105,8 @@ function switchMainTab(tabId) {
   const sections = {
     home: 'view-home-page',
     shows: 'view-shows-page',
-    footprint: 'view-footprint-page'
+    footprint: 'view-footprint-page',
+    chant: 'view-chant-page'
   };
   Object.entries(sections).forEach(([id, sel]) => {
     const el = document.getElementById(sel);
@@ -125,6 +126,7 @@ function switchMainTab(tabId) {
   if (tabId === 'home' && typeof renderHomeDashboard === 'function') renderHomeDashboard();
   if (tabId === 'shows' && typeof renderTourCards === 'function') renderTourCards();
   if (tabId === 'footprint' && typeof renderFootprintPage === 'function') renderFootprintPage();
+  if (tabId === 'chant' && typeof renderChantPage === 'function') renderChantPage();
   if (tabId === 'footprint' && typeof mountFeatureTip === 'function') {
     setTimeout(() => {
       mountFeatureTip('footprints_tab', document.getElementById('view-footprint-page'));
