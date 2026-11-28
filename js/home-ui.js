@@ -418,6 +418,17 @@ function syncTicketToAnniversary() {
 }
 
 // ================= 近期演出微时间轴（合并云端 + 本地，去重后严格按日期降序） =================
+function pickTransportTextOf(item) {
+  const rec = item || {};
+  if (typeof pickTransportText === 'function') {
+    try {
+      const t = pickTransportText(rec, rec);
+      if (t) return t;
+    } catch (e) { /* ignore */ }
+  }
+  return rec.transport || rec.traffic || rec.transit || '';
+}
+
 function buildHomeTimelineList() {
   const map = new Map();
   const push = rec => {
@@ -451,6 +462,7 @@ function buildHomeTimelineList() {
       : (Array.isArray(item.timetables) ? item.timetables
       : (Array.isArray(item.timetable_urls) ? item.timetable_urls
       : (Array.isArray(item.schedule_images) ? item.schedule_images : []))),
+    transport: pickTransportTextOf(item),
     cloudId: item.cloudId
   }));
 
@@ -470,6 +482,7 @@ function buildHomeTimelineList() {
       : (Array.isArray(item.timetables) ? item.timetables
       : (Array.isArray(item.timetable_urls) ? item.timetable_urls
       : (Array.isArray(item.schedule_images) ? item.schedule_images : []))),
+    transport: pickTransportTextOf(item),
     cloudId: item.cloudId,
     isArchive: true
   }));
@@ -553,8 +566,14 @@ function renderUpcomingMiniTimeline() {
           ${item === pinned
             ? `<span class="timeline-next-badge text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap">⚡ 下一场</span>`
             : `<span class="text-[10px] px-1.5 py-0.5 rounded ${isFuture ? 'bg-white border border-slate-300 text-slate-600' : 'bg-slate-100 text-slate-500'}">${isFuture ? '待开演' : '已落幕'}</span>`}
-          ${(typeof item.cloudId === 'number' && !item.isArchive) ? `<button type="button" onclick="exportShowICS(${item.cloudId})" class="tour-action-btn tour-action-btn--mini" title="导出日历提醒">📅 日历</button>` : ''}
           <button type="button" onclick="switchMainTab('shows')" class="tour-action-btn tour-action-btn--mini">详情</button>
+        </div>
+        <div class="tl-quick-bar" data-tl-bar="${idx}">
+          <button type="button" class="tl-quick-btn" data-tl-action="traffic" data-tl-idx="${idx}" aria-expanded="false">🚇 交通</button>
+          <button type="button" class="tl-quick-btn" data-tl-action="security" data-tl-idx="${idx}" aria-expanded="false">🛡️ 安检体验</button>
+          <button type="button" class="tl-quick-btn" data-tl-action="buddy" data-tl-idx="${idx}">🤝 找搭子</button>
+          <button type="button" class="tl-quick-btn" data-tl-action="calendar" data-tl-idx="${idx}">📅 日历</button>
+          <button type="button" class="tl-quick-btn" data-tl-action="map" data-tl-idx="${idx}" aria-expanded="false">📍 地图</button>
         </div>
       </div>
     `;
@@ -565,6 +584,15 @@ function renderUpcomingMiniTimeline() {
     imgs: Array.isArray(item.scheduleImgs) ? item.scheduleImgs : [],
     title: String(item.city || item.title || '音乐节').replace(/['"<>]/g, '')
   }));
+  homeTimelineRecords = list;
+  box.querySelectorAll('[data-tl-action]').forEach(btn => {
+    btn.addEventListener('click', ev => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      handleHomeTimelineAction(btn.dataset.tlAction, Number(btn.dataset.tlIdx), btn);
+    });
+  });
+
   box.querySelectorAll('[data-sched]').forEach(btn => {
     btn.addEventListener('click', ev => {
       ev.stopPropagation();
@@ -578,4 +606,110 @@ function renderUpcomingMiniTimeline() {
       }
     });
   });
+}
+
+
+// ================= 首页微时间轴：底部 5 项实用功能（交通 / 安检 / 搭子 / 日历 / 地图） =================
+let homeTimelineRecords = [];
+
+function closeHomeTimelinePanels(exceptCard) {
+  document.querySelectorAll('#home-upcoming-timeline .tl-quick-panel').forEach(panel => {
+    if (exceptCard && panel.closest('.timeline-card') === exceptCard) return;
+    panel.remove();
+  });
+  document.querySelectorAll('#home-upcoming-timeline [data-tl-action]').forEach(btn => {
+    if (exceptCard && btn.closest('.timeline-card') === exceptCard) return;
+    btn.classList.remove('is-active');
+    btn.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function toggleHomeTimelinePanel(card, action, html) {
+  const existing = card.querySelector('.tl-quick-panel');
+  const sameAction = existing && existing.dataset.tlPanel === action;
+  closeHomeTimelinePanels(card);
+  const btn = card.querySelector(`[data-tl-action="${action}"]`);
+  if (existing) existing.remove();
+  if (sameAction) {
+    if (btn) { btn.classList.remove('is-active'); btn.setAttribute('aria-expanded', 'false'); }
+    return;
+  }
+  const holder = document.createElement('div');
+  holder.className = 'tl-quick-panel';
+  holder.dataset.tlPanel = action;
+  holder.innerHTML = html;
+  card.appendChild(holder);
+  if (btn) { btn.classList.add('is-active'); btn.setAttribute('aria-expanded', 'true'); }
+  if (action === 'security' && typeof hydrateSecurityVoteBlocks === 'function') {
+    try { hydrateSecurityVoteBlocks(); } catch (e) { /* ignore */ }
+  }
+  if (action === 'map' && typeof bindShowMapMenuDismiss === 'function') bindShowMapMenuDismiss();
+}
+
+function handleHomeTimelineAction(action, idx, btn) {
+  const rec = homeTimelineRecords[idx];
+  const card = btn.closest('.timeline-card');
+  if (!rec || !card) return;
+  const safeTitle = String(rec.city || rec.title || '').replace(/['"<>]/g, '');
+  const safeVenue = String(rec.venue || rec.city || '').replace(/['"<>]/g, '');
+  const esc = v => String(v == null ? '' : v).replace(/['"<>]/g, '');
+
+  if (action === 'traffic') {
+    const text = rec.transport || '暂无该场次的交通指南，可在「档案」中补充。';
+    toggleHomeTimelinePanel(card, 'traffic', `
+      <div class="tl-quick-panel-inner">
+        <div class="tl-quick-panel-title">🚇 交通与入场指南</div>
+        <div class="tl-quick-panel-body">${esc(text).replace(/\n/g, '<br />')}</div>
+      </div>`);
+    return;
+  }
+
+  if (action === 'security') {
+    let html = '';
+    if (typeof buildVenueExperienceDrawerHTML === 'function') {
+      html = buildVenueExperienceDrawerHTML(rec.venue || rec.city, `tl-vexp-${idx}`, `tl-vexp-${rec.cloudId || idx}`, safeTitle, 'archive', {
+        showDate: rec.date,
+        artist: rec.artist,
+        city: rec.city
+      });
+    }
+    toggleHomeTimelinePanel(card, 'security', `<div class="tl-quick-panel-inner">${html || '<div class="tl-quick-panel-body">暂无可记录的安检体验数据。</div>'}</div>`);
+    return;
+  }
+
+  if (action === 'buddy') {
+    closeHomeTimelinePanels();
+    if (typeof switchMainTab === 'function') switchMainTab('shows');
+    const cid = rec.cloudId;
+    window.setTimeout(() => {
+      const panel = document.querySelector(`[data-buddy-card="${String(cid)}"]`);
+      if (!panel) return;
+      panel.classList.remove('hidden');
+      panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (typeof refreshBuddyPanel === 'function' && cid != null) {
+        try { refreshBuddyPanel(String(cid)); } catch (e) { /* ignore */ }
+      }
+    }, 120);
+    return;
+  }
+
+  if (action === 'calendar') {
+    if (rec.cloudId != null && typeof exportShowICS === 'function') {
+      try { exportShowICS(rec.cloudId); } catch (e) { console.warn('日历生成失败', e); }
+    }
+    return;
+  }
+
+  if (action === 'map') {
+    const city = esc(rec.city || '');
+    toggleHomeTimelinePanel(card, 'map', `
+      <div class="tl-quick-panel-inner">
+        <div class="tl-quick-panel-title">📍 场馆导航 · ${safeVenue || '场馆待定'}</div>
+        <div class="tl-map-menu" data-show-map-menu data-map-venue="${encodeURIComponent(rec.venue || rec.city || '')}" data-map-city="${encodeURIComponent(city)}">
+          <button type="button" onclick="launchShowMapApp('amap', this)" class="tour-action-btn tour-action-btn--mini">🧭 高德 App</button>
+          <button type="button" onclick="launchShowMapApp('baidu', this)" class="tour-action-btn tour-action-btn--mini">🗺️ 百度 App</button>
+          <button type="button" onclick="launchShowMapApp('web', this)" class="tour-action-btn tour-action-btn--mini">🌐 网页版地图</button>
+        </div>
+      </div>`);
+  }
 }

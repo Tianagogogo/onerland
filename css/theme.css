@@ -1153,3 +1153,72 @@ select::-moz-focus-inner { border: 0; }
   white-space: normal;
   word-break: break-word;
 }
+
+/* ================= 首页微时间轴：底部 5 项功能栏（银白金属） ================= */
+.timeline-card { flex-wrap: wrap; }
+.tl-quick-bar {
+  flex: 0 0 100%;
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(226, 232, 240, 0.9);
+}
+.tl-quick-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #ffffff 0%, #f4f7fa 48%, #e8eef5 100%);
+  border: 1px solid #d5dde6;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 1px 3px rgba(100, 116, 139, 0.12);
+  transition: background 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease, color 0.16s ease;
+}
+.tl-quick-btn:hover {
+  background: linear-gradient(135deg, #ffffff 0%, #eef3f9 50%, #dde5ef 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1), 0 2px 7px rgba(100, 116, 139, 0.2);
+  transform: translateY(-1px);
+}
+.tl-quick-btn.is-active {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-color: #94a3b8;
+  color: #0f172a;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 5px rgba(100, 116, 139, 0.26);
+}
+.tl-quick-panel {
+  flex: 0 0 100%;
+  width: 100%;
+  margin-top: 8px;
+}
+.tl-quick-panel-inner {
+  position: relative;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #fbfcfe 0%, #f2f5f9 100%);
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 11.5px;
+  line-height: 1.6;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.tl-quick-panel-title { font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+.tl-quick-panel-body { white-space: normal; word-break: break-word; }
+.tl-map-menu { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+@media (max-width: 640px) {
+  .tl-quick-bar { gap: 5px; margin-top: 7px; }
+  .tl-quick-btn { height: 23px; padding: 0 6px; font-size: 10.5px; }
+  .tl-quick-panel-inner { font-size: 11px; padding: 8px; }
+}
