@@ -484,6 +484,23 @@ function renderTicketCanvasPreview() {
   const canvas = document.getElementById('souvenir-ticket-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  try {
+    paintSouvenirTicket(canvas, ctx);
+  } catch (e) {
+    console.warn('票根绘制失败：', e);
+  }
+  // Safari：容器不可见时绘制的画布可能为空白，等布局完成后再补一次
+  if (!canvas.offsetWidth && !canvas.__ticketRetryScheduled) {
+    canvas.__ticketRetryScheduled = true;
+    requestAnimationFrame(() => {
+      canvas.__ticketRetryScheduled = false;
+      if (canvas.offsetWidth) { try { paintSouvenirTicket(canvas, ctx); } catch (e) { /* ignore */ } }
+    });
+  }
+}
+
+function paintSouvenirTicket(canvas, ctx) {
   // 逻辑坐标 760×384，实际按 2 倍像素绘制，保证导出 PNG 高清
   const W = 760;
   const H = 384;
@@ -741,14 +758,115 @@ function renderTicketCanvasPreview() {
   ctx.textAlign = 'left';
 }
 
+function ticketCanvasDataUrl() {
+  const canvas = document.getElementById('souvenir-ticket-canvas');
+  if (!canvas) return '';
+  if (!canvas.width || !canvas.height) {
+    try { renderTicketCanvasPreview(); } catch (e) { /* ignore */ }
+  }
+  try {
+    return canvas.toDataURL('image/png');
+  } catch (e) {
+    // Safari：画布偶发被判定为不安全时，重绘一次再导出
+    try {
+      paintSouvenirTicket(canvas, canvas.getContext('2d'));
+      return canvas.toDataURL('image/png');
+    } catch (e2) {
+      return '';
+    }
+  }
+}
+
+function dataUrlToFile(dataUrl, fileName) {
+  try {
+    const parts = String(dataUrl).split(',');
+    const mime = (parts[0].match(/:(.*?);/) || [])[1] || 'image/png';
+    const bin = atob(parts[1] || '');
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new File([bytes], fileName, { type: mime });
+  } catch (e) { return null; }
+}
+
+function closeTicketSaveModal() {
+  const el = document.getElementById('ticket-save-modal');
+  if (!el) return;
+  el.classList.add('is-hiding');
+  setTimeout(() => el.remove(), 200);
+}
+
+function openTicketSaveModal(dataUrl) {
+  document.getElementById('ticket-save-modal')?.remove();
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const canShareFiles = typeof navigator.canShare === 'function' && typeof File === 'function';
+  const modal = document.createElement('div');
+  modal.id = 'ticket-save-modal';
+  modal.className = 'ticket-save-overlay';
+  modal.innerHTML = `
+    <div class="ticket-save-card" role="dialog" aria-modal="true" aria-label="纪念票根已生成">
+      <button type="button" class="ticket-save-close" aria-label="关闭" onclick="closeTicketSaveModal()">✕</button>
+      <div class="ticket-save-title">🎟️ 专属纪念票根已生成</div>
+      <div class="ticket-save-imgbox">
+        <img src="${dataUrl}" alt="ONERLAND 纪念票根" style="width:100%;border-radius:14px;-webkit-touch-callout:default;display:block" />
+      </div>
+      ${isIOS
+        ? `<p class="ticket-save-hint">📱 Safari 存图提示：长按上方票根图片，点击「存储到“照片”」即可高清保存至手机相册</p>`
+        : `<p class="ticket-save-hint">💻 若未自动下载，可在图片上右键「将图像存储为…」，或直接拖拽到桌面保存</p>`}
+      <div class="ticket-save-actions">
+        ${canShareFiles ? `<button type="button" class="ticket-save-share" onclick="shareTicketImage()">📤 唤起系统分享 / 存相册</button>` : ''}
+        <button type="button" class="ticket-save-done" onclick="closeTicketSaveModal()">完成</button>
+      </div>
+    </div>
+  `;
+  modal.addEventListener('click', ev => { if (ev.target === modal) closeTicketSaveModal(); });
+  document.body.appendChild(modal);
+  window.__ticketSaveDataUrl = dataUrl;
+}
+
+async function shareTicketImage() {
+  const dataUrl = window.__ticketSaveDataUrl;
+  if (!dataUrl) return;
+  const fileName = `ONERLAND-纪念票根-${Date.now()}.png`;
+  const file = dataUrlToFile(dataUrl, fileName);
+  if (!file || typeof navigator.share !== 'function') {
+    return toastError('当前浏览器不支持直接分享，请长按图片保存');
+  }
+  try {
+    if (typeof navigator.canShare === 'function' && !navigator.canShare({ files: [file] })) {
+      return toastError('当前浏览器不支持分享图片，请长按图片保存');
+    }
+    await navigator.share({ files: [file], title: 'ONERLAND 纪念票根' });
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+    toastError('分享未完成，可长按图片保存');
+  }
+}
+
 function downloadSouvenirTicket() {
   const canvas = document.getElementById('souvenir-ticket-canvas');
   if (!canvas) return;
-  const a = document.createElement('a');
-  a.href = canvas.toDataURL('image/png');
-  a.download = `ONERLAND-纪念票根-${Date.now()}.png`;
-  a.click();
+  const dataUrl = ticketCanvasDataUrl();
+  if (!dataUrl) {
+    toastError('票根生成失败，请刷新页面后重试');
+    return;
+  }
+  // 1) 常规浏览器：尝试 <a download>（Safari 可能忽略 download 属性，故必须保留弹窗兜底）
+  try {
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `ONERLAND-纪念票根-${Date.now()}.png`;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch (e) { /* Safari 不支持时静默失败 */ }
+  // 2) 所有环境都弹出存图弹窗（长按存图 / 右键存储 / 系统分享）
+  openTicketSaveModal(dataUrl);
 }
 
 window.renderTicketCanvasPreview = renderTicketCanvasPreview;
 window.downloadSouvenirTicket = downloadSouvenirTicket;
+window.openTicketSaveModal = openTicketSaveModal;
+window.closeTicketSaveModal = closeTicketSaveModal;
+window.shareTicketImage = shareTicketImage;
