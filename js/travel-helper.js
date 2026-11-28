@@ -148,7 +148,8 @@ const checkinState = {
   proofData: '',
   proofKb: 0,
   pendingOpen: false,
-  memberFilter: 'ONER全员'
+  memberFilter: 'ONER全员',
+  adminKeyStale: false
 };
 
 function checkinIsAdmin() {
@@ -164,8 +165,117 @@ async function checkinRpc(fnName, params) {
     headers: { ...SB_HEADERS, 'Content-Type': 'application/json' },
     body: JSON.stringify(params || {})
   });
-  if (!res.ok) throw new Error('rpc-failed-' + res.status);
+  if (!res.ok) {
+    let info = null;
+    let raw = '';
+    try { raw = await res.text(); } catch (e) { raw = ''; }
+    try { info = raw ? JSON.parse(raw) : null; } catch (e) { info = null; }
+    const err = new Error('rpc-failed-' + res.status);
+    err.status = res.status;
+    err.code = String((info && (info.code || info.error_code)) || '');
+    err.detail = String((info && (info.message || info.details || info.hint || info.error)) || '');
+    throw err;
+  }
   return res.json().catch(() => null);
+}
+
+// ---------- 全站统一管理员口令读取（不新造存储 Key） ----------
+// 真实来源永远是 store.js 的 setSecurityAdminKey/getSecurityAdminKey（当前会话内存），
+// 这里只是把历史遗留的存储键与全局变量作为只读兜底，读到就回写进统一通道。
+const CHECKIN_ADMIN_KEY_ALIASES = [
+  'onerland_security_admin_key',
+  'onerland_admin_key',
+  'onerland_admin_password',
+  'onerlandAdminKey',
+  'admin_key',
+  'admin_password'
+];
+let checkinKeyPrompting = false;
+
+function readLegacyAdminKey() {
+  const stores = [];
+  try { stores.push(window.localStorage); } catch (e) { /* ignore */ }
+  try { stores.push(window.sessionStorage); } catch (e) { /* ignore */ }
+  for (let i = 0; i < stores.length; i++) {
+    const store = stores[i];
+    if (!store) continue;
+    for (let j = 0; j < CHECKIN_ADMIN_KEY_ALIASES.length; j++) {
+      try {
+        const v = String(store.getItem(CHECKIN_ADMIN_KEY_ALIASES[j]) || '').trim();
+        if (v) return v;
+      } catch (e) { /* ignore */ }
+    }
+  }
+  const globals = [window.adminPassword, window.admin_password, window.adminKey];
+  for (let i = 0; i < globals.length; i++) {
+    const v = String(globals[i] || '').trim();
+    if (v) return v;
+  }
+  return '';
+}
+
+function syncCheckinAdminKey(key) {
+  const k = String(key || '').trim();
+  if (!k) return '';
+  try { if (typeof setSecurityAdminKey === 'function') setSecurityAdminKey(k); } catch (e) { /* ignore */ }
+  try {
+    if (typeof AppState !== 'undefined') AppState.isAdminPasswordVerified = true;
+  } catch (e) { /* ignore */ }
+  return k;
+}
+
+// 统一读取：优先全站内存口令，其次历史存储 / 全局变量
+function getCheckinAdminKey() {
+  let key = '';
+  try { key = typeof getSecurityAdminKey === 'function' ? String(getSecurityAdminKey() || '').trim() : ''; } catch (e) { key = ''; }
+  if (!key) key = readLegacyAdminKey();
+  return key ? syncCheckinAdminKey(key) : '';
+}
+
+// 只在用户明确操作（提交 / 审核 / 重试）时弹一次口令框，避免任何循环
+function promptCheckinAdminKey(message) {
+  if (checkinKeyPrompting) return '';
+  checkinKeyPrompting = true;
+  let typed = '';
+  try {
+    typed = window.prompt(message || '请输入管理员密码（与全站解锁口令一致）：') || '';
+  } catch (e) { typed = ''; }
+  checkinKeyPrompting = false;
+  const key = String(typed || '').trim();
+  if (!key) return '';
+  return syncCheckinAdminKey(key);
+}
+
+function isCheckinAuthError(err) {
+  if (!err) return false;
+  const status = Number(err.status || 0);
+  const code = String(err.code || '');
+  const text = `${err.message || ''} ${err.detail || ''}`;
+  if (status === 401 || status === 403) return true;
+  if (code === '42501' || code === 'PGRST301') return true;
+  return /unauthorized|invalid.*(key|password)|口令|密码|permission denied|jwt/i.test(text);
+}
+
+// 管理员 RPC 统一通道：自动带 p_admin_key，校验失败只补弹一次口令并重试一次
+async function checkinAdminRpc(fnName, params) {
+  let key = getCheckinAdminKey();
+  if (!key) {
+    key = promptCheckinAdminKey();
+    if (!key) throw new Error('admin-key-cancelled');
+  }
+  const build = k => Object.assign({}, params || {}, { p_admin_key: k });
+  try {
+    return await checkinRpc(fnName, build(key));
+  } catch (e) {
+    if (!isCheckinAuthError(e)) throw e;
+    const next = promptCheckinAdminKey('管理员密码校验未通过（可能已过期），请重新输入全站管理员密码：');
+    if (!next) {
+      const err = new Error('admin-key-cancelled');
+      err.authFailed = true;
+      throw err;
+    }
+    return checkinRpc(fnName, build(next));
+  }
 }
 
 // 📷 浏览器端大图压缩：最长边 ≤960px，Base64 ≤220000 字符，体积目标 <150KB
@@ -353,13 +463,28 @@ async function loadCheckinSpots(city, force) {
 }
 
 async function loadCheckinPending() {
-  if (!checkinIsAdmin()) { checkinState.pending = []; return; }
-  const key = String(typeof getSecurityAdminKey === 'function' ? getSecurityAdminKey() : '').trim();
-  if (!key) { checkinState.pending = []; return; }
+  if (!checkinIsAdmin()) { checkinState.pending = []; checkinState.adminKeyStale = false; return; }
+  const key = getCheckinAdminKey();
+  if (!key) { checkinState.pending = []; checkinState.adminKeyStale = true; return; }
   try {
     const data = await checkinRpc('admin_get_pending_checkin_spots', { p_admin_key: key });
     checkinState.pending = Array.isArray(data) ? data : [];
-  } catch (e) { checkinState.pending = []; }
+    checkinState.adminKeyStale = false;
+  } catch (e) {
+    checkinState.pending = [];
+    checkinState.adminKeyStale = isCheckinAuthError(e);
+  }
+}
+
+// 待审核区「重新输入口令」：一次弹框 → 写入全站统一通道 → 只重拉一次
+async function retryCheckinAdminKey() {
+  const key = promptCheckinAdminKey('请输入全站管理员密码（与顶部解锁使用同一个）：');
+  if (!key) return;
+  checkinState.adminKeyStale = false;
+  await loadCheckinPending();
+  if (checkinState.adminKeyStale) toastError('口令仍未通过校验，请确认与顶部解锁口令一致');
+  else showToast('✅ 管理员口令已生效');
+  renderCheckinSection();
 }
 
 async function submitCheckinSpot() {
@@ -388,17 +513,14 @@ async function submitCheckinSpot() {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 提交中…'; }
   try {
     if (isAdmin) {
-      const adminKey = String(typeof getSecurityAdminKey === 'function' ? getSecurityAdminKey() : '').trim();
-      if (!adminKey) throw new Error('管理员口令已失效，请重新解锁');
-      await checkinRpc('admin_create_checkin_spot', {
+      await checkinAdminRpc('admin_create_checkin_spot', {
         p_city: city,
         p_members: checkinState.members,
         p_category: checkinState.category,
         p_spot_name: name,
         p_note: note,
         p_proof_data: proof,
-        p_device_id: deviceId,
-        p_admin_key: adminKey
+        p_device_id: deviceId
       });
       showToast('✅ 已免审直发，立即公开展示');
     } else {
@@ -421,7 +543,9 @@ async function submitCheckinSpot() {
     await loadCheckinSpots(city, true);
   } catch (e) {
     const msg = String(e && e.message || '');
-    toastError(msg.indexOf('rpc-failed') >= 0 ? '提交失败：后台接口未就绪或已达投稿上限' : `提交失败：${msg}`);
+    if (msg === 'admin-key-cancelled') toastError('已取消：未提供有效的管理员口令');
+    else if (isCheckinAuthError(e) || /Unauthorized/i.test(msg)) toastError('管理员口令未通过校验，请用顶部解锁的同一口令重试');
+    else toastError(msg.indexOf('rpc-failed') >= 0 ? '提交失败：后台接口未就绪或已达投稿上限' : `提交失败：${msg}`);
     if (btn) { btn.disabled = false; btn.textContent = isAdmin ? '➕ 免审发布' : '📮 提交审核'; }
   }
 }
@@ -446,39 +570,36 @@ function toggleCheckinPending() {
 }
 
 async function adminReviewCheckin(spotId) {
-  const adminKey = String(typeof getSecurityAdminKey === 'function' ? getSecurityAdminKey() : '').trim();
-  if (!adminKey) return toastError('管理员口令已失效，请重新解锁');
   try {
-    await checkinRpc('admin_review_checkin_spot', { p_id: String(spotId), p_action: 'approve', p_admin_key: adminKey });
+    await checkinAdminRpc('admin_review_checkin_spot', { p_id: String(spotId), p_action: 'approve' });
     showToast('✅ 已通过并公开');
     await loadCheckinSpots(checkinState.city, true);
   } catch (e) {
+    if (e && (e.message === 'admin-key-cancelled' || e.authFailed)) return toastError('已取消：未提供有效管理员口令');
     toastError('审核失败，请稍后重试');
   }
 }
 
 async function adminRejectCheckin(spotId) {
-  const adminKey = String(typeof getSecurityAdminKey === 'function' ? getSecurityAdminKey() : '').trim();
-  if (!adminKey) return toastError('管理员口令已失效，请重新解锁');
   try {
-    await checkinRpc('admin_review_checkin_spot', { p_id: String(spotId), p_action: 'reject', p_admin_key: adminKey });
+    await checkinAdminRpc('admin_review_checkin_spot', { p_id: String(spotId), p_action: 'reject' });
     checkinState.pending = checkinState.pending.filter(sp => String(sp.id) !== String(spotId));
     renderCheckinSection();
     showToast('🗑️ 已驳回并彻底删除');
   } catch (e) {
+    if (e && (e.message === 'admin-key-cancelled' || e.authFailed)) return toastError('已取消：未提供有效管理员口令');
     toastError('驳回失败，请稍后重试');
   }
 }
 
 async function deleteApprovedCheckin(spotId) {
-  const adminKey = String(typeof getSecurityAdminKey === 'function' ? getSecurityAdminKey() : '').trim();
-  if (!adminKey) return toastError('管理员口令已失效，请重新解锁');
   try {
-    await checkinRpc('admin_review_checkin_spot', { p_id: String(spotId), p_action: 'delete', p_admin_key: adminKey });
+    await checkinAdminRpc('admin_review_checkin_spot', { p_id: String(spotId), p_action: 'delete' });
     checkinState.spots = checkinState.spots.filter(sp => String(sp.id) !== String(spotId));
     renderCheckinSection();
     showToast('🗑️ 已删除该打卡点');
   } catch (e) {
+    if (e && (e.message === 'admin-key-cancelled' || e.authFailed)) return toastError('已取消：未提供有效管理员口令');
     toastError('删除失败，请稍后重试');
   }
 }
@@ -594,6 +715,7 @@ function renderCheckinSection() {
         <button type="button" class="checkin-admin-head" onclick="toggleCheckinPending()">
           ⏳ 待审核同款投稿（${pending.length} 条） <span>${checkinState.pendingOpen ? '▴' : '▾'}</span>
         </button>
+        ${checkinState.adminKeyStale ? `<div class="checkin-empty">🔑 管理员口令未通过校验，<button type="button" class="checkin-link-btn" onclick="retryCheckinAdminKey()">点此重新输入</button></div>` : ''}
         ${checkinState.pendingOpen ? (pending.length
           ? `<div class="checkin-list">${pending.map(sp => `
               <div class="checkin-row is-pending">
@@ -1164,3 +1286,5 @@ window.adminReviewCheckin = adminReviewCheckin;
 window.adminRejectCheckin = adminRejectCheckin;
 window.deleteApprovedCheckin = deleteApprovedCheckin;
 window.renderCheckinSection = renderCheckinSection;
+window.retryCheckinAdminKey = retryCheckinAdminKey;
+window.getCheckinAdminKey = getCheckinAdminKey;

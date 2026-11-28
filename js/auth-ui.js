@@ -174,6 +174,8 @@ async function verifyAdminPassword() {
       throw new Error((data && (data.error || data.detail)) || `HTTP ${res.status}`);
     }
     saveAdminToken(data.token, data.expires_at);
+    // 全站统一：解锁时把同一口令写入安全口令通道，供安检投票 / 反馈箱 / 同款打卡等 RPC 直接复用
+    try { if (typeof setSecurityAdminKey === 'function') setSecurityAdminKey(password); } catch (e) { /* ignore */ }
     if (input) input.value = '';
     document.getElementById('admin-unlock-modal')?.classList.add('hidden');
     syncAuthState();

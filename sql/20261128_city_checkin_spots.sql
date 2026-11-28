@@ -52,6 +52,8 @@ drop policy if exists city_checkin_no_delete on public.city_checkin_spots;
 revoke all on table public.city_checkin_spots from anon, authenticated;
 
 -- ---------- 3) 管理员口令校验（复用 security_admin_config） ----------
+-- 与安检投票 / 反馈箱 / 抢票表完全同一套口令：security_admin_config.key_sha256
+-- 前端传 p_admin_key（已 btrim），这里同样 btrim 后 sha256 比对，失败抛 28000 → HTTP 403
 create or replace function public._checkin_admin_ok(p_admin_key text)
 returns boolean
 language plpgsql
@@ -59,16 +61,21 @@ security definer
 set search_path = public, extensions
 as $$
 declare
-  v_hash text;
+  v_expected text := '';
 begin
-  if p_admin_key is null or btrim(p_admin_key) = '' then
-    return false;
+  select coalesce(key_sha256, '') into v_expected
+    from public.security_admin_config where id = 1;
+  v_expected := lower(btrim(coalesce(v_expected, '')));
+
+  if v_expected = '' then
+    raise exception 'Admin key hash not configured' using errcode = '28000';
   end if;
-  select key_sha256 into v_hash from public.security_admin_config where id = 1;
-  if v_hash is null then
-    raise exception 'security_admin_config 未初始化，请先执行安检投票管理员口令 SQL';
+
+  if encode(digest(coalesce(btrim(p_admin_key), ''), 'sha256'), 'hex') <> v_expected then
+    raise exception 'Unauthorized' using errcode = '28000';
   end if;
-  return encode(digest(btrim(p_admin_key), 'sha256'), 'hex') = v_hash;
+
+  return true;
 end;
 $$;
 
@@ -183,9 +190,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if not public._checkin_admin_ok(p_admin_key) then
-    raise exception 'Unauthorized';
-  end if;
+  perform public._checkin_admin_ok(p_admin_key);
 
   return query
     select s.id, s.city, s.members, s.category, s.spot_name, s.note, s.proof_data, s.device_id, s.created_at
@@ -207,9 +212,7 @@ declare
   v_action text := lower(btrim(coalesce(p_action, '')));
   v_count int := 0;
 begin
-  if not public._checkin_admin_ok(p_admin_key) then
-    raise exception 'Unauthorized';
-  end if;
+  perform public._checkin_admin_ok(p_admin_key);
 
   if v_action = 'approve' then
     update public.city_checkin_spots
@@ -257,9 +260,7 @@ declare
   v_members text[];
   v_id uuid;
 begin
-  if not public._checkin_admin_ok(p_admin_key) then
-    raise exception 'Unauthorized';
-  end if;
+  perform public._checkin_admin_ok(p_admin_key);
 
   if v_city = '' then raise exception 'city_required'; end if;
   if v_name = '' then raise exception 'spot_name_required'; end if;
