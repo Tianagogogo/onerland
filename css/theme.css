@@ -4091,3 +4091,36 @@ input.seat-select { background-image: none; }
   .seat-combo--triple { grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
   .seat-combo--triple .seat-select { font-size: 11px; padding-left: 6px; padding-right: 16px; }
 }
+
+/* ================= 📱 卡片顶部标签栏：手机端防溢出兜底 ================= */
+@media (max-width: 768px) {
+  .show-card-top-row,
+  .archive-title-row {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .show-card-top-actions,
+  .archive-top-actions,
+  .series-card-top-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    max-width: 100%;
+    min-width: 0;
+    flex-shrink: 1;
+  }
+  .show-card-top-actions .plan-chip,
+  .archive-top-actions .plan-chip,
+  .series-card-top-actions .plan-chip {
+    height: auto;
+    min-height: 0;
+    line-height: 1.35;
+    padding: 3px 7px;
+    font-size: 11px;
+    margin-left: 0;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}

@@ -1259,7 +1259,7 @@ function openSeriesModal(themeKey) {
                   <span class="text-[10px] px-1.5 py-0.5 rounded text-white font-semibold shrink-0" style="background:${(ARTIST_COLORS[s.artist] || ARTIST_COLORS['ONER']).bg}">${String(s.artist || 'ONER')}</span>
                   <div class="series-card-top-actions">
                     <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 shrink-0">${s.status}</span>
-                    <button type="button" title="添加或查看该场足迹（仅存本机）" onclick="event.stopPropagation(); recordFootprintFromShow('${safeTitle}', '${s.date}', '${String(s.venue || '').replace(/['"<>]/g, '')}', '${String(s.artist || 'ONER').replace(/['"<>]/g, '')}')" class="plan-chip footprint-chip ${saved ? 'is-active' : ''}">${saved ? '✓ 已点亮足迹' : '+ 足迹'}</button>
+                    <button type="button" title="添加或查看该场足迹（仅存本机）" onclick="event.stopPropagation(); recordFootprintFromShow('${safeTitle}', '${s.date}', '${String(s.venue || '').replace(/['"<>]/g, '')}', '${String(s.artist || 'ONER').replace(/['"<>]/g, '')}')" class="plan-chip footprint-chip ${saved ? 'is-active' : ''}">${saved ? '✓ 已点亮' : '+ 足迹'}</button>
                   </div>
                 </div>`;
               })()}
@@ -2105,7 +2105,7 @@ function renderTourCards() {
                   ${isUpcomingShow
                     ? `<button type="button" class="plan-chip ${plannedShow ? 'is-active' : ''}" aria-pressed="${plannedShow ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); togglePlannedShowFromCard(this, '${planKey.replace(/['"<>]/g, '')}')">${plannedShow ? '✓ 计划前往' : '🎫 计划前往'}</button>`
                     : ''}
-                  <button type="button" title="添加或查看该场足迹（仅存本机）" onclick="event.stopPropagation(); recordFootprintFromShow('${safeCity}', '${item.show_date}', '${cleanVenue}', '${item.artist}')" class="plan-chip footprint-chip ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已点亮足迹' : '+ 足迹'}</button>
+                  <button type="button" title="添加或查看该场足迹（仅存本机）" onclick="event.stopPropagation(); recordFootprintFromShow('${safeCity}', '${item.show_date}', '${cleanVenue}', '${item.artist}')" class="plan-chip footprint-chip ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已点亮' : '+ 足迹'}</button>
                 </div>
               </div>
               <h3 class="show-card-title font-bold text-base text-slate-900 leading-snug break-words">${safeCity}${statusBadge}</h3>
@@ -2479,7 +2479,7 @@ function renderArchiveTimeline() {
           return `<button type="button" class="plan-chip ${on ? 'is-active' : ''}" aria-pressed="${on ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); togglePlannedShowFromCard(this, '${pk}')">${on ? '✓ 计划前往' : '🎫 计划前往'}</button>`;
         })()
       : '';
-    const footprintChipHtml = `<button type="button" title="添加或查看该场足迹（仅存本机）" onclick="event.stopPropagation(); recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="plan-chip footprint-chip ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已点亮足迹' : '+ 足迹'}</button>`;
+    const footprintChipHtml = `<button type="button" title="添加或查看该场足迹（仅存本机）" onclick="event.stopPropagation(); recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="plan-chip footprint-chip ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已点亮' : '+ 足迹'}</button>`;
 
     return `
       <div class="show-card archive-strip p-4 rounded-2xl metal-card space-y-3">
