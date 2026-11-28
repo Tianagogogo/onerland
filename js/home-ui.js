@@ -169,9 +169,9 @@ function renderAnniversaryCard() {
       </div>
 
       <button type="button" onclick="openAnniversaryManager()"
-        class="w-full flex items-center gap-2 pt-2.5 border-t border-slate-300/60 text-left hover:opacity-80 transition-opacity">
-        <span class="anniv-day-strip flex items-center gap-2 overflow-x-auto flex-1 min-w-0">${microHtml}</span>
-        <span class="shrink-0 text-[11px] text-slate-400">管理 ›</span>
+        class="anniv-bottom-bar w-full flex flex-wrap items-center gap-x-2 gap-y-1 pt-2.5 border-t border-slate-300/60 text-left hover:opacity-80 transition-opacity">
+        <span class="anniv-day-strip flex flex-wrap sm:flex-nowrap items-center gap-x-2 gap-y-1 overflow-x-auto flex-1 min-w-0 basis-full sm:basis-auto">${microHtml}</span>
+        <span class="anniv-manage-link shrink-0 text-[11px] text-slate-400 w-full text-right sm:w-auto">管理 ›</span>
       </button>
     </div>
   `;
@@ -521,20 +521,20 @@ function renderUpcomingMiniTimeline() {
     const weekday = isNaN(item.ts) ? '' : ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][new Date(item.ts).getDay()];
     const isFuture = item.ts + 3 * 3600 * 1000 > Date.now();
     return `
-      <div class="p-3.5 rounded-xl metal-card timeline-card flex items-center justify-between gap-3 ${item === pinned ? 'timeline-card-next' : ''}">
-        <div class="flex items-center gap-3 min-w-0">
+      <div class="p-3.5 rounded-xl metal-card timeline-card flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 ${item === pinned ? 'timeline-card-next' : ''}">
+        <div class="timeline-card-main flex items-start sm:items-center gap-3 min-w-0 w-full">
           <div class="w-12 poster-square-box shrink-0">
             ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" ${posterImgAttrs(item.posterUrl, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
           </div>
           <div class="min-w-0">
             <div class="flex items-center gap-1.5">
               <span class="text-[10px] px-1.5 py-0.5 rounded text-white font-semibold shrink-0" style="background:${badge}">${displayArtist}</span>
-              <span class="font-bold text-sm text-slate-900 truncate">${safeTitle}</span>
+              <span class="timeline-card-title font-bold text-sm text-slate-900 leading-snug break-words">${safeTitle}</span>
             </div>
-            <p class="text-xs text-slate-500 truncate mt-0.5">🗓️ ${item.date} ${weekday} · 📍 ${item.venue || '场馆待定'}${item.slot ? ` · <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-900 text-white text-[10px] font-semibold">⏰ ${String(item.slot).replace(/[<>\"']/g, '')}</span>` : ''}</p>
+            <p class="timeline-card-meta text-xs text-slate-500 mt-0.5 leading-relaxed break-words">🗓️ ${item.date} ${weekday} · 📍 ${item.venue || '场馆待定'}${item.slot ? ` · <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-900 text-white text-[10px] font-semibold">⏰ ${String(item.slot).replace(/[<>\"']/g, '')}</span>` : ''}</p>
           </div>
         </div>
-        <div class="flex items-center gap-1.5 shrink-0">
+        <div class="timeline-card-actions flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-end flex-wrap pt-1.5 sm:pt-0 border-t border-slate-200/70 sm:border-0">
           ${item === pinned
             ? `<span class="timeline-next-badge text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap">⚡ 下一场 · 距开演 ${Math.max(0, Math.ceil((item.ts - todayTs) / 86400000))} 天</span>`
             : `<span class="text-[10px] px-1.5 py-0.5 rounded ${isFuture ? 'bg-white border border-slate-300 text-slate-600' : 'bg-slate-100 text-slate-500'}">${isFuture ? '待开演' : '已落幕'}</span>`}

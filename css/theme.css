@@ -864,3 +864,45 @@ select::-moz-focus-inner { border: 0; }
 @media (prefers-reduced-motion: reduce) {
   .timeline-card-next::before { animation: none; }
 }
+
+/* ================= 移动端窄屏：底部生日栏与时间轴卡片不重叠、不截断 ================= */
+*, *::before, *::after { box-sizing: border-box; }
+.metal-card, .chronicle-card { max-width: 100%; min-width: 0; }
+#home-upcoming-timeline, .anniv-bottom-bar, .timeline-card-main { min-width: 0; max-width: 100%; }
+
+@media (max-width: 640px) {
+  .anniv-bottom-bar { align-items: flex-start; }
+  .anniv-day-strip {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    row-gap: 4px;
+    column-gap: 6px;
+    width: 100%;
+    flex: 1 1 100%;
+  }
+  .anniv-day-strip .anniv-day-item { font-size: 11px; }
+  .anniv-day-strip .anniv-days { font-size: 10px; }
+  .anniv-manage-link { text-align: right; width: 100%; }
+
+  .timeline-card { width: 100%; overflow: hidden; }
+  .timeline-card-main { align-items: flex-start; }
+  .timeline-card-title {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: normal;
+    word-break: break-word;
+  }
+  .timeline-card-meta {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-break: break-word;
+  }
+  .timeline-card-actions {
+    border-top: 1px solid rgba(226, 232, 240, 0.85);
+    justify-content: flex-end;
+  }
+  .timeline-next-badge { font-size: 10px; }
+}
