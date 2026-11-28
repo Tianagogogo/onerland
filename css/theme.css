@@ -2819,3 +2819,37 @@ body {
     position: static !important;
   }
 }
+
+/* ================= 开屏动效补充 & 海报占位封面 ================= */
+#app-splash-screen { z-index: 99999; }
+#app-splash-screen .splash-inner { gap: 14px; }
+#app-splash-screen .splash-hint {
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  color: #94a3b8;
+  opacity: 0.85;
+  margin-top: 18px;
+}
+#app-splash-screen, #app-splash-screen * { cursor: pointer; }
+
+/* 无海报 / 海报不可用时的冷银渐变文字封面（替代灰色 ONER 方块） */
+.poster-square-box .poster-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: linear-gradient(150deg, #f8fafc 0%, #e2e8f0 45%, #cbd5e1 100%);
+}
+.poster-square-box .poster-placeholder .poster-fallback-label {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: linear-gradient(120deg, #64748b 0%, #ffffff 45%, #94a3b8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}

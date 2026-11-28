@@ -1,0 +1,27 @@
+/* 核心演出海报本地化映射：优先走站内静态资源，规避图床防盗链与外链抖动 */
+window.POSTER_LOCAL_MAP = {
+  "32": "assets/posters/32.jpg",
+  "33": "assets/posters/33.jpg",
+  "35": "assets/posters/35.jpg",
+  "46": "assets/posters/46.jpg",
+  "47": "assets/posters/47.jpg",
+  "48": "assets/posters/48.jpg",
+  "49": "assets/posters/49.jpg",
+  "50": "assets/posters/50.jpg",
+  "51": "assets/posters/51.jpg",
+  "52": "assets/posters/52.jpg",
+  "53": "assets/posters/53.jpg",
+  "55": "assets/posters/55.jpg",
+  "57": "assets/posters/57.jpg",
+  "58": "assets/posters/58.jpg",
+  "60": "assets/posters/60.jpg",
+  "61": "assets/posters/61.jpg",
+  "62": "assets/posters/62.jpg",
+  "63": "assets/posters/63.jpg",
+  "64": "assets/posters/64.jpg",
+  "65": "assets/posters/65.jpg",
+  "66": "assets/posters/66.jpg",
+  "67": "assets/posters/67.jpg",
+  "68": "assets/posters/68.jpg",
+  "72": "assets/posters/72.jpg"
+};

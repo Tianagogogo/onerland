@@ -258,55 +258,56 @@ function closeAnniversaryTargetPicker() {
 }
 
 // ================= 开屏过渡收尾 =================
-const SPLASH_START_TS = Date.now();
-const SPLASH_MIN_MS = 350;
-const SPLASH_FADE_MS = 450;
-const SPLASH_MAX_MS = 3500;
+// 遮罩只做顶层 fixed 淡出：主页面与海报从第 0 秒就在后台并发加载，绝不被遮罩阻塞。
+const SPLASH_START_TS = (window.performance && performance.timing && performance.timing.navigationStart) ? performance.timing.navigationStart : Date.now();
+const SPLASH_MIN_MS = 1250;   // 品牌动效完整播放时长（自页面打开计约 1.25s）
+const SPLASH_FADE_MS = 400;   // 淡出时长
+const SPLASH_MAX_MS = 4000;   // 弱网兜底：最多 4s 必撤
 let splashFinished = false;
+let splashScheduled = false;
 
 function finishSplashNow() {
+  if (splashFinished === false) splashFinished = true;
   const el = document.getElementById('app-splash-screen');
   if (typeof ensurePosterImagesVisible === 'function') ensurePosterImagesVisible();
   if (!el) return;
+  if (el.dataset.hiding === '1') return;
+  el.dataset.hiding = '1';
   el.classList.add('is-hiding');
-  setTimeout(() => el.remove(), SPLASH_FADE_MS + 50);
+  // 淡出结束后再从 DOM 移除，期间底层页面已经完全可交互
+  setTimeout(() => { if (el && el.parentNode) el.remove(); }, SPLASH_FADE_MS + 60);
   // 遮罩撤掉后再补两轮，覆盖 Safari 缓存命中漏 onload 的情况
-  [0, 120, 600].forEach(ms => setTimeout(() => {
+  [SPLASH_FADE_MS, SPLASH_FADE_MS + 160, SPLASH_FADE_MS + 700].forEach(ms => setTimeout(() => {
     if (typeof ensurePosterImagesVisible === 'function') ensurePosterImagesVisible();
   }, ms));
 }
 
-function hideSplashScreen() {
+// 点击 / 触摸 / Esc 立即跳过（提前淡出，不硬切）
+function skipSplashScreen() {
   if (splashFinished) return;
   splashFinished = true;
-  const el = document.getElementById('app-splash-screen');
-  if (!el) return;
-  // 首屏可见区域内的海报：等 onload / onerror，避免遮罩撤掉时露出空框
-  const imgs = Array.from(document.querySelectorAll('#home-upcoming-timeline img, #home-anniversary-box img'))
-    .filter(img => {
-      const r = img.getBoundingClientRect ? img.getBoundingClientRect() : null;
-      return !r || (r.top < (window.innerHeight || 800) && r.bottom > 0);
-    });
-  const waitImg = img => new Promise(resolve => {
-    if (img.complete && img.naturalWidth > 0) return resolve();
-    if (img.complete) return resolve();
-    const done = () => { img.removeEventListener('load', done); img.removeEventListener('error', done); resolve(); };
-    img.addEventListener('load', done);
-    img.addEventListener('error', done);
-    // 单张图最多再等 1.2s，防弱网拖死
-    setTimeout(done, 1200);
-  });
-  const elapsed = Date.now() - SPLASH_START_TS;
-  const minWait = Math.max(0, SPLASH_MIN_MS - elapsed);
-  Promise.race([
-    Promise.all([Promise.all(imgs.map(waitImg)), new Promise(r => setTimeout(r, minWait))]),
-    new Promise(r => setTimeout(r, SPLASH_MAX_MS))
-  ]).finally(finishSplashNow);
+  finishSplashNow();
 }
 
-// 弱网/脚本异常兜底：最多 3.5s 必撤
-setTimeout(() => { if (!splashFinished) { splashFinished = true; finishSplashNow(); } }, SPLASH_MAX_MS);
+function hideSplashScreen() {
+  if (splashFinished || splashScheduled) return;
+  splashScheduled = true;
+  // 遮罩只负责品牌开场：固定播放 1.3s 后淡出，数据与海报在底层并行加载，绝不互相拖累
+  const rest = Math.max(0, SPLASH_MIN_MS - (Date.now() - SPLASH_START_TS));
+  setTimeout(() => { if (!splashFinished) finishSplashNow(); }, rest);
+}
+
+// 弱网/脚本异常兜底：最多 4s 必撤
+setTimeout(() => { if (!splashFinished) finishSplashNow(); }, SPLASH_MIN_MS);
 window.hideSplashScreen = hideSplashScreen;
+window.skipSplashScreen = skipSplashScreen;
+document.addEventListener('DOMContentLoaded', () => {
+  const el = document.getElementById('app-splash-screen');
+  if (!el) return;
+  el.addEventListener('click', skipSplashScreen, { passive: true });
+  el.addEventListener('touchstart', skipSplashScreen, { passive: true, once: true });
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') skipSplashScreen(); });
 
 function escapeAnnivText(text) {
   return String(text == null ? '' : text)
@@ -611,7 +612,7 @@ function renderUpcomingMiniTimeline() {
       <div class="p-3.5 rounded-xl metal-card timeline-card flex flex-col gap-2.5 ${item === pinned ? 'timeline-card-next' : ''}">
         <div class="timeline-card-main flex items-start gap-3 min-w-0 w-full">
           <div class="w-12 poster-square-box shrink-0">
-            ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" ${posterImgAttrs(item.posterUrl, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
+            ${(() => { const ps = (typeof posterSrcFor === 'function') ? posterSrcFor(item, item.posterUrl) : item.posterUrl; return ps ? `<img src="${ps}" alt="${safeTitle}" ${(typeof posterAttrsFor === 'function') ? posterAttrsFor(item, item.posterUrl, idx) : posterImgAttrs(ps, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" />` : ((typeof posterPlaceholderHtml === 'function') ? posterPlaceholderHtml(safeTitle) : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`); })()}
           </div>
           <div class="timeline-card-body min-w-0 flex-1">
             <div class="timeline-title-row flex items-start gap-1.5 flex-wrap">
@@ -659,7 +660,7 @@ function renderUpcomingMiniTimeline() {
   homeTimelineRecords = list;
   // 开屏期间就并发预加载首屏海报（前 6 张），撤遮罩即可见
   if (typeof preloadPosterImages === 'function') {
-    preloadPosterImages(list.map(it => it.posterUrl), 6);
+    preloadPosterImages(list.map(it => (typeof posterSrcFor === 'function' ? posterSrcFor(it, it.posterUrl) : it.posterUrl)), 6);
   }
   if (typeof ensurePosterImagesVisible === 'function') {
     ensurePosterImagesVisible(box);

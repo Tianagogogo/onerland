@@ -622,6 +622,47 @@ function compressTimetableImage(file, maxEdge = 2560, quality = 0.92) {
   });
 }
 
+// ================= 海报地址解析：本地静态资源优先 → 外链 → 专属渐变封面 =================
+function localPosterFor(item) {
+  const map = (typeof window !== 'undefined' && window.POSTER_LOCAL_MAP) || {};
+  if (!item) return '';
+  const keys = [item.cloudId, item.id, item.localKey];
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    if (k === undefined || k === null || k === '') continue;
+    const hit = map[String(k)];
+    if (hit) return hit;
+  }
+  return '';
+}
+
+function posterSrcFor(item, rawUrl) {
+  const local = localPosterFor(item);
+  if (local) return local;
+  return String(rawUrl || (item && (item.posterUrl || item.poster_url || item.poster || item.cover || item.image)) || '');
+}
+
+function escapeAttrValue(v) {
+  return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function posterAttrsFor(item, rawUrl, index) {
+  const local = localPosterFor(item);
+  const remote = String(rawUrl || '');
+  const src = local || remote;
+  let attrs = posterImgAttrs(src, index);
+  if (local && remote && !/^data:/i.test(remote)) {
+    attrs += ` data-remote-src="${escapeAttrValue(remote)}"`;
+  }
+  return attrs;
+}
+
+// 无海报时的专属渐变文字封面（不再出现灰色 ONER 方块）
+function posterPlaceholderHtml(label) {
+  const text = String(label || 'ONER').replace(/[<>"]/g, '').slice(0, 16) || 'ONER';
+  return `<div class="w-full h-full poster-placeholder"><span class="poster-fallback-label">${text}</span></div>`;
+}
+
 // ================= 海报加载策略：仅真实裂图时降级，不做超时掐断 =================
 function degradePosterImage(img) {
   if (!img) return;
@@ -636,6 +677,13 @@ function degradePosterImage(img) {
     return;
   }
   if (img.dataset.degraded === '1') return;
+  // 本地文件失效（被删/路径错）时，先回落到原始外链再谈降级
+  const remote = String(img.dataset.remoteSrc || '').trim();
+  if (remote && img.dataset.remoteTried !== '1') {
+    img.dataset.remoteTried = '1';
+    img.setAttribute('src', remote);
+    return;
+  }
   img.dataset.degraded = '1';
   const box = img.closest ? img.closest('.poster-square-box') : null;
   if (box) {
