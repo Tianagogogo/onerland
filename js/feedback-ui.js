@@ -13,7 +13,15 @@ const FEEDBACK_UNREAD_KEY = 'onerland_feedback_unread_v1';
 const FEEDBACK_THROTTLE_MS = 30 * 1000;
 const FEEDBACK_MAX_LEN = 500;
 
-let feedbackState = { category: 'bug', submitting: false, inboxLoading: false, items: [] };
+let feedbackState = { category: 'bug', submitting: false, inboxLoading: false, items: [], inboxTab: 'open' };
+
+// 管理员两项预设回复（与后端白名单保持完全一致，改文案需同步 SQL 白名单）
+const FEEDBACK_REPLY_PRESETS = [
+  { key: 'done', icon: '✅', text: '已实现，感谢你的反馈' },
+  { key: 'later', icon: '🙏', text: '现阶段无法实现，感谢你的反馈' }
+];
+// 本机提交过的反馈凭证（仅存本机，用于回看处理进度与站长回复）
+const FEEDBACK_TOKENS_KEY = 'onerland_feedback_tokens_v1';
 
 // ❓ 使用帮助配置：按「首页 / 档案 / 足迹 / 身份与隐私」四大板块组织，日后增删改只改这里
 // points 支持两种写法：字符串，或 { t: '加粗小标题', d: '详细说明' }
@@ -179,12 +187,39 @@ function openFeedbackModal() {
   renderHelpGuide();
   setFeedbackCategory(feedbackState.category);
   updateFeedbackCounter();
+  loadMyFeedbackStatus();
   modal.classList.remove('hidden');
   setTimeout(() => ta && ta.focus(), 40);
 }
 
 function closeFeedbackModal() {
   document.getElementById('feedback-modal')?.classList.add('hidden');
+}
+
+function ensureFeedbackClientToken() {
+  try {
+    let t = localStorage.getItem(FEEDBACK_TOKENS_KEY + '_current') || '';
+    if (!/^[a-z0-9]{16,40}$/.test(t)) {
+      t = (Date.now().toString(36) + Math.random().toString(36).slice(2, 10)).slice(0, 32);
+      localStorage.setItem(FEEDBACK_TOKENS_KEY + '_current', t);
+    }
+    return t;
+  } catch (e) { return ''; }
+}
+
+function getMyFeedbackRecords() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(FEEDBACK_TOKENS_KEY) || '[]');
+    return Array.isArray(raw) ? raw.filter(r => r && r.token).slice(0, 20) : [];
+  } catch (e) { return []; }
+}
+
+function saveMyFeedbackRecord(rec) {
+  try {
+    const list = getMyFeedbackRecords();
+    list.unshift(rec);
+    localStorage.setItem(FEEDBACK_TOKENS_KEY, JSON.stringify(list.slice(0, 20)));
+  } catch (e) { /* ignore */ }
 }
 
 // 提交匿名反馈：纯 INSERT，前端不会也不应拿到任何 SELECT 能力
@@ -217,11 +252,25 @@ async function submitSiteFeedback() {
       page_url: String(location.pathname + location.hash).slice(0, 200),
       status: 'new'
     };
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/site_feedback`, {
-      method: 'POST',
-      headers: { ...SB_HEADERS, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-      body: JSON.stringify(payload)
-    });
+    // 本机凭证：用于提交后回看「站长回复」，不关联任何账号信息
+    const clientToken = ensureFeedbackClientToken();
+    const postFeedback = async (body) => {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/site_feedback`, {
+        method: 'POST',
+        headers: { ...SB_HEADERS, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify(body)
+      });
+      return res;
+    };
+    let res = await postFeedback({ ...payload, client_token: clientToken });
+    if (!res.ok) {
+      // 云端尚未执行升级 SQL（无 client_token 列）时，退回基础字段，保证提交不失败
+      let raw = '';
+      try { raw = await res.clone().text(); } catch (e) { raw = ''; }
+      if (res.status === 400 && /client_token/i.test(raw)) {
+        res = await postFeedback(payload);
+      }
+    }
     if (!res.ok) {
       let raw = '';
       try { raw = await res.text(); } catch (e) { raw = ''; }
@@ -236,6 +285,12 @@ async function submitSiteFeedback() {
     }
     try { localStorage.setItem(FEEDBACK_LAST_AT_KEY, String(Date.now())); } catch (e) { /* ignore */ }
     saveFeedbackNick(nickname);
+    saveMyFeedbackRecord({
+      token: clientToken,
+      category: feedbackState.category,
+      content: content.slice(0, 60),
+      at: Date.now()
+    });
     if (ta) ta.value = '';
     updateFeedbackCounter();
     closeFeedbackModal();
@@ -320,7 +375,7 @@ async function loadAdminFeedbacks() {
     const items = Array.isArray(data) ? data : (data && Array.isArray(data.items) ? data.items : []);
     feedbackState.items = items;
     if (typeof setSecurityAdminKey === 'function') setSecurityAdminKey(adminKey);
-    setFeedbackUnreadCache(items.filter(it => String(it.status || 'new') !== 'read').length);
+    setFeedbackUnreadCache(items.filter(it => String(it.status || 'new') === 'new').length);
     renderAdminFeedbackList(items);
   } catch (e) {
     box.innerHTML = `<div class="text-xs text-rose-500 py-4 text-center leading-relaxed">${escapeFeedbackText(e && e.message ? e.message : '读取失败')}</div>`;
@@ -329,19 +384,60 @@ async function loadAdminFeedbacks() {
   }
 }
 
+function isFeedbackResolved(item) {
+  return String((item && item.status) || 'new') === 'resolved';
+}
+
+function setFeedbackInboxTab(tab) {
+  feedbackState.inboxTab = tab === 'resolved' ? 'resolved' : 'open';
+  document.querySelectorAll('[data-fb-tab]').forEach(btn => {
+    const on = btn.dataset.fbTab === feedbackState.inboxTab;
+    btn.classList.toggle('is-active', on);
+    btn.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  renderAdminFeedbackList(feedbackState.items);
+}
+
+function renderAdminFeedbackTabs(items) {
+  const box = document.getElementById('feedback-inbox-tabs');
+  if (!box) return;
+  const list = Array.isArray(items) ? items : [];
+  const open = list.filter(it => !isFeedbackResolved(it)).length;
+  const done = list.filter(isFeedbackResolved).length;
+  const openBtn = box.querySelector('[data-fb-tab="open"]');
+  const doneBtn = box.querySelector('[data-fb-tab="resolved"]');
+  if (openBtn) openBtn.textContent = `🆕 未处理 (${open})`;
+  if (doneBtn) doneBtn.textContent = `✅ 已处理 (${done})`;
+  box.classList.remove('hidden');
+}
+
+function feedbackReplyButtons(item) {
+  const id = String(item.id || '');
+  const current = String(item.admin_reply || '');
+  return FEEDBACK_REPLY_PRESETS.map(p => `
+    <button type="button" class="fb-reply-btn${current === p.text ? ' is-current' : ''}" title="${current === p.text ? '当前回复（点击可重复设置）' : '填入该预设回复并标记为已处理'}"
+      onclick="replyFeedbackAsAdmin('${id}', '${p.text}')">${p.icon} ${p.text}</button>
+  `).join('');
+}
+
 function renderAdminFeedbackList(items) {
   const box = document.getElementById('feedback-inbox-list');
   if (!box) return;
-  if (!items || !items.length) {
-    box.innerHTML = `<div class="text-xs text-slate-400 py-6 text-center">暂时没有新留言，辛苦啦 ✨</div>`;
+  const all = Array.isArray(items) ? items : [];
+  renderAdminFeedbackTabs(all);
+  const tab = feedbackState.inboxTab === 'resolved' ? 'resolved' : 'open';
+  const list = all.filter(it => (tab === 'resolved' ? isFeedbackResolved(it) : !isFeedbackResolved(it)));
+  if (!list.length) {
+    box.innerHTML = `<div class="text-xs text-slate-400 py-6 text-center">${tab === 'resolved' ? '还没有已处理的反馈 ✨' : '暂时没有待处理留言，辛苦啦 ✨'}</div>`;
     return;
   }
-  box.innerHTML = items.map(item => {
+  box.innerHTML = list.map(item => {
     const id = String(item.id || '');
-    const isRead = String(item.status || 'new') === 'read';
+    const resolved = isFeedbackResolved(item);
     const isPublic = item.is_public !== false;
+    const reply = String(item.admin_reply || '');
     return `
-      <div class="feedback-inbox-item ${isRead ? 'is-read' : ''}">
+      <div class="feedback-inbox-item ${resolved ? 'is-read' : ''}">
         <div class="feedback-inbox-head">
           <span class="feedback-inbox-cat">${escapeFeedbackText(feedbackCategoryLabel(item.category))}</span>
           <span class="feedback-inbox-time">${escapeFeedbackText(formatFeedbackTime(item.created_at))}</span>
@@ -350,16 +446,38 @@ function renderAdminFeedbackList(items) {
         <div class="feedback-inbox-meta">
           <span>🙋 ${escapeFeedbackText(item.nickname || '匿名访客')}</span>
           ${item.page_url ? `<span>🔗 ${escapeFeedbackText(item.page_url)}</span>` : ''}
-          <span>${isRead ? '✓ 已读' : '🆕 待处理'}</span>
+          <span>${resolved ? '✅ 已处理' : '🆕 待处理'}</span>
         </div>
+        ${resolved && reply ? `<div class="feedback-inbox-reply">💬 站长回复：${escapeFeedbackText(reply)}</div>` : ''}
         <div class="feedback-inbox-actions">
-          ${isRead ? '' : `<button type="button" class="tour-action-btn tour-action-btn--mini" onclick="markFeedbackRead('${id}')">✓ 已读/处理</button>`}
+          ${feedbackReplyButtons(item)}
+          ${resolved ? `<button type="button" class="fb-reopen-btn" onclick="replyFeedbackAsAdmin('${id}', '')">↩️ 退回未处理</button>` : ''}
           <button type="button" class="fb-public-toggle ${isPublic ? '' : 'is-off'}" title="仅在公开鸣谢名单里隐藏该昵称，不删除留言" onclick="toggleFeedbackPublic('${id}', ${isPublic ? 'false' : 'true'})">🙈 ${isPublic ? '移出公开鸣谢' : '恢复公开鸣谢'}</button>
           <button type="button" class="feedback-del-btn" onclick="deleteFeedbackAsAdmin('${id}')">🗑️ 删除</button>
         </div>
       </div>
     `;
   }).join('');
+}
+
+// 管理员：写入预设回复（传空字符串 = 退回未处理）
+async function replyFeedbackAsAdmin(id, replyText) {
+  const adminKey = getFeedbackAdminKeyFromMemory();
+  if (!adminKey) return toastError('管理员口令已过期，请重新打开反馈箱');
+  const text = String(replyText || '').trim();
+  if (text && !FEEDBACK_REPLY_PRESETS.some(p => p.text === text)) return toastError('只能使用预设回复模板');
+  try {
+    await feedbackAdminRpc('admin_reply_feedback', {
+      p_id: String(id),
+      p_admin_key: adminKey,
+      p_reply: text
+    });
+    showToast(text ? '已回复并标记为已处理' : '已退回未处理');
+    await loadAdminFeedbacks();
+    loadPublicThanksList();
+  } catch (e) {
+    toastError(`操作失败：${e && e.message ? e.message : '网络异常'}`);
+  }
 }
 
 async function markFeedbackRead(id) {
@@ -442,10 +560,67 @@ function renderPublicThanksWall(items, anonCount) {
       @${escapeFeedbackText(it.nickname || '')}<span class="fb-thanks-chip-sep">·</span>${escapeFeedbackText(thanksCategoryLabel(it.category))}
     </span>
   `).join('');
+  // 已有站长回复的建议：公开回显回复胶囊，让提建议的伙伴看到处理结果
+  const replied = list.filter(it => String(it.admin_reply || '').trim()).slice(0, 12);
+  const replyRows = replied.map(it => `
+    <div class="fb-thanks-reply-row">
+      <span class="fb-thanks-reply-who">@${escapeFeedbackText(it.nickname || '伙伴')}<span class="fb-thanks-chip-sep">·</span>${escapeFeedbackText(thanksCategoryLabel(it.category))}</span>
+      <span class="fb-thanks-reply-pill">💬 站长回复：${escapeFeedbackText(it.admin_reply)}</span>
+    </div>
+  `).join('');
   box.innerHTML = `
     <div class="fb-thanks-chips">${chips || '<span class="fb-thanks-empty">暂无可展示的公开昵称</span>'}</div>
     ${anon > 0 ? `<div class="fb-thanks-anon">以及 ${anon} 位匿名伙伴的暖心建议</div>` : ''}
+    ${replyRows ? `<div class="fb-thanks-replies">${replyRows}</div>` : ''}
   `;
+}
+
+// ---------- 📮 我的反馈进度（仅本机凭证查询，返回脱敏状态 + 站长回复） ----------
+function renderMyFeedbackStatus(rows) {
+  const sec = document.getElementById('feedback-mine-section');
+  const box = document.getElementById('feedback-mine-list');
+  if (!sec || !box) return;
+  if (!rows || !rows.length) {
+    sec.classList.add('hidden');
+    box.innerHTML = '';
+    return;
+  }
+  box.innerHTML = rows.map(r => {
+    const reply = String(r.admin_reply || '').trim();
+    const resolved = String(r.status || '') === 'resolved';
+    return `
+      <div class="fb-mine-item">
+        <div class="fb-mine-head">
+          <span>${escapeFeedbackText(thanksCategoryLabel(r.category))}</span>
+          <span class="fb-mine-state ${resolved ? 'is-done' : ''}">${resolved ? '✅ 已处理' : '⏳ 待处理'}</span>
+        </div>
+        ${reply ? `<div class="fb-mine-reply">💬 站长回复：${escapeFeedbackText(reply)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+  sec.classList.remove('hidden');
+}
+
+async function loadMyFeedbackStatus() {
+  const sec = document.getElementById('feedback-mine-section');
+  const box = document.getElementById('feedback-mine-list');
+  if (!sec || !box) return;
+  const records = getMyFeedbackRecords();
+  if (!records.length) return renderMyFeedbackStatus([]);
+  const tokens = records.map(r => r.token).filter(Boolean);
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_my_feedback_status`, {
+      method: 'POST',
+      headers: { ...SB_HEADERS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_tokens: tokens })
+    });
+    if (!res.ok) return renderMyFeedbackStatus([]);
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : (data && Array.isArray(data.items) ? data.items : []);
+    renderMyFeedbackStatus(rows.slice(0, 20));
+  } catch (e) {
+    renderMyFeedbackStatus([]);
+  }
 }
 
 // RPC 返回结构兼容解析：后端可能返回 直接数组 / {items} / {contributors} / {data}
@@ -501,7 +676,9 @@ async function loadPublicThanksList() {
         if (!name) return;
         const ts = Date.parse((it && it.created_at) || '') || 0;
         const prev = seen.get(name);
-        if (!prev || ts >= prev.ts) seen.set(name, { nickname: name, category: it.category, created_at: it.created_at, ts });
+        const reply = String((it && it.admin_reply) || '').trim();
+        if (!prev || ts >= prev.ts) seen.set(name, { nickname: name, category: it.category, created_at: it.created_at, admin_reply: reply || (prev && prev.admin_reply) || '', ts });
+        else if (reply && !prev.admin_reply) { prev.admin_reply = reply; seen.set(name, prev); }
       });
       const list = [...seen.values()].sort((a, b) => b.ts - a.ts);
       renderPublicThanksWall(list, payload.anonCount);
@@ -549,6 +726,9 @@ window.showFeedbackThanksModal = showFeedbackThanksModal;
 window.closeFeedbackThanksModal = closeFeedbackThanksModal;
 window.loadPublicThanksList = loadPublicThanksList;
 window.toggleFeedbackPublic = toggleFeedbackPublic;
+window.replyFeedbackAsAdmin = replyFeedbackAsAdmin;
+window.setFeedbackInboxTab = setFeedbackInboxTab;
+window.loadMyFeedbackStatus = loadMyFeedbackStatus;
 
 document.addEventListener('DOMContentLoaded', () => {
   renderHelpGuide();
