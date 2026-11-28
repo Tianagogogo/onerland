@@ -1635,8 +1635,8 @@ async function saveLocalBuddyIntent(cloudId, showTitle, event) {
     contact = `${platform}：${accountId}`;
   }
 
-  const noteEl = document.getElementById(`buddy-note-${cloudId}`);
-  let publicNote = (noteEl ? noteEl.value : '').trim().replace(/\s+/g, ' ').slice(0, 60);
+  // 公开同行宣言输入框已下线：公开备注固定为空，仅物料名称可写入
+  let publicNote = '';
   if (tags.includes('🎁 互换物料')) {
     const matEl = document.getElementById(`buddy-material-${cloudId}`);
     const material = (matEl ? matEl.value : '').trim().replace(/\s+/g, ' ').slice(0, 24);
@@ -2145,14 +2145,6 @@ function renderTourCards() {
                   placeholder="要互换的物料名称：小卡 / 透扇 / 手幅…"
                   class="buddy-material-input" />
               </div>
-            </div>
-
-            <div class="space-y-1 pt-1 border-t border-slate-100">
-              <span class="text-[11px] font-semibold text-slate-700">公开同行宣言（选填，全站可见）：</span>
-              <input id="buddy-note-${item.cloudId}" type="text" maxlength="60" autocomplete="off"
-                placeholder="如：想找人一起蹲入口排队 / 求拼车回市区（勿写联系方式）"
-                class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-[12px]" />
-              <p class="buddy-safety-hint">🔒 手机号、微信号、QQ 等联系方式请填下方加密栏，公开备注会自动拦截</p>
             </div>
 
             <div class="space-y-1 pt-1 border-t border-slate-100" data-enter-scope>
