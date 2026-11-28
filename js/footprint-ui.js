@@ -140,6 +140,94 @@ function getFootprintProvinceStats(list) {
   return stats;
 }
 
+// 🗺️ 城市 → 中国省级 SVG 地图坐标（viewBox 1000×979，以省质心为锚点推算）
+const CITY_SVG_COORDS = {
+  '北京': [696, 320], '天津': [714, 337], '上海': [781, 499], '重庆': [557, 526],
+  '石家庄': [665, 345], '唐山': [700, 335], '保定': [676, 335], '秦皇岛': [715, 320],
+  '太原': [640, 360], '大同': [630, 320], '呼和浩特': [645, 295], '包头': [615, 285],
+  '沈阳': [800, 285], '大连': [790, 330], '长春': [845, 230], '哈尔滨': [865, 175],
+  '南京': [740, 470], '苏州': [763, 481], '无锡': [759, 477], '常州': [755, 469],
+  '徐州': [715, 430], '南通': [762, 455], '扬州': [748, 458],
+  '杭州': [785, 525], '宁波': [800, 535], '温州': [775, 570], '嘉兴': [790, 510],
+  '合肥': [710, 485], '芜湖': [729, 497], '蚌埠': [712, 455],
+  '福州': [736, 598], '厦门': [716, 636], '泉州': [720, 615],
+  '南昌': [684, 569], '赣州': [660, 615], '九江': [683, 545],
+  '济南': [720, 390], '青岛': [795, 405], '烟台': [812, 370], '聊城': [700, 395],
+  '潍坊': [770, 385], '临沂': [730, 420],
+  '郑州': [660, 430], '洛阳': [630, 425], '开封': [670, 435],
+  '武汉': [655, 505], '宜昌': [600, 505], '襄阳': [615, 460],
+  '长沙': [630, 565], '株洲': [635, 580], '衡阳': [620, 600],
+  '广州': [646, 659], '深圳': [659, 673], '佛山': [640, 660], '东莞': [654, 661],
+  '珠海': [648, 678], '中山': [645, 668], '惠州': [672, 665], '汕头': [690, 680],
+  '南宁': [565, 675], '桂林': [590, 640], '柳州': [575, 650],
+  '海口': [653, 845], '三亚': [640, 880],
+  '成都': [482, 507], '绵阳': [475, 470], '德阳': [478, 486],
+  '贵阳': [548, 575], '遵义': [555, 545],
+  '昆明': [470, 620], '大理': [445, 620], '丽江': [440, 595],
+  '拉萨': [256, 505],
+  '西安': [573, 420], '咸阳': [569, 420], '宝鸡': [545, 415],
+  '兰州': [480, 395], '天水': [510, 410], '嘉峪关': [390, 340],
+  '西宁': [450, 400], '银川': [535, 375],
+  '乌鲁木齐': [280, 255], '喀什': [150, 320],
+  '香港': [661, 662], '澳门': [651, 665], '台北': [790, 625], '高雄': [780, 655]
+};
+
+// 兜底：未收录城市按所属省份质心定位；再兜底到全国中心点，绝不让坐标变成 NaN
+function citySvgPoint(city) {
+  const name = String(city || '').trim();
+  const hit = CITY_SVG_COORDS[name];
+  if (hit && Number.isFinite(hit[0]) && Number.isFinite(hit[1])) return [hit[0], hit[1]];
+  const province = typeof getProvinceOfCity === 'function' ? getProvinceOfCity(name) : '';
+  const geoName = province && typeof PROVINCE_GEO_KEY !== 'undefined' ? PROVINCE_GEO_KEY[province] : '';
+  const geo = geoName && window.CHINA_PROVINCE_MAP && window.CHINA_PROVINCE_MAP.provinces
+    ? window.CHINA_PROVINCE_MAP.provinces[geoName] : null;
+  if (geo && Number.isFinite(geo.cx) && Number.isFinite(geo.cy)) return [geo.cx, geo.cy];
+  return [500, 490];
+}
+
+// 按演出日期升序排列、去掉相邻同城，得到奔赴顺序
+function buildFootprintRoutePoints(list) {
+  const sorted = (list || []).slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+  const points = [];
+  sorted.forEach(f => {
+    const xy = citySvgPoint(f.city);
+    if (!xy || !Number.isFinite(xy[0]) || !Number.isFinite(xy[1])) return;
+    const city = String(f.city || '').trim();
+    const prev = points[points.length - 1];
+    if (prev && prev.city === city) return;
+    if (prev && Math.abs(prev.x - xy[0]) < 0.5 && Math.abs(prev.y - xy[1]) < 0.5) return;
+    points.push({ city, x: xy[0], y: xy[1] });
+  });
+  return points;
+}
+
+// 二次贝塞尔曲线航线：每段坐标都做有限值校验，避免 3+ 城市时整条线消失
+function buildRoutePathD(points) {
+  if (!Array.isArray(points) || points.length < 2) return '';
+  const cmds = [];
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1];
+    const b = points[i];
+    const x1 = Number(a.x), y1 = Number(a.y), x2 = Number(b.x), y2 = Number(b.y);
+    if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    if (!Number.isFinite(len) || len < 0.5) continue;
+    const off = Math.min(34, len * 0.18);
+    const cx = ((x1 + x2) / 2) - (dy / len) * off;
+    const cy = ((y1 + y2) / 2) + (dx / len) * off;
+    cmds.push(`M ${x1.toFixed(1)},${y1.toFixed(1)} Q ${cx.toFixed(1)},${cy.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)}`);
+  }
+  return cmds.join(' ');
+}
+
+function toggleFootprintCityLabels() {
+  window.__fpShowCityLabels = window.__fpShowCityLabels === false;
+  renderFootprintMapAndList();
+}
+
+window.toggleFootprintCityLabels = toggleFootprintCityLabels;
+
 function renderChinaProvinceMap(list) {
   const map = window.CHINA_PROVINCE_MAP;
   if (!map || !map.provinces) return '';
@@ -148,6 +236,27 @@ function renderChinaProvinceMap(list) {
   const citySet = new Set();
   (list || []).forEach(f => { if (f.city) citySet.add(String(f.city)); });
   const themeC1 = (getComputedStyle(document.documentElement).getPropertyValue('--footprint-theme-solid').trim()) || '#C8102E';
+  const rcPair = typeof getFanThemeHexes === 'function' ? getFanThemeHexes() : [themeC1, themeC1];
+  const routeGradientEnd = rcPair[1] || themeC1;
+  const routePoints = buildFootprintRoutePoints(list);
+  const routeD = buildRoutePathD(routePoints);
+  const showCityLabels = window.__fpShowCityLabels !== false;
+  const routeLayer = routePoints.length ? `
+    <g class="footprint-route-layer" style="pointer-events:none">
+      ${routeD ? `<path d="${routeD}" fill="none" stroke="url(#fp-route-grad)" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="7 5" opacity="0.95">
+        <animate attributeName="stroke-dashoffset" from="24" to="0" dur="1.6s" repeatCount="indefinite" />
+      </path>` : ''}
+      ${routePoints.map((p, i) => `
+        <g>
+          <circle cx="${p.x}" cy="${p.y}" r="8" fill="${themeC1}" opacity="0.16" />
+          <circle cx="${p.x}" cy="${p.y}" r="5.6" fill="#ffffff" opacity="0.95" />
+          <circle cx="${p.x}" cy="${p.y}" r="3.6" fill="url(#fp-route-grad)" />
+          ${showCityLabels ? `<text x="${p.x}" y="${p.y - 11}" text-anchor="middle" font-size="11" font-weight="700"
+            fill="#0f172a" stroke="#ffffff" stroke-width="2.6" style="paint-order:stroke">${escapeTicketHtml(p.city)}</text>` : ''}
+          <title>${escapeTicketHtml(p.city)} · 第 ${i + 1} 站</title>
+        </g>
+      `).join('')}
+    </g>` : '';
 
   const paths = Object.entries(map.provinces).map(([geoName, geo]) => {
     const short = Object.keys(PROVINCE_GEO_KEY).find(k => PROVINCE_GEO_KEY[k] === geoName) || geoName;
@@ -167,18 +276,27 @@ function renderChinaProvinceMap(list) {
     <div class="p-4 sm:p-5 rounded-2xl metal-card space-y-3" id="footprint-china-map-card">
       <div class="flex items-center justify-between gap-2 flex-wrap">
         <h3 class="text-sm font-bold text-slate-900">🗺️ 中国足迹点亮地图</h3>
-        <span class="text-[11px] font-semibold" style="color:${themeC1}">已点亮全国 ${litProvinces.length} 个省份 · ${citySet.size} 座城市</span>
+        <span class="text-[11px] font-semibold" style="color:${themeC1}">已点亮全国 ${litProvinces.length} 个省份 · ${citySet.size} 座城市（仅保存在本机）</span>
       </div>
       <div class="w-full rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100 p-2 flex justify-center">
-        <svg viewBox="0 0 ${map.width} ${map.height}" class="w-full max-w-xl h-auto" role="img" aria-label="中国省份足迹点亮地图">
+        <svg viewBox="0 0 ${map.width} ${map.height}" class="w-full max-w-xl h-auto" role="img" aria-label="中国省份足迹点亮地图与个人奔赴航线">
           <defs>
             <linearGradient id="fp-province-lit" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="${themeC1}" stop-opacity="0.92" />
               <stop offset="100%" stop-color="${themeC1}" stop-opacity="0.55" />
             </linearGradient>
+            <linearGradient id="fp-route-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="${themeC1}" />
+              <stop offset="100%" stop-color="${routeGradientEnd}" />
+            </linearGradient>
           </defs>
           ${paths}
+          ${routeLayer}
         </svg>
+      </div>
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <span class="text-[10px] text-slate-400">✈️ 航线按演出日期先后连接，共 ${routePoints.length} 个城市节点</span>
+        <button type="button" class="text-[10px] text-slate-500 underline" onclick="toggleFootprintCityLabels()">${showCityLabels ? '🙈 隐藏城市名' : '👁️ 显示城市名'}</button>
       </div>
       <div class="flex items-center gap-1.5 flex-wrap">
         ${litProvinces.length
@@ -310,46 +428,14 @@ function renderFootprintMapAndList() {
   if (!box) return;
   const list = AppState.footprints;
 
-  // 将经纬度映射为轻量 SVG 坐标（中国区域框：经度 75~135，纬度 18~54）
-  const toXY = ([lon, lat]) => [
-    Math.round(((lon - 75) / 60) * 340 + 30),
-    Math.round(((54 - lat) / 36) * 180 + 20)
-  ];
-
-  const points = list
-    .slice().reverse()
-    .map(f => ({ ...f, xy: CITY_COORDS[f.city] ? toXY(CITY_COORDS[f.city]) : null }))
-    .filter(p => p.xy);
-
-  const polylinePts = points.map(p => p.xy.join(',')).join(' ');
   const themeSolid = getComputedStyle(document.documentElement).getPropertyValue('--footprint-theme-solid').trim() || '#C8102E';
-  const [themeC1, themeC2] = getFanThemeHexes();
-  const isGradient = themeC1 !== themeC2;
 
   box.innerHTML = `
     ${renderChinaProvinceMap(list)}
     <div class="p-4 sm:p-5 rounded-2xl metal-card space-y-3">
       <div class="flex items-center justify-between">
-        <h3 class="text-sm font-bold text-slate-900">🗺️ 个人奔赴连线足迹（已点亮 ${list.length} 场）</h3>
+        <h3 class="text-sm font-bold text-slate-900">🎫 我的观演足迹档案（已点亮 ${list.length} 场）</h3>
         <span class="text-[11px] text-slate-400">仅保存在本机 · 不做他人排名对比</span>
-      </div>
-
-      <div class="w-full bg-slate-50 rounded-xl border border-slate-200 p-2 flex justify-center">
-        <svg viewBox="0 0 400 220" class="w-full max-w-lg h-auto">
-          <defs>
-            <linearGradient id="footprint-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="38%" stop-color="${themeC1}" />
-              <stop offset="62%" stop-color="${isGradient ? themeC2 : themeC1}" />
-            </linearGradient>
-          </defs>
-          <rect x="10" y="10" width="380" height="200" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-dasharray="4 4"/>
-          ${points.length >= 2 ? `<polyline fill="none" stroke="url(#footprint-grad)" stroke-width="2.5" stroke-dasharray="4 3" points="${polylinePts}"/>` : ''}
-          ${points.map((p, i) => `
-            <circle cx="${p.xy[0]}" cy="${p.xy[1]}" r="5.5" fill="url(#footprint-grad)" stroke="#ffffff" stroke-width="1.5"/>
-            <text x="${p.xy[0]}" y="${p.xy[1] - 10}" text-anchor="middle" fill="#0f172a" font-size="9" font-weight="bold">${p.city}(#${i + 1})</text>
-          `).join('')}
-          ${!points.length ? `<text x="200" y="114" text-anchor="middle" fill="#94a3b8" font-size="11">在「档案」点击演出卡片右上角「+ 足迹」即可点亮城市连线</text>` : ''}
-        </svg>
       </div>
 
       <div class="space-y-1.5 max-h-72 overflow-y-auto no-scrollbar">
