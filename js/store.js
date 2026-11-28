@@ -1311,7 +1311,7 @@ async function loadTourData() {
   renderLoadedTourData();
 
   if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) {
-    AppState.showLoadError = 'Supabase 未配置';
+    AppState.showLoadError = '暂时加载失败，请稍后点击刷新重试';
     renderLoadedTourData();
     return;
   }
@@ -1775,7 +1775,7 @@ async function postBuddyRequestPayload(payload) {
     }
     return { ok: false, status: res.status, detail, sent: body };
   }
-  return { ok: false, status: 400, detail: '字段与云端表结构不匹配', sent: body };
+  return { ok: false, status: 400, detail: '保存的内容格式不对，请检查后再试', sent: body };
 }
 
 async function sendBuddyRequest(buddy, note, contact, context) {
@@ -2311,7 +2311,7 @@ function aggregateSecurityTags(rows, myTags, venueRows) {
 
 // ---------- Supabase RPC：数据库层按 出口IP + 硬件指纹 去重 ----------
 async function securityRpc(fnName, params) {
-  if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) throw new Error('未配置 Supabase');
+  if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) throw new Error('服务暂时不可用，请稍后再试');
   const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
     method: 'POST',
     headers: { ...SB_HEADERS, 'Content-Type': 'application/json' },
@@ -2330,7 +2330,7 @@ async function securityRpc(fnName, params) {
     if (info && info.hint) parts.push(`hint: ${String(info.hint).trim()}`);
     if (info && info.code) parts.push(`code: ${info.code}`);
     const suffix = parts.length ? `：${parts.join(' | ')}` : (raw ? `：${raw.slice(0, 240)}` : '');
-    const err = new Error(`RPC ${fnName} HTTP ${res.status}${suffix}`);
+    const err = new Error('服务暂时开小差，请稍后再试');
     err.status = res.status;
     err.detail = info;
     throw err;
@@ -2378,7 +2378,7 @@ async function fetchSecurityTagStats(showId, venue) {
       securityVoteCache.set(key, stats);
       return stats;
     }
-    throw new Error('RPC 返回为空');
+    throw new Error('暂时没有拿到数据，请稍后点击刷新重试');
   } catch (rpcErr) {
     // RPC 未部署时回退 REST 直读（旧部署不受影响）
   }

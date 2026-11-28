@@ -110,7 +110,7 @@ const models = ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-3.5-flash-
 
     if (!aiSucceeded) {
       if (typeof Tesseract === 'undefined') {
-        throw new Error('AI 接口返回 404 且本地 OCR 未加载，请检查 AI 密钥或稍后再试');
+        throw new Error('这次没识别出来，换个更清晰的图再试一次就好');
       }
       statusEl.textContent = '🔍 AI 节点不可用，已自动切换本地中文 OCR 识别...';
       const enhanced = posterUrl.startsWith('data:image/') ? await preprocessImageForLocalOCR(posterUrl) : posterUrl;

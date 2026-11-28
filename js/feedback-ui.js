@@ -201,7 +201,7 @@ async function submitSiteFeedback() {
   if (btn) { btn.disabled = true; btn.textContent = '提交中…'; }
 
   try {
-    if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) throw new Error('未配置 Supabase');
+    if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) throw new Error('留言服务还没准备好，请稍后再试');
     const payload = {
       category: feedbackState.category,
       content,
@@ -235,7 +235,7 @@ async function submitSiteFeedback() {
     showFeedbackThanksModal(nickname);
     loadPublicThanksList();
   } catch (e) {
-    toastError(`提交失败：${e && e.message ? e.message : '网络异常'}（若未建表，请先执行 site_feedback 建表 SQL）`);
+    toastError('暂时没能提交成功，请稍后点击刷新重试');
   } finally {
     feedbackState.submitting = false;
     if (btn) { btn.disabled = false; btn.textContent = oldText || '提交反馈'; }
@@ -268,7 +268,7 @@ async function feedbackAdminRpc(fnName, params) {
     let info = null;
     try { info = raw ? JSON.parse(raw) : null; } catch (e) { info = null; }
     const detail = info && (info.message || info.details || info.hint);
-    throw new Error(`RPC ${fnName} HTTP ${res.status}${detail ? `：${detail}` : ''}`);
+    throw new Error('服务暂时开小差，请稍后再试');
   }
   return res.json().catch(() => null);
 }

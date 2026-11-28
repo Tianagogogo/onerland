@@ -6,7 +6,7 @@
   <title>ONERLAND · 时光典藏与观演实用工具站</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <link rel="stylesheet" href="./css/theme.css?v=20261128_footprint_btn" />
+  <link rel="stylesheet" href="./css/theme.css?v=20261128_clean_copy" />
 </head>
 <body class="text-slate-800 min-h-screen antialiased selection:bg-slate-300 selection:text-slate-950">
   <!-- 全屏开屏过渡：银白液态金属 -->
@@ -86,8 +86,7 @@
       <div class="p-4 sm:p-5 rounded-2xl chronicle-card space-y-4">
         <div class="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <h3 class="text-sm font-bold text-slate-900">🎟️ 专属观演纪念票根生成器（纯前端本地生成）</h3>
-            <p class="text-[11px] text-slate-500 mt-0.5">高拟真实体票根：主券 72%（演出名 / 场馆 / 日期 / 座位 / 观演寄语）+ 副券存根 28%（竖排编号 / 日期简码 / 留念印章 / 矢量条形码），交界处物理半圆缺口 + 打孔撕裂线，复古液态银白灰金属纸质基调。</p>
+            <h3 class="text-sm font-bold text-slate-900">🎟️ 专属观演纪念票根生成器</h3>
           </div>
           <div class="flex items-center gap-1.5 flex-wrap">
             <button type="button" onclick="syncTicketToAnniversary()" class="tour-action-btn text-xs font-semibold">🔗 同步记录为纪念日</button>
@@ -446,25 +445,25 @@
           <button type="button" onclick="document.getElementById('feedback-inbox-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-800">✕</button>
         </div>
       </div>
-      <p class="text-[11px] text-slate-500 leading-relaxed">仅管理员密码解锁后可见；数据由 RPC 校验口令后返回，普通访客在数据库层无任何读取权限。</p>
+      <p class="text-[11px] text-slate-500 leading-relaxed">仅管理员可见，用来日常维护演出信息，普通访客看不到这里的任何内容。</p>
       <div id="feedback-inbox-list" class="space-y-2">
         <div class="text-xs text-slate-400 py-3 text-center">正在读取…</div>
       </div>
     </div>
   </div>
 
-  <script src="./js/config.js?v=20261128_footprint_btn"></script>
-  <script src="./js/poster-local.js?v=20261128_footprint_btn"></script>
-  <script src="./js/store.js?v=20261128_footprint_btn"></script>
-  <script src="./js/home-ui.js?v=20261128_footprint_btn"></script>
-  <script src="./js/shows-ui.js?v=20261128_footprint_btn"></script>
-  <script src="./js/parser.js?v=20261128_footprint_btn"></script>
-  <script src="./js/footprint-ui.js?v=20261128_footprint_btn"></script>
-  <script src="./js/admin-ui.js?v=20261128_footprint_btn"></script>
-  <script src="./js/auth-ui.js?v=20261128_footprint_btn"></script>
-  <script src="./js/travel-helper.js?v=20261128_footprint_btn"></script>
-  <script src="./js/fandom-sync.js?v=20261128_footprint_btn"></script>
-  <script src="./js/feedback-ui.js?v=20261128_footprint_btn"></script>
+  <script src="./js/config.js?v=20261128_clean_copy"></script>
+  <script src="./js/poster-local.js?v=20261128_clean_copy"></script>
+  <script src="./js/store.js?v=20261128_clean_copy"></script>
+  <script src="./js/home-ui.js?v=20261128_clean_copy"></script>
+  <script src="./js/shows-ui.js?v=20261128_clean_copy"></script>
+  <script src="./js/parser.js?v=20261128_clean_copy"></script>
+  <script src="./js/footprint-ui.js?v=20261128_clean_copy"></script>
+  <script src="./js/admin-ui.js?v=20261128_clean_copy"></script>
+  <script src="./js/auth-ui.js?v=20261128_clean_copy"></script>
+  <script src="./js/travel-helper.js?v=20261128_clean_copy"></script>
+  <script src="./js/fandom-sync.js?v=20261128_clean_copy"></script>
+  <script src="./js/feedback-ui.js?v=20261128_clean_copy"></script>
   <script>
     if ('serviceWorker' in navigator) {
       // 刷新一次后清除标记，保证后续版本更新仍能自动刷新（10 秒后再放开，避免刷新循环）

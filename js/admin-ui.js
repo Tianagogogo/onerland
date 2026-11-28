@@ -554,7 +554,7 @@ async function bulkCompressLegacyImages() {
     alert('请先通过管理员密码解锁后再使用该工具。');
     return;
   }
-  if (!confirm('将遍历云端所有场次的海报与座位图，把超过 200KB 的图片压缩为 WebP 后写回数据库。\n过程中请勿关闭页面，是否继续？')) return;
+  if (!confirm('会逐场检查海报与座位图，把较大的图片压缩后保存，让页面打开更快。\n过程中请先别关闭页面，是否继续？')) return;
 
   const btn = document.getElementById('adm-compress-btn');
   const statusEl = document.getElementById('adm-compress-status');

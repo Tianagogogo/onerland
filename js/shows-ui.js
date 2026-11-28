@@ -660,14 +660,6 @@ function refreshFootprintAfterSecurity(showKey) {
 }
 
 // ================= 安检体验：云端公共投票（匿名聚合，无自由文本） =================
-const SECURITY_VOTE_SQL_HINT = `-- 在 Supabase SQL Editor 执行一次 sql/security_votes.sql
--- 表 public.show_security_votes，UNIQUE (show_id, voter_key, tag)
--- RPC：submit_security_vote(p_show_id, p_tag, p_hw_hash, p_venue)  —— 有则删、无则插
---      get_security_votes(p_show_id, p_hw_hash, p_venue)
--- voter_key = md5(出口IP || ':' || 硬件指纹)，微信/Safari/无痕共用同一票
-grant execute on function public.submit_security_vote(text, text, text, text, text[]) to anon;
-grant execute on function public.get_security_votes(text, text, text) to anon;`;
-
 function escapeVoteText(v) {
   return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -736,10 +728,7 @@ function renderSecurityVoteBlock(host, stats) {
   ` : '';
 
   const degradedHtml = stats && stats.degraded ? `
-    <details class="security-sql-hint">
-      <summary>⚠️ 云端投票暂不可用（点开查看建表 SQL）</summary>
-      <pre>${escapeVoteText(SECURITY_VOTE_SQL_HINT)}</pre>
-    </details>
+    <div class="security-sql-hint text-[11px] text-slate-500">云端投票暂时没能连上，稍后刷新页面再试试；本机的安检笔记照常保存。</div>
   ` : '';
 
   host.dataset.ready = '1';

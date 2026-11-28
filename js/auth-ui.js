@@ -218,7 +218,7 @@ function getAdminRequestHeaders() {
 function translateAuthError(raw, status) {
   const msg = String(raw || '').toLowerCase();
   if (msg.includes('invalid login credentials') || msg.includes('invalid_grant')) return '邮箱或密码不正确，请检查后重试。';
-  if (msg.includes('email not confirmed')) return '该邮箱尚未完成验证。请在 Supabase 后台关闭 Confirm email 后重试。';
+  if (msg.includes('email not confirmed')) return '该邮箱还没完成验证，先去邮箱里点开验证链接，再回来登录即可。';
   if (msg.includes('user already registered') || msg.includes('already been registered')) return '该邮箱已注册，请直接点「登录」。';
   if (msg.includes('password should be at least')) return '密码太短，至少需要 6 位字符。';
   if (msg.includes('weak password') || msg.includes('weak_password')) return '密码强度过低，请换用更复杂的密码。';
