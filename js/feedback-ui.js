@@ -15,6 +15,92 @@ const FEEDBACK_MAX_LEN = 500;
 
 let feedbackState = { category: 'bug', submitting: false, inboxLoading: false, items: [] };
 
+// ❓ 使用帮助配置：日后增删改功能说明只改这里即可
+const HELP_GUIDE_ITEMS = [
+  {
+    id: 'anniversary',
+    icon: '✨',
+    title: '时光提醒与纪念日',
+    defaultOpen: true,
+    points: [
+      '点击顶部「昵称 / 对象 / 动作词」即可自定义显示文案与关联对象。',
+      '为未来场次点亮 `🎫 计划前往` 后，顶部倒计时自动改为「距下次见面还有 X 天」（不计入已观演场次）。',
+      '支持管理内置官方纪念日、新增自定义纪念日，并生成纪念票根留作收藏。'
+    ]
+  },
+  {
+    id: 'calendar-travel',
+    icon: '📅',
+    title: '演出日历与出行比价',
+    defaultOpen: true,
+    points: [
+      '点击卡片上的演出日期，可一键把该场演出导入手机 / 电脑日历并设提醒。',
+      '点击 `🚄 出行比价`：先选出发城市与往返日期，再直达机票、高铁、场馆路线与周边酒店查询。',
+      '手机自带浏览器打开可自动拉起对应 App；微信内请点右上角「在默认浏览器打开」。'
+    ]
+  },
+  {
+    id: 'security',
+    icon: '🛡️',
+    title: '演出安检体验与私人笔记',
+    defaultOpen: false,
+    points: [
+      '无需上传票根即可参与安检标签投票（安检严格 / 安检宽松 / 查相机长焦 / 翻包细致 / 过检很快）。',
+      '同一设备始终只算 1 票，再点一次可取消；换浏览器或设备会自动合并去重。',
+      '下方「我的私人安检笔记」仅存本机、不公开，散场次日起自动归档到「场馆体验」与「我的足迹」。'
+    ]
+  },
+  {
+    id: 'buddy',
+    icon: '🤝',
+    title: '找搭子与双向同意解锁',
+    defaultOpen: false,
+    points: [
+      '在任意场次发布「找搭子」意向（昵称 + 简短备注，联系方式可填但不公开）。',
+      '双方互相点击申请并确认同意后，才会展示彼此联系方式，避免被陌生人直接查看。',
+      '严禁填写手机号、身份证号或转账链接；线下见面请核对票根并注意安全。'
+    ]
+  },
+  {
+    id: 'footprint',
+    icon: '🎫',
+    title: '我的足迹与搭子纪念日',
+    defaultOpen: false,
+    points: [
+      '历史场次点击 `+ 足迹` 即可点亮并累计「已点亮线下 X 面」见面次数。',
+      '足迹里可记录本机「🤝 同行搭子昵称」，并支持从已互换联系方式的搭子中一键点选填入。',
+      '填写搭子后可点 `🎂 生成搭子纪念日`，自动同步到首页「✨ 时光提醒」的倒计时栏。'
+    ]
+  },
+  {
+    id: 'local-data',
+    icon: '🔒',
+    title: '免注册与本机数据存储',
+    defaultOpen: false,
+    points: [
+      '全站免注册即可浏览与使用；个人足迹、计划前往、私人笔记、搭子备注、纪念日设置都只存在当前浏览器。',
+      '清理浏览器缓存 / 数据、换浏览器或换设备后，这些记录不会自动带过去，请提前备份（导出备份）。',
+      '安检投票、找搭子等公共数据会匿名上云；私人笔记与搭子备注绝不上传。'
+    ]
+  }
+];
+
+function renderHelpGuide() {
+  const box = document.getElementById('feedback-help-guide');
+  if (!box) return;
+  box.innerHTML = HELP_GUIDE_ITEMS.map((item, idx) => {
+    const open = item.defaultOpen || idx < 2;
+    const pts = (item.points || []).map(t => `<li>${escapeFeedbackText(t).replace(/`([^`]+)`/g, '<code class="help-guide-code">$1</code>')}</li>`).join('');
+    return `
+      <details class="help-guide-item"${open ? ' open' : ''}>
+        <summary class="help-guide-summary"><span class="help-guide-icon">${escapeFeedbackText(item.icon)}</span><span class="help-guide-title">${escapeFeedbackText(item.title)}</span></summary>
+        <ul class="help-guide-points">${pts}</ul>
+      </details>
+    `;
+  }).join('');
+}
+
+
 function feedbackCategoryLabel(id) {
   const hit = FEEDBACK_CATEGORIES.find(c => c.id === id);
   return hit ? hit.label : '💬 留言';
@@ -87,6 +173,7 @@ function openFeedbackModal() {
   if (ta) ta.value = '';
   const nick = document.getElementById('feedback-nick');
   if (nick) nick.value = getSavedFeedbackNick();
+  renderHelpGuide();
   setFeedbackCategory(feedbackState.category);
   updateFeedbackCounter();
   modal.classList.remove('hidden');
@@ -303,8 +390,10 @@ window.loadAdminFeedbacks = loadAdminFeedbacks;
 window.markFeedbackRead = markFeedbackRead;
 window.deleteFeedbackAsAdmin = deleteFeedbackAsAdmin;
 window.refreshFeedbackEntryPoints = refreshFeedbackEntryPoints;
+window.renderHelpGuide = renderHelpGuide;
 
 document.addEventListener('DOMContentLoaded', () => {
+  renderHelpGuide();
   refreshFeedbackEntryPoints();
   updateFeedbackCounter();
 });
