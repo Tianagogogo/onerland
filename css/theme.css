@@ -3084,3 +3084,92 @@ body.phd-open { overflow: hidden; }
     padding: 0 8px;
   }
 }
+
+/* ================= 演出卡片统一顶栏：艺人标签左 / 计划+足迹右 / 标题另起一行 ================= */
+.show-card-top-row,
+.series-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  flex-wrap: nowrap;
+}
+.show-card-top-actions,
+.series-card-top-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.show-card-title { display: block; width: 100%; margin-top: 6px; }
+.show-card-top-actions .plan-chip,
+.archive-top-actions .plan-chip,
+.series-card-top-actions .plan-chip {
+  height: 26px;
+  min-height: 26px;
+  line-height: 26px;
+  padding: 0 9px;
+  font-size: 11px;
+  margin-left: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.archive-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  flex-wrap: nowrap;
+}
+.archive-top-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.archive-strip-title { display: block; width: 100%; margin-top: 4px; }
+
+@media (max-width: 768px) {
+  .show-card-top-row,
+  .archive-title-row,
+  .series-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    width: 100%;
+    flex-wrap: nowrap;
+  }
+  .show-card-top-actions,
+  .archive-top-actions,
+  .series-card-top-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+  }
+  .show-card-top-actions .plan-chip,
+  .archive-top-actions .plan-chip,
+  .series-card-top-actions .plan-chip {
+    height: 24px;
+    min-height: 24px;
+    line-height: 24px;
+    padding: 0 8px;
+    font-size: 11px;
+    margin-left: 0;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .show-card-title,
+  .archive-strip-title {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    font-weight: 600;
+  }
+}

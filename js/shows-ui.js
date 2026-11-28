@@ -1184,12 +1184,6 @@ function openSeriesModal(themeKey) {
               ${(typeof posterSrcFor === 'function' ? posterSrcFor(s, s.posterUrl) : s.posterUrl) ? `<img src="${(typeof posterSrcFor === 'function' ? posterSrcFor(s, s.posterUrl) : s.posterUrl)}" alt="${safeTitle}" data-cap="${safeTitle} · 海报" ${(typeof posterAttrsFor === 'function' ? posterAttrsFor(s, s.posterUrl, stops.indexOf(s)) : posterImgAttrs(s.posterUrl, stops.indexOf(s)))} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" onclick="event.stopPropagation(); openPosterLightbox(this.dataset.hdSrc || this.src, this.dataset.cap)" class="cursor-zoom-in" />` : `<div class="w-full h-full flex items-center justify-center text-[10px] text-slate-400">ONER</div>`}
             </div>
             <div class="min-w-0 flex-1 space-y-1">
-              <div class="flex items-center justify-between gap-1">
-                <span class="font-bold text-slate-900 truncate">${safeTitle}</span>
-                <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 shrink-0">${s.status}</span>
-              </div>
-              <p class="text-slate-500">🗓️ ${s.date}${s.showTime ? ` ${s.showTime}` : ''}</p>
-              <p class="text-slate-500 truncate">📍 ${s.venue}</p>
               ${(() => {
                 const saved = typeof findFootprintIndex === 'function' && findFootprintIndex({
                   showKey: typeof buildShowKey === 'function' ? buildShowKey(s.venue, safeTitle) : '',
@@ -1197,8 +1191,17 @@ function openSeriesModal(themeKey) {
                   date: s.date,
                   venue: s.venue
                 }) >= 0;
-                return `<button type="button" title="添加或查看该场足迹（仅存本机）" onclick="event.stopPropagation(); recordFootprintFromShow('${safeTitle}', '${s.date}', '${String(s.venue || '').replace(/['"<>]/g, '')}', '${String(s.artist || 'ONER').replace(/['"<>]/g, '')}')" class="plan-chip footprint-chip mt-0.5 ${saved ? 'is-active' : ''}">${saved ? '✓ 已点亮足迹' : '+ 足迹'}</button>`;
+                return `<div class="series-card-top">
+                  <span class="text-[10px] px-1.5 py-0.5 rounded text-white font-semibold shrink-0" style="background:${(ARTIST_COLORS[s.artist] || ARTIST_COLORS['ONER']).bg}">${String(s.artist || 'ONER')}</span>
+                  <div class="series-card-top-actions">
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 shrink-0">${s.status}</span>
+                    <button type="button" title="添加或查看该场足迹（仅存本机）" onclick="event.stopPropagation(); recordFootprintFromShow('${safeTitle}', '${s.date}', '${String(s.venue || '').replace(/['"<>]/g, '')}', '${String(s.artist || 'ONER').replace(/['"<>]/g, '')}')" class="plan-chip footprint-chip ${saved ? 'is-active' : ''}">${saved ? '✓ 已点亮足迹' : '+ 足迹'}</button>
+                  </div>
+                </div>`;
               })()}
+              <span class="font-bold text-slate-900 block">${safeTitle}</span>
+              <p class="text-slate-500">🗓️ ${s.date}${s.showTime ? ` ${s.showTime}` : ''}</p>
+              <p class="text-slate-500 truncate">📍 ${s.venue}</p>
             </div>
           </div>
         `;
@@ -1990,20 +1993,21 @@ function renderTourCards() {
             ${(() => { const raw = item.posterUrl || item.poster_url || item.poster || item.cover || item.image || ''; const ps = (typeof posterSrcFor === 'function') ? posterSrcFor(item, raw) : raw; return ps ? `<img src="${ps}" alt="${safeCity}" data-cap="${safeCity} · 演出海报" ${(typeof posterAttrsFor === 'function') ? posterAttrsFor(item, raw, idx) : posterImgAttrs(ps, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" onclick="event.stopPropagation(); openPosterLightbox(this.dataset.hdSrc || this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : ((typeof posterPlaceholderHtml === 'function') ? posterPlaceholderHtml(safeCity) : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`); })()}
           </div>
           <div class="flex-1 min-w-0 space-y-1.5">
-            <div class="show-card-head flex items-start justify-between gap-2 flex-wrap">
-              <div class="flex items-center gap-1.5 flex-wrap min-w-0">
-                <span class="text-[11px] px-2 py-0.5 rounded text-white font-semibold" style="background:${badge}">${item.artist}</span>
-                <h3 class="show-card-title font-bold text-base text-slate-900 leading-snug break-words">${safeCity}</h3>
-                ${statusBadge}
+            <div class="show-card-head">
+              <div class="show-card-top-row">
+                <span class="text-[11px] px-2 py-0.5 rounded text-white font-semibold shrink-0" style="background:${badge}">${item.artist}</span>
+                <div class="show-card-top-actions">
+                  ${isUpcomingShow
+                    ? `<button type="button" class="plan-chip ${plannedShow ? 'is-active' : ''}" aria-pressed="${plannedShow ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); togglePlannedShowFromCard(this, '${planKey.replace(/['"<>]/g, '')}')">${plannedShow ? '✓ 计划前往' : '🎫 计划前往'}</button>`
+                    : ''}
+                  <button type="button" title="添加或查看该场足迹（仅存本机）" onclick="event.stopPropagation(); recordFootprintFromShow('${safeCity}', '${item.show_date}', '${cleanVenue}', '${item.artist}')" class="plan-chip footprint-chip ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已点亮足迹' : '+ 足迹'}</button>
+                </div>
               </div>
+              <h3 class="show-card-title font-bold text-base text-slate-900 leading-snug break-words">${safeCity}${statusBadge}</h3>
             </div>
-            <div class="show-card-quick-row">
-              ${isUpcomingShow
-                ? `<button type="button" class="plan-chip ${plannedShow ? 'is-active' : ''}" aria-pressed="${plannedShow ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); togglePlannedShowFromCard(this, '${planKey.replace(/['"<>]/g, '')}')">${plannedShow ? '✓ 计划前往' : '🎫 计划前往'}</button>`
-                : ''}
-              <button type="button" title="添加或查看该场足迹（仅存本机）" onclick="event.stopPropagation(); recordFootprintFromShow('${safeCity}', '${item.show_date}', '${cleanVenue}', '${item.artist}')" class="plan-chip footprint-chip ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已点亮足迹' : '+ 足迹'}</button>
-              ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="ticket" data-edit-title="${safeCity.replace(/"/g, '&quot;')}" data-edit-date="${String(item.show_date || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini edit-soft-btn">✏️ 编辑</button>` : ''}
-            </div>
+            ${canEditContent() ? `<div class="show-card-quick-row">
+              <button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="ticket" data-edit-title="${safeCity.replace(/"/g, '&quot;')}" data-edit-date="${String(item.show_date || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini edit-soft-btn">✏️ 编辑</button>
+            </div>` : ''}
             <p class="show-card-meta text-xs text-slate-500"><span>📍 ${item.venue}</span><span class="meta-sep"> ｜ </span><button type="button" class="meta-date-ics" title="点击添加到日历提醒" onclick="event.stopPropagation(); exportShowICS('${String(item.cloudId == null ? '' : item.cloudId).replace(/["'<>]/g, '')}')">🗓️ ${item.show_date}</button></p>
             ${item.prices ? `<p class="text-[11px] text-slate-600">💰 ${item.prices}</p>` : ''}
             ${safeBooth ? `<p class="text-[11px] text-slate-500 truncate" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</p>` : ''}
@@ -2362,17 +2366,20 @@ function renderArchiveTimeline() {
               ${(() => { const ps = (typeof posterSrcFor === 'function') ? posterSrcFor(item, item.posterUrl) : item.posterUrl; return ps ? `<img src="${ps}" alt="${safeTitle}" data-cap="${safeTitle} · 往日海报" ${(typeof posterAttrsFor === 'function') ? posterAttrsFor(item, item.posterUrl, idx) : posterImgAttrs(ps, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" onclick="event.stopPropagation(); openPosterLightbox(this.dataset.hdSrc || this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : ((typeof posterPlaceholderHtml === 'function') ? posterPlaceholderHtml(safeTitle) : `<div class="w-full h-full flex items-center justify-center text-xs text-slate-400">ONER</div>`); })()}
             </div>
             <div class="min-w-0 space-y-1 archive-strip-body">
-              <div class="archive-title-row flex items-center gap-1.5 flex-wrap">
-                <span class="text-[10px] px-2 py-0.5 rounded text-white font-semibold" style="background:${badge}">${item.artist}</span>
-                <span class="archive-strip-title font-bold text-sm text-slate-900 leading-snug">${safeTitle}</span>
-                ${(typeof isShowEnded === 'function' ? !isShowEnded(item) : (typeof isShowUpcomingOrToday === 'function' && isShowUpcomingOrToday(item.showDate)))
-                  ? (() => {
-                      const pk = planShowKeyOf(item.cloudId, item.venue, safeTitle, item.showDate).replace(/['"<>]/g, '');
-                      const on = isShowPlanned(pk);
-                      return `<button type="button" class="plan-chip ${on ? 'is-active' : ''}" aria-pressed="${on ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); togglePlannedShowFromCard(this, '${pk}')">${on ? '✓ 计划前往' : '🎫 计划前往'}</button>`;
-                    })()
-                  : ''}
+              <div class="archive-title-row">
+                <span class="text-[10px] px-2 py-0.5 rounded text-white font-semibold shrink-0" style="background:${badge}">${item.artist}</span>
+                <div class="archive-top-actions">
+                  ${(typeof isShowEnded === 'function' ? !isShowEnded(item) : (typeof isShowUpcomingOrToday === 'function' && isShowUpcomingOrToday(item.showDate)))
+                    ? (() => {
+                        const pk = planShowKeyOf(item.cloudId, item.venue, safeTitle, item.showDate).replace(/['"<>]/g, '');
+                        const on = isShowPlanned(pk);
+                        return `<button type="button" class="plan-chip ${on ? 'is-active' : ''}" aria-pressed="${on ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); togglePlannedShowFromCard(this, '${pk}')">${on ? '✓ 计划前往' : '🎫 计划前往'}</button>`;
+                      })()
+                    : ''}
+                  <button type="button" title="添加或查看该场足迹（仅存本机）" onclick="event.stopPropagation(); recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="plan-chip footprint-chip ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已点亮足迹' : '+ 足迹'}</button>
+                </div>
               </div>
+              <span class="archive-strip-title font-bold text-sm text-slate-900 leading-snug">${safeTitle}</span>
               ${(item.slot || (item.scheduleImgs && item.scheduleImgs.length) || safeBooth) ? `<div class="archive-badge-row">
                 ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeTitle)}
                 ${safeBooth ? `<span class="text-[10px] px-2 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-700 font-medium" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</span>` : ''}
@@ -2385,7 +2392,6 @@ function renderArchiveTimeline() {
             <button type="button" class="tour-action-btn tour-action-btn--mini" data-travel-btn data-city="${attrEsc(getArchiveCity(item) || '')}" data-venue="${attrEsc(item.venue || '')}" data-date="${attrEsc(String(item.showDate || '').slice(0, 10))}" data-title="${attrEsc(safeTitle)}" onclick="event.stopPropagation(); openTravelHelperFromButton(this)">🚄 出行比价</button>
             <button type="button" data-tour-toggle="vexp-arc-drawer-${idx}" class="tour-action-btn tour-action-btn--mini">📊 场馆体验<span class="hidden sm:inline text-[10px] opacity-70 ml-1">${venueStats.total}${venueStats.unlocked ? '' : '/5'}</span></button>
             ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="archive" data-edit-title="${safeTitle.replace(/"/g, '&quot;')}" data-edit-date="${String(item.showDate || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini edit-soft-btn">✏️ 编辑</button>` : ''}
-            <button type="button" title="添加或查看该场足迹（仅存本机）" onclick="recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="tour-action-btn tour-action-btn--mini footprint-chip ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已点亮足迹' : '+ 足迹'}</button>
           </div>
         </div>
 
