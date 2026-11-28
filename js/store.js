@@ -2325,7 +2325,7 @@ function upsertFootprintEntry(payload = {}) {
     artist: payload.artist || base.artist || 'ONER',
     updatedAt: new Date().toLocaleString('zh-CN')
   };
-  ['seatArea', 'venueScores', 'experienceNote', 'ratedAt', 'noteUpdatedAt', 'securityLevel', 'securityDetail', 'securityUpdatedAt'].forEach(key => {
+  ['seatArea', 'venueScores', 'experienceNote', 'ratedAt', 'noteUpdatedAt', 'securityLevel', 'securityDetail', 'securityUpdatedAt', 'buddyName'].forEach(key => {
     if (payload[key] !== undefined) next[key] = payload[key];
   });
   if (idx >= 0) list[idx] = next;
@@ -2338,6 +2338,19 @@ function upsertFootprintEntry(payload = {}) {
 window.buildShowKey = buildShowKey;
 window.findFootprintIndex = findFootprintIndex;
 window.upsertFootprintEntry = upsertFootprintEntry;
+
+// 🤝 同行搭子昵称：只存本机，绝不上传对方任何联系方式
+function updateFootprintBuddy(id, buddyName) {
+  const list = Array.isArray(AppState.footprints) ? [...AppState.footprints] : [];
+  const idx = list.findIndex(f => String(f.id) === String(id));
+  if (idx < 0) return { ok: false };
+  const name = String(buddyName || '').trim().slice(0, 20);
+  list[idx] = { ...list[idx], buddyName: name, buddyUpdatedAt: new Date().toLocaleString('zh-CN') };
+  AppState.footprints = list;
+  localStorage.setItem(LOCAL_KEYS.FOOTPRINTS, JSON.stringify(AppState.footprints));
+  return { ok: true, entry: list[idx] };
+}
+window.updateFootprintBuddy = updateFootprintBuddy;
 
 // ================= 2. 脱敏票根核验状态（上传 → 等待审核通过 → 才解锁评分） =================
 const VERIFIED_TICKETS_KEY = 'onerland_verified_ticket_shows_v1';

@@ -142,6 +142,50 @@ function recordFootprintFromShow(title, date, venue, artist = 'ONER') {
   }
 }
 
+// 本机搭子列表里可以一键点选的昵称（只读昵称，不涉及任何联系方式）
+function getBuddyNicknameSuggestions() {
+  const names = [];
+  const push = v => {
+    const n = String(v || '').trim();
+    if (n && !names.includes(n)) names.push(n);
+  };
+  try {
+    Object.values(window.buddyCloudCache || {}).forEach(list => {
+      (Array.isArray(list) ? list : []).forEach(entry => {
+        if (!entry || typeof isBuddyOwner !== 'function' || isBuddyOwner(entry)) return;
+        push(entry.nickname);
+      });
+    });
+  } catch (e) { /* ignore */ }
+  return names;
+}
+
+function saveFootprintBuddy(id, name) {
+  const res = typeof updateFootprintBuddy === 'function' ? updateFootprintBuddy(id, name) : { ok: false };
+  if (!res.ok) return toastError('保存同行搭子失败');
+  showToast(name ? '已记录同行搭子（仅本机）' : '已清空同行搭子');
+  renderFootprintMapAndList();
+  if (typeof renderAnniversaryCard === 'function') renderAnniversaryCard();
+}
+
+// 🎂 一键把「与XX线下同行纪念」写入自定义纪念日（同日期同名自动覆盖）
+function createBuddyAnniversary(id) {
+  const entry = (AppState.footprints || []).find(f => String(f.id) === String(id));
+  const buddy = String(entry && entry.buddyName || '').trim();
+  if (!buddy) return toastError('请先填写同行搭子昵称');
+  const showDate = String(entry.date || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(showDate)) return toastError('该足迹缺少有效演出日期');
+  const title = `与${buddy}线下同行纪念`;
+  const res = addCustomAnniversary(title, showDate.slice(5));
+  if (!res || res.ok === false) return toastError((res && res.message) || '生成失败');
+  showToast(`已生成「${title}」纪念日`);
+  if (typeof renderAnniversaryCard === 'function') renderAnniversaryCard();
+  if (typeof renderAnniversaryManager === 'function' &&
+      !document.getElementById('anniversary-manager-modal')?.classList.contains('hidden')) {
+    renderAnniversaryManager();
+  }
+}
+
 function removeFootprint(id) {
   AppState.footprints = AppState.footprints.filter(f => f.id !== id);
   localStorage.setItem(LOCAL_KEYS.FOOTPRINTS, JSON.stringify(AppState.footprints));
@@ -214,6 +258,16 @@ function renderFootprintMapAndList() {
                   <span class="text-slate-400 shrink-0">${f.date} · ${f.venue}</span>
                 </div>
                 <button type="button" onclick="removeFootprint(${f.id})" class="tour-action-btn tour-action-btn--mini shrink-0">移除</button>
+              </div>
+              <div class="fp-buddy-row">
+                <span class="shrink-0">🤝 同行搭子</span>
+                ${f.buddyName ? `<span class="fp-buddy-tag">${escapeTicketHtml(f.buddyName)}</span>` : ''}
+                <input type="text" maxlength="20" value="${escapeTicketHtml(f.buddyName || '')}"
+                  placeholder="选填，仅存本机" onchange="saveFootprintBuddy(${f.id}, this.value)" />
+                ${getBuddyNicknameSuggestions().filter(n => n !== f.buddyName).slice(0, 3).map(n =>
+                  `<button type="button" class="fp-buddy-chip" onclick="saveFootprintBuddy(${f.id}, '${escapeTicketHtml(n).replace(/'/g, "&#39;")}')">${escapeTicketHtml(n)}</button>`
+                ).join('')}
+                ${f.buddyName ? `<button type="button" class="tour-action-btn tour-action-btn--mini shrink-0" title="写入自定义纪念日（同名同日自动覆盖）" onclick="createBuddyAnniversary(${f.id})">🎂 生成搭子纪念日</button>` : ''}
               </div>
               ${(f.seatArea || scoreEntries.length || f.experienceNote) ? `
                 <details class="text-[11px] text-slate-600">

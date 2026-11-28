@@ -49,6 +49,8 @@ const TRAVEL_CITIES = [
 ];
 
 const TRAVEL_ORIGIN_KEY = 'onerland_travel_origin_v1';
+// 热门出发城市快捷胶囊（点一下就切换出发地）
+const TRAVEL_HOT_CITIES = ['北京', '上海', '广州', '深圳', '成都', '杭州', '重庆', '武汉', '西安', '南京', '长沙', '合肥'];
 const travelHelperState = { show: null, origin: '北京', depart: '', ret: '' };
 
 function travelCityMeta(cityName) {
@@ -98,59 +100,59 @@ function buildTravelLinks() {
     flights: [
       {
         label: '携程 · 特价机票日历',
-        desc: '低价日历 + 含税总价',
-        url: `https://flights.ctrip.com/itinerary/oneway/${origin.iata || origin.city}-${dest.iata || dest.city}?date=${enc(depart)}`
+        desc: '低价日历 + 含税总价（移动端）',
+        url: `https://m.ctrip.com/html5/flight/oneway?departCity=${enc(origin.city)}&arriveCity=${enc(dest.city)}&departDate=${enc(depart)}`
       },
       {
         label: '去哪儿 · 特价机票',
-        desc: '多航司比价 / 中转方案',
-        url: `https://flight.qunar.com/site/oneway_list.htm?searchDepartureAirport=${enc(origin.city)}&searchArrivalAirport=${enc(dest.city)}&searchDepartureTime=${enc(depart)}`
+        desc: '多航司比价 / 中转方案（移动端）',
+        url: `https://m.flight.qunar.com/nkc/oneway?depCity=${enc(origin.city)}&arrCity=${enc(dest.city)}&depDate=${enc(depart)}`
       },
       {
         label: '飞猪 · 机票比价',
-        desc: '阿里系运价 + 优惠券',
-        url: `https://sjipiao.fliggy.com/flight_search_result.htm?tripType=0&depCity=${enc(origin.city)}&arrCity=${enc(dest.city)}&goDate=${enc(depart)}`
+        desc: '阿里系运价 + 优惠券（H5）',
+        url: `https://h5.m.taobao.com/trip/flight/search/index.html?depCity=${enc(origin.city)}&arrCity=${enc(dest.city)}&depDate=${enc(depart)}`
       }
     ],
     trains: [
       {
         label: '携程 · 火车票余票/票价',
-        desc: '二等座 / 一等座对比',
-        url: `https://trains.ctrip.com/TrainBooking/Search.aspx?from=${enc(origin.station || origin.city)}&to=${enc(dest.station || dest.city)}&day=${enc(depart)}`
+        desc: '二等座 / 一等座对比（移动端）',
+        url: `https://m.ctrip.com/html5/train/list?from=${enc(origin.station || origin.city)}&to=${enc(dest.station || dest.city)}&date=${enc(depart)}`
       },
       {
         label: '去哪儿 · 火车票查询',
-        desc: '车次耗时 / 中转组合',
-        url: `https://train.qunar.com/stationToStation.htm?fromStation=${enc(origin.city)}&toStation=${enc(dest.city)}&date=${enc(depart)}`
+        desc: '车次耗时 / 中转组合（移动端）',
+        url: `https://m.train.qunar.com/nkc/station2station?fromStation=${enc(origin.city)}&toStation=${enc(dest.city)}&date=${enc(depart)}`
       },
       {
         label: '铁路 12306 · 官方查询',
         desc: '官方余票与正晚点',
-        url: 'https://www.12306.cn/index/'
+        url: `https://kyfw.12306.cn/otn/leftTicket/init?linktypeid=dc&fs=${enc(origin.station || origin.city)}&ts=${enc(dest.station || dest.city)}&date=${enc(depart)}`
       }
     ],
     local: [
       {
         label: '高德地图 · 场馆路线 / 打车估价',
-        desc: `${venue || dest.city} · 车站机场 → 场馆`,
-        url: `https://uri.amap.com/search?keyword=${enc(venue || dest.city)}&city=${enc(dest.city)}&callnative=1`
+        desc: `${venue || dest.city} · 公交地铁优先（可唤醒 App）`,
+        url: `https://uri.amap.com/navigation?to=,,${enc(venue || dest.city)}&mode=bus&src=onerland&callnative=1`
       },
       {
         label: '百度地图 · 地铁换乘方案',
-        desc: '地铁耗时 / 步行距离',
-        url: `https://map.baidu.com/?newmap=1&qt=s&wd=${enc(venue || dest.city)}&c=${enc(dest.city)}`
+        desc: '公交/地铁耗时 · 步行距离（可唤醒 App）',
+        url: `https://api.map.baidu.com/direction?destination=${enc(venue || dest.city)}&mode=transit&region=${enc(dest.city)}&output=html&src=onerland`
       }
     ],
     hotels: [
       {
         label: '携程 · 场馆周边酒店',
-        desc: `${venue || dest.city} 附近 · ${showDate} 入住`,
-        url: `https://hotels.ctrip.com/hotels/list?city=${enc(dest.city)}&keyword=${enc(venue || dest.city)}&checkin=${enc(showDate)}&checkout=${enc(travelShiftDate(showDate, 1))}`
+        desc: `${venue || dest.city} 附近 · ${showDate} 入住（移动端）`,
+        url: `https://m.ctrip.com/html5/hotel/list?city=${enc(dest.city)}&keyword=${enc(venue || dest.city)}&checkin=${enc(showDate)}&checkout=${enc(travelShiftDate(showDate, 1))}`
       },
       {
         label: '去哪儿 · 场馆周边酒店',
-        desc: '步行 / 地铁直达筛选',
-        url: `https://hotel.qunar.com/city/${enc(dest.city)}/?q=${enc(venue || dest.city)}&fromDate=${enc(showDate)}&toDate=${enc(travelShiftDate(showDate, 1))}`
+        desc: '步行 / 地铁直达筛选（移动端）',
+        url: `https://touch.qunar.com/hotel?city=${enc(dest.city)}&q=${enc(venue || dest.city)}&fromDate=${enc(showDate)}&toDate=${enc(travelShiftDate(showDate, 1))}`
       }
     ]
   };
@@ -183,8 +185,7 @@ function ensureTravelModal() {
       <div class="travel-controls">
         <label class="travel-field">
           <span>出发城市</span>
-          <input id="travel-origin" list="travel-origin-list" autocomplete="off" placeholder="输入或选择出发城市" />
-          <datalist id="travel-origin-list"></datalist>
+          <select id="travel-origin" class="travel-select"></select>
         </label>
         <label class="travel-field">
           <span>去程日期</span>
@@ -195,18 +196,36 @@ function ensureTravelModal() {
           <input id="travel-return" type="date" />
         </label>
       </div>
+      <div class="travel-hot-cities" id="travel-hot-cities"></div>
       <div class="travel-body" id="travel-body"></div>
-      <div class="travel-foot">全部为官方/正规平台直达链接，新标签页打开；本站不抓取任何第三方页面数据，也不参与任何交易。</div>
+      <div class="travel-foot">
+        全部为官方/正规平台直达链接，新标签页打开；本站不抓取任何第三方页面数据，也不参与任何交易。<br />
+        📱 手机浏览器打开可自动拉起对应 App；若在微信内打开，点右上角「在默认浏览器打开」即可一键唤醒 App。
+      </div>
     </div>
   `;
   document.body.appendChild(modal);
 
-  const listBox = modal.querySelector('#travel-origin-list');
+  const originSelect = modal.querySelector('#travel-origin');
   TRAVEL_CITIES.forEach(c => {
     const opt = document.createElement('option');
     opt.value = c.city;
-    opt.label = `${c.iata || '—'} · ${c.station || c.city}`;
-    listBox.appendChild(opt);
+    opt.textContent = `${c.city}（${c.iata || '—'} · ${c.station || c.city}）`;
+    originSelect.appendChild(opt);
+  });
+
+  const hotBox = modal.querySelector('#travel-hot-cities');
+  hotBox.innerHTML = TRAVEL_HOT_CITIES.map(city =>
+    `<button type="button" class="travel-hot-chip" data-hot-city="${travelEsc(city)}">${travelEsc(city)}</button>`
+  ).join('');
+  hotBox.addEventListener('click', event => {
+    const chip = event.target.closest('[data-hot-city]');
+    if (!chip) return;
+    event.preventDefault();
+    travelHelperState.origin = travelCityMeta(chip.dataset.hotCity).city;
+    setTravelOrigin(travelHelperState.origin);
+    renderTravelHelper();
+    loadTravelFlightPrices();
   });
 
   modal.addEventListener('click', event => {
@@ -215,7 +234,7 @@ function ensureTravelModal() {
     }
   });
 
-  modal.querySelector('#travel-origin').addEventListener('change', event => {
+  originSelect.addEventListener('change', event => {
     const val = String(event.target.value || '').trim();
     const meta = travelCityMeta(val);
     travelHelperState.origin = meta.city;
@@ -272,7 +291,11 @@ function renderTravelHelper() {
       <div class="travel-link-grid">${travelLinkButtons(links.hotels)}</div>
     </section>
   `;
-  modal.querySelector('#travel-origin').value = travelHelperState.origin;
+  const originSelectEl = modal.querySelector('#travel-origin');
+  if (originSelectEl) originSelectEl.value = travelHelperState.origin;
+  modal.querySelectorAll('[data-hot-city]').forEach(chip => {
+    chip.classList.toggle('is-active', chip.dataset.hotCity === travelHelperState.origin);
+  });
   modal.querySelector('#travel-depart').value = travelHelperState.depart;
   modal.querySelector('#travel-return').value = travelHelperState.ret;
 }

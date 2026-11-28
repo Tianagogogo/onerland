@@ -124,10 +124,14 @@ function renderAnniversaryCard() {
 
   const nextMeet = getNextMeetCountdown(targets);
   const nextMeetTitle = nextMeet ? String(nextMeet.title || nextMeet.city || '演出').replace(/[<>]/g, '') : '';
+  const meetPrefix = nextMeet
+    ? (nextMeet.planned ? `距与 ${targetLabel} 下次见面还有` : `距 ${targetLabel} 下一场演出还有`)
+    : '';
+  const meetSuffixShort = nextMeet
+    ? `${String(nextMeet.city || nextMeetTitle).replace(/站$/, '')}站 ${String(nextMeet.date).slice(5)}`
+    : '';
   const meetText = nextMeet
-    ? (nextMeet.planned
-      ? `距与 ${targetLabel} 下次见面还有 <strong class="countdown-value" style="color:${accent.solid}">${nextMeet.days}</strong> 天（${nextMeetTitle} ${nextMeet.date}）`
-      : `距 ${targetLabel} 下一场演出还有 <strong class="countdown-value" style="color:${accent.solid}">${nextMeet.days}</strong> 天（${nextMeetTitle} ${nextMeet.date}）`)
+    ? `${meetPrefix} <strong class="countdown-value" style="color:${accent.solid}">${nextMeet.days}</strong> 天<span class="meet-place-full">（${nextMeetTitle} ${nextMeet.date}）</span><span class="meet-place-short">（${meetSuffixShort}）</span>`
     : `与 ${targetLabel} 暂无待开演场次 · 期待下一次线下奔赴`;
 
   const microList = getMergedAnniversaryList().slice(0, 3);
@@ -167,7 +171,7 @@ function renderAnniversaryCard() {
             <span class="inline-flex items-center gap-1">你好，${nicknameHtml}</span>
             <span class="text-[10px] text-slate-400">（点击昵称 / 对象 / 动作词可改）</span>
           </div>
-          <div class="text-base sm:text-lg font-bold text-slate-900 leading-relaxed">
+          <div class="anniv-main-line text-base sm:text-lg font-bold text-slate-900 leading-relaxed">
             与 <button type="button" class="anniv-editable anniv-target-btn" title="点击切换关联对象"
               style="${targetStyle}"
               onclick="openAnniversaryTargetPicker(event)">${escapeAnnivText(targetLabel)}</button>
@@ -184,7 +188,7 @@ function renderAnniversaryCard() {
               aria-label="打开我的线下足迹"
               onclick="switchMainTab('footprint')">${AppState.footprints.length}</button> 面
           </div>
-          <p class="text-xs text-slate-600">${meetText}</p>
+          <p class="anniv-meet-line text-xs text-slate-600">${meetText}</p>
         </div>
         <div class="flex items-center gap-1.5 shrink-0 flex-wrap">
           <button type="button" onclick="switchMainTab('footprint')" class="tour-action-btn tour-action-btn--mini">🎫 生成纪念票根</button>
@@ -606,9 +610,12 @@ function renderUpcomingMiniTimeline() {
             ${item.posterUrl ? `<img src="${item.posterUrl}" alt="${safeTitle}" ${posterImgAttrs(item.posterUrl, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
           </div>
           <div class="timeline-card-body min-w-0 flex-1">
-            <div class="timeline-title-row flex items-center gap-1.5">
+            <div class="timeline-title-row flex items-center gap-1.5 flex-wrap">
               <span class="text-[10px] px-1.5 py-0.5 rounded text-white font-semibold shrink-0" style="background:${badge}">${displayArtist}</span>
               <span class="timeline-card-title font-bold text-sm text-slate-900 leading-snug break-words">${safeTitle}</span>
+              ${isUpcomingShow
+                ? `<button type="button" class="plan-chip ${plannedShow ? 'is-active' : ''}" aria-pressed="${plannedShow ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); handleHomeTimelinePlan(${idx}, this)">${plannedShow ? '✓ 计划前往' : '🎫 计划前往'}</button>`
+                : ''}
             </div>
             <div class="timeline-card-meta text-xs text-slate-500 mt-1">
               <button type="button" class="timeline-meta-line timeline-meta-date meta-date-ics" title="点击添加到日历提醒"
@@ -625,9 +632,6 @@ function renderUpcomingMiniTimeline() {
           ${item === pinned
             ? `<span class="timeline-next-badge text-[10px] px-1.5 py-0.5 rounded border">⚡ 下一场</span>`
             : `<span class="text-[10px] px-1.5 py-0.5 rounded ${isFuture ? 'bg-white border border-slate-300 text-slate-600' : 'bg-slate-100 text-slate-500'}">${isFuture ? '待开演' : '已落幕'}</span>`}
-          ${isUpcomingShow
-            ? `<button type="button" class="tour-action-btn tour-action-btn--mini tl-plan-btn ${plannedShow ? 'is-active' : ''}" aria-pressed="${plannedShow ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); handleHomeTimelinePlan(${idx}, this)">${plannedShow ? '✓ 计划前往' : '🎫 计划前往'}</button>`
-            : ''}
           <button type="button" onclick="switchMainTab('shows')" class="tour-action-btn tour-action-btn--mini">详情</button>
         </div>
         <div class="tl-quick-bar" data-tl-bar="${idx}">

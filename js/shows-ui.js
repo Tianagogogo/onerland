@@ -308,6 +308,8 @@ function triggerShowMapScheme(url) {
   window.setTimeout(() => a.remove(), 1500);
 }
 
+// 📍 地图跳转：统一使用 https 官方通用链接（禁止私有 URL Scheme），
+// 手机浏览器 / 微信「在默认浏览器打开」后由 Universal Link 自动拉起对应 App
 function launchShowMapApp(provider, trigger) {
   const menu = trigger?.closest('[data-show-map-menu]');
   const keyword = decodeShowMapValue(menu?.dataset.mapVenue || '') ||
@@ -316,47 +318,20 @@ function launchShowMapApp(provider, trigger) {
   closeShowMapMenus();
   if (!keyword) return;
 
-  clearShowMapFallback();
-  const webUrl = `https://uri.amap.com/search?keyword=${encodeURIComponent(keyword)}${city ? `&city=${encodeURIComponent(city)}` : ''}`;
+  const enc = encodeURIComponent;
+  const url = provider === 'baidu'
+    ? `https://api.map.baidu.com/direction?destination=${enc(keyword)}&mode=transit&region=${enc(city)}&output=html&src=onerland`
+    : provider === 'web'
+      ? `https://uri.amap.com/search?keyword=${enc(keyword)}${city ? `&city=${enc(city)}` : ''}`
+      : `https://uri.amap.com/navigation?to=,,${enc(keyword)}&mode=bus&src=onerland&callnative=1`;
 
-  if (provider === 'web') {
-    const a = document.createElement('a');
-    a.href = webUrl;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    document.body.appendChild(a);
-    a.click();
-    window.setTimeout(() => a.remove(), 0);
-    return;
-  }
-
-  const ua = navigator.userAgent || '';
-  const isIOS = /iPad|iPhone|iPod/.test(ua) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const encodedKeyword = encodeURIComponent(keyword);
-  const scheme = provider === 'baidu'
-    ? `baidumap://map/place/search?query=${encodedKeyword}&region=${encodeURIComponent(city)}&src=onerland.pwa`
-    : isIOS
-      ? `iosamap://poi?sourceApplication=ONERLAND&keywords=${encodedKeyword}&dev=0`
-      : `androidamap://poi?sourceApplication=ONERLAND&keywords=${encodedKeyword}&dev=0`;
-
-  triggerShowMapScheme(scheme);
-
-  const onVisibilityChange = () => {
-    if (document.hidden) clearShowMapFallback();
-  };
-  const onPageHide = () => clearShowMapFallback();
-  document.addEventListener('visibilitychange', onVisibilityChange);
-  window.addEventListener('pagehide', onPageHide);
-  showMapFallbackState.cleanup = () => {
-    document.removeEventListener('visibilitychange', onVisibilityChange);
-    window.removeEventListener('pagehide', onPageHide);
-  };
-  showMapFallbackState.timer = window.setTimeout(() => {
-    const shouldFallback = !document.hidden && document.hasFocus();
-    clearShowMapFallback();
-    if (shouldFallback) window.location.href = webUrl;
-  }, 900);
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  window.setTimeout(() => a.remove(), 0);
 }
 
 // 🎫 计划前往：未来未开演场次的本机标记，不计入「已点亮线下 X 面」
@@ -1975,12 +1950,15 @@ function renderTourCards() {
               <div class="flex items-center gap-1.5 flex-wrap min-w-0">
                 <span class="text-[11px] px-2 py-0.5 rounded text-white font-semibold" style="background:${badge}">${item.artist}</span>
                 <h3 class="show-card-title font-bold text-base text-slate-900 leading-snug break-words">${safeCity}</h3>
+                ${isUpcomingShow
+                  ? `<button type="button" class="plan-chip ${plannedShow ? 'is-active' : ''}" aria-pressed="${plannedShow ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); togglePlannedShowFromCard(this, '${planKey.replace(/['"<>]/g, '')}')">${plannedShow ? '✓ 计划前往' : '🎫 计划前往'}</button>`
+                  : ''}
                 ${statusBadge}
               </div>
               <div class="show-card-actions flex items-center gap-1.5 shrink-0">
-                ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="ticket" data-edit-title="${safeCity.replace(/"/g, '&quot;')}" data-edit-date="${String(item.show_date || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini">✏️ 编辑</button>` : ''}
+                ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="ticket" data-edit-title="${safeCity.replace(/"/g, '&quot;')}" data-edit-date="${String(item.show_date || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini edit-soft-btn">✏️ 编辑</button>` : ''}
                 ${isUpcomingShow
-                  ? `<button type="button" class="tour-action-btn tour-action-btn--mini tl-plan-btn ${plannedShow ? 'is-active' : ''}" aria-pressed="${plannedShow ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); togglePlannedShowFromCard(this, '${planKey.replace(/['"<>]/g, '')}')">${plannedShow ? '✓ 计划前往' : '🎫 计划前往'}</button>`
+                  ? ''
                   : `<button type="button" onclick="recordFootprintFromShow('${safeCity}', '${item.show_date}', '${cleanVenue}', '${item.artist}')" class="tour-action-btn tour-action-btn--mini ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已打卡' : '+ 足迹'}</button>`}
               </div>
             </div>
@@ -2303,6 +2281,13 @@ function renderArchiveTimeline() {
               <div class="archive-title-row flex items-center gap-1.5 flex-wrap">
                 <span class="text-[10px] px-2 py-0.5 rounded text-white font-semibold" style="background:${badge}">${item.artist}</span>
                 <span class="archive-strip-title font-bold text-sm text-slate-900 leading-snug">${safeTitle}</span>
+                ${(typeof isShowUpcomingOrToday === 'function' && isShowUpcomingOrToday(item.showDate))
+                  ? (() => {
+                      const pk = planShowKeyOf(item.cloudId, item.venue, safeTitle, item.showDate).replace(/['"<>]/g, '');
+                      const on = isShowPlanned(pk);
+                      return `<button type="button" class="plan-chip ${on ? 'is-active' : ''}" aria-pressed="${on ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); togglePlannedShowFromCard(this, '${pk}')">${on ? '✓ 计划前往' : '🎫 计划前往'}</button>`;
+                    })()
+                  : ''}
               </div>
               ${(item.slot || (item.scheduleImgs && item.scheduleImgs.length) || safeBooth) ? `<div class="archive-badge-row">
                 ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeTitle)}
@@ -2315,13 +2300,9 @@ function renderArchiveTimeline() {
             ${hasSeries ? `<button type="button" data-theme="${safeJumpTheme}" onclick="openSeriesModal(this.dataset.theme)" class="tour-action-btn tour-action-btn--mini font-medium">${isFest ? '🎪 音乐节合集' : `🏛️ 专题页${seriesCount > 1 ? ` (${seriesCount}场)` : ''}`} ↗</button>` : ''}
             <button type="button" class="tour-action-btn tour-action-btn--mini" data-travel-btn data-city="${attrEsc(getArchiveCity(item) || '')}" data-venue="${attrEsc(item.venue || '')}" data-date="${attrEsc(String(item.showDate || '').slice(0, 10))}" data-title="${attrEsc(safeTitle)}" onclick="event.stopPropagation(); openTravelHelperFromButton(this)">🚄 出行比价</button>
             <button type="button" data-tour-toggle="vexp-arc-drawer-${idx}" class="tour-action-btn tour-action-btn--mini">📊 场馆体验<span class="hidden sm:inline text-[10px] opacity-70 ml-1">${venueStats.total}${venueStats.unlocked ? '' : '/5'}</span></button>
-            ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="archive" data-edit-title="${safeTitle.replace(/"/g, '&quot;')}" data-edit-date="${String(item.showDate || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini">✏️ 编辑</button>` : ''}
+            ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="archive" data-edit-title="${safeTitle.replace(/"/g, '&quot;')}" data-edit-date="${String(item.showDate || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini edit-soft-btn">✏️ 编辑</button>` : ''}
             ${(typeof isShowUpcomingOrToday === 'function' && isShowUpcomingOrToday(item.showDate))
-              ? (() => {
-                  const pk = planShowKeyOf(item.cloudId, item.venue, safeTitle, item.showDate).replace(/['"<>]/g, '');
-                  const on = isShowPlanned(pk);
-                  return `<button type="button" class="tour-action-btn tour-action-btn--mini tl-plan-btn ${on ? 'is-active' : ''}" aria-pressed="${on ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); togglePlannedShowFromCard(this, '${pk}')">${on ? '✓ 计划前往' : '🎫 计划前往'}</button>`;
-                })()
+              ? ''
               : `<button type="button" onclick="recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="tour-action-btn tour-action-btn--mini ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已打卡' : '+ 足迹'}</button>`}
           </div>
         </div>

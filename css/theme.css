@@ -1648,3 +1648,192 @@ body.travel-modal-open { overflow: hidden; }
   border-color: #fca5a5;
   background: linear-gradient(135deg, #fff5f5 0%, #fee2e2 100%);
 }
+
+/* ================= 🎫 计划前往：标题末尾微胶囊 ================= */
+.plan-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 60%, #e2e8f0 100%);
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+.plan-chip:hover { border-color: #94a3b8; color: #0f172a; }
+.plan-chip.is-active {
+  border-color: #94a3b8;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  color: #0f172a;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+/* ================= ✏️ 编辑：手机端弱化为微型胶囊 ================= */
+.edit-soft-btn { transition: opacity 0.16s ease, border-color 0.16s ease; }
+
+/* ================= 手机端精修（≤640px） ================= */
+@media (max-width: 640px) {
+  /* 1) 时光提醒：副标题单行不折行 + 括号内精简为「城市站 MM-DD」 */
+  .anniv-meet-line {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 12px;
+    line-height: 1.5;
+    max-width: 100%;
+  }
+  .anniv-meet-line .meet-place-full { display: none; }
+  .anniv-meet-line .meet-place-short { display: inline; }
+  .anniv-main-line {
+    font-size: 14.5px;
+    line-height: 1.55;
+    letter-spacing: -0.01em;
+  }
+
+  /* 2) 微时间轴卡片：收紧留白，恢复底部 5 个快捷按钮 */
+  .timeline-card { gap: 2px; }
+  .timeline-card-actions {
+    padding-top: 0;
+    border-top: 0;
+    margin-top: 2px;
+    gap: 6px;
+  }
+  .tl-quick-bar {
+    margin-top: 4px;
+    padding-top: 5px;
+    gap: 5px;
+  }
+  .tl-quick-btn {
+    height: 24px;
+    padding: 0 7px;
+    font-size: 11px;
+    flex: 0 0 auto;
+  }
+
+  /* 3) 计划前往：标题末尾紧凑微胶囊 */
+  .plan-chip {
+    margin-left: 5px;
+    padding: 2px 6px;
+    font-size: 11px;
+    border-radius: 6px;
+  }
+
+  /* 4) 编辑按钮：低调微型胶囊，不单独占行抢焦点 */
+  .edit-soft-btn {
+    font-size: 11px;
+    padding: 2px 6px;
+    min-height: 22px;
+    height: auto;
+    opacity: 0.72;
+    background: transparent;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: #64748b;
+  }
+  .edit-soft-btn:hover { opacity: 1; }
+
+  /* 5) 出行比价：去返程日期上下单列，彻底避免 iOS 重叠 */
+  .travel-controls {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .travel-controls .travel-field,
+  .travel-controls .travel-field input,
+  .travel-controls .travel-select {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .travel-hot-cities { padding: 0 13px 6px; }
+}
+
+.meet-place-full { display: inline; }
+.meet-place-short { display: none; }
+
+/* ================= 出行比价：出发城市下拉 + 热门胶囊 ================= */
+.travel-select {
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 9px;
+  border: 1px solid #d7dfe8;
+  background: #fff;
+  color: #1e293b;
+  font-size: 12px;
+  font-family: inherit;
+}
+.travel-select:focus { outline: none; border-color: #94a3b8; box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.22); }
+.travel-hot-cities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 16px 2px;
+}
+.travel-hot-chip {
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid #dbe3ec;
+  background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+.travel-hot-chip:hover { border-color: #94a3b8; color: #0f172a; }
+.travel-hot-chip.is-active {
+  border-color: #94a3b8;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  color: #0f172a;
+}
+
+/* ================= 足迹：同行搭子标签 ================= */
+.fp-buddy-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: #475569;
+}
+.fp-buddy-row input {
+  flex: 1 1 8rem;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid #d7dfe8;
+  background: #fff;
+  font-size: 11px;
+}
+.fp-buddy-chip {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid #dbe3ec;
+  background: #fff;
+  color: #64748b;
+  font-size: 10.5px;
+  cursor: pointer;
+}
+.fp-buddy-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: linear-gradient(135deg, #ffffff 0%, #eef2f7 100%);
+  color: #334155;
+  font-size: 10.5px;
+  font-weight: 600;
+}
