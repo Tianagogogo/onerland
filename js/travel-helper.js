@@ -411,7 +411,7 @@ async function submitCheckinSpot() {
         p_proof_data: proof,
         p_device_id: deviceId
       });
-      showToast('🎉 投稿成功！站长审核通过后将在列表公开展示');
+      showToast('🎉 投稿成功！审核通过后将在列表公开展示');
     }
     checkinState.formOpen = false;
     checkinState.proofData = '';
@@ -945,7 +945,7 @@ async function loadTravelFlightPrices() {
   }
 }
 
-// ================= 🍜 美食与同款打卡：独立弹窗（与出行比价同级） =================
+// ================= 🍜 同款打卡：独立弹窗（与出行比价同级） =================
 function highlightCheckinMemberBar() {
   const bar = document.querySelector('#checkin-spots-box .checkin-member-bar');
   if (!bar) return;
@@ -962,23 +962,23 @@ function ensureCheckinModal() {
   modal.id = 'checkin-modal';
   modal.className = 'travel-modal checkin-modal hidden';
   modal.innerHTML = `
-    <div class="travel-shell checkin-shell" role="dialog" aria-modal="true" aria-label="美食与同款打卡">
+    <div class="travel-shell checkin-shell" role="dialog" aria-modal="true" aria-label="同款打卡">
       <div class="travel-head">
         <div class="travel-title-wrap">
-          <div class="travel-title">🍜 美食与同款打卡</div>
+          <div class="travel-title" id="checkin-title">🍜 同款打卡</div>
           <div class="travel-sub" id="checkin-sub"></div>
         </div>
         <button type="button" class="travel-close" data-checkin-close aria-label="关闭">✕</button>
       </div>
       <div class="travel-body checkin-modal-body" id="checkin-body">
-        <div class="checkin-quick-head">🍜 找吃的 · 三张直达卡</div>
+        <div class="checkin-quick-head">🍜 三张直达卡 · 城市必吃 / 成员同款</div>
         <div class="travel-link-grid checkin-quick-links" id="checkin-quick-links"></div>
         <div class="food-spot-box checkin-standalone-box" id="checkin-spots-box">
           <div class="checkin-empty">⏳ 正在加载同款打卡点…</div>
         </div>
       </div>
       <div class="travel-foot">
-        美食与打卡信息由站外平台提供，新标签页打开；同款投稿经站长审核后公开展示，仅保存在本站数据库。<br />
+        美食与打卡信息由站外平台提供，新标签页打开；同款投稿经审核后公开展示，仅保存在本站数据库。<br />
         📱 手机浏览器打开可自动拉起对应 App；若在微信内打开，点右上角「在默认浏览器打开」体验更完整。
       </div>
     </div>
@@ -1017,12 +1017,38 @@ function renderCheckinHelper() {
   parts.push('仅保存在本机浏览记录，投稿经审核后公开');
   if (sub) sub.textContent = parts.join(' · ');
 
+  const titleEl = modal.querySelector('#checkin-title');
+  if (titleEl) titleEl.textContent = city ? `🍜 同款打卡 · ${city}` : '🍜 同款打卡';
+
   const quick = modal.querySelector('#checkin-quick-links');
   if (quick) quick.innerHTML = travelLinkButtons(buildCheckinQuickLinks(city));
 
   const box = document.getElementById('checkin-spots-box');
   if (box) box.dataset.city = city;
   renderCheckinSection();
+}
+
+// 从演出标题 / 场馆里扒出“真城市名”（避免把巡演标题当成城市塞进检索词）
+function checkinCityName(src) {
+  const data = src || {};
+  const explicit = String(data.city || '').trim();
+  if (explicit && /^[\u4e00-\u9fa5]{2,6}$/.test(explicit) && travelCityMeta(explicit).city === explicit) return explicit;
+  const text = `${explicit} ${data.title || ''} ${data.venue || ''}`.trim();
+  if (typeof detectFootprintCity === 'function') {
+    try {
+      const hit = detectFootprintCity({ city: '', title: text, venue: data.venue || '' });
+      if (hit && hit !== '未知城市') return hit;
+    } catch (e) { /* ignore */ }
+  }
+  const stop = text.match(/([\u4e00-\u9fa5]{2,6})站/);
+  if (stop) {
+    const c = stop[1].replace(/[省市县区]$/g, '');
+    if (c && !/收官|加场|返场|首站|最终|巡演|演出|音乐节|演唱会|开票|预售/.test(c)) return c;
+  }
+  const known = Object.keys(typeof CITY_TO_PROVINCE !== 'undefined' ? CITY_TO_PROVINCE : {})
+    .sort((a, b) => b.length - a.length)
+    .find(c => text.includes(c));
+  return known || travelCityMeta(explicit).city || explicit;
 }
 
 function openCheckinHelper(show) {
@@ -1035,7 +1061,9 @@ function openCheckinHelper(show) {
     date,
     title: src.title || src.city || ''
   };
-  checkinState.city = String(src.city || '').trim();
+  const cityName = checkinCityName(src);
+  checkinState.show.city = cityName;
+  checkinState.city = cityName;
   checkinState.spots = [];
   checkinState.pending = [];
   checkinState.loaded = false;
