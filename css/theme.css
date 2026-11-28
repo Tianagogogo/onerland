@@ -4214,7 +4214,6 @@ input.seat-select { background-image: none; }
   margin-bottom: 8px;
 }
 .checkin-member-title { font-size: 11px; font-weight: 700; color: #334155; margin-bottom: 6px; }
-.checkin-member-sub { font-weight: 500; color: #94a3b8; font-size: 10px; }
 .checkin-chip-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .checkin-chip {
   border: 1px solid #cbd5e1;
@@ -4235,34 +4234,6 @@ input.seat-select { background-image: none; }
   font-weight: 600;
 }
 .checkin-chip.is-hint { box-shadow: 0 0 0 3px rgba(15, 23, 42, .12); }
-
-.checkin-keyword {
-  margin-top: 6px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10.5px;
-  color: #475569;
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
-  border-radius: 7px;
-  padding: 4px 7px;
-  word-break: break-all;
-}
-.checkin-member-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
-.checkin-action-primary,
-.checkin-action-ghost {
-  flex: 1 1 0;
-  min-width: 0;
-  text-align: center;
-  border-radius: 8px;
-  padding: 5px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.checkin-action-primary { background: #334155; color: #f8fafc; border: 1px solid #334155; }
-.checkin-action-ghost { background: #ffffff; color: #334155; border: 1px solid #cbd5e1; }
 
 .checkin-list-head {
   font-size: 10.5px;
@@ -4414,8 +4385,6 @@ input.seat-select { background-image: none; }
 .checkin-admin-head span { float: right; opacity: .7; }
 @media (max-width: 420px) {
   .checkin-form-row { flex-direction: column; }
-  .checkin-member-actions { flex-direction: column; }
-  .checkin-action-primary, .checkin-action-ghost { width: 100%; }
 }
 
 /* ================= 🍜 同款打卡独立弹窗 + 出行比价手风琴裁切修复 ================= */
@@ -4593,21 +4562,6 @@ body.feature-modal-open { overflow: hidden; }
   overflow-wrap: anywhere;
   word-break: break-word;
 }
-.checkin-keyword-box {
-  margin-top: 2px;
-  padding: 8px 9px;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-}
-.checkin-keyword-label {
-  font-size: 10.5px;
-  font-weight: 700;
-  color: #64748b;
-  margin-bottom: 2px;
-}
-.checkin-keyword-box .checkin-keyword { margin-top: 4px; }
-.checkin-keyword-box .checkin-member-actions { margin-top: 8px; }
 .checkin-quick-links.checkin-quick-links--duo .travel-link:last-child { grid-column: auto !important; }
 @media (max-width: 360px) {
   /* 极窄屏：状态与操作整行整体换到下一行，按钮本身仍保持单行不挤压 */
@@ -5534,6 +5488,25 @@ body.feature-modal-open { overflow: hidden; }
   box-shadow: 0 8px 18px rgba(141, 13, 14, 0.2);
 }
 .brand-add-btn:hover { filter: brightness(1.06); }
+.brand-sync-btn,
+.brand-refresh-btn {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  background: #ffffff;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(148, 163, 184, 0.16);
+}
+.brand-sync-btn {
+  border-color: rgba(14, 116, 144, 0.38);
+  color: #0e7490;
+  background: #ecfeff;
+}
+.brand-sync-btn:hover,
+.brand-refresh-btn:hover { filter: brightness(0.98); }
 .brand-admin-hint { font-size: 9.5px; color: #64748b; }
 
 .brand-filter-bar {

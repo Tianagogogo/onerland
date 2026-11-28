@@ -1,9 +1,10 @@
 /* ================= 💼 商务档案：代言 / 品牌合作一览 =================
    规范：
-   1) 数据优先读 Supabase brand_endorsements（匿名只读）；未建表 / 离线时降级本机 localStorage；
-   2) 写操作复用全站统一管理员口令（/api/admin），失败自动降级本机，访客只读；
-   3) 状态只有「🟢 正在合作中 / ⚪ 合作已结束」两种，默认合作中置顶、官宣日期倒序；
-   4) 颜色直接复用 config.js 的 ARTIST_COLORS（团红渐变 + 三位成员专属应援色）。 */
+   1) 数据只以 Supabase brand_endorsements 云端表为权威源（匿名 SELECT），打开弹窗即重新拉取；
+   2) 写操作必须调用管理员口令校验 RPC，失败明确提示具体原因，绝不静默写 localStorage 伪装成功；
+   3) 本机 localStorage 仅保留历史未同步草稿，管理员解锁后可一键批量上云；
+   4) 状态只有「🟢 正在合作中 / ⚪ 合作已结束」两种，默认合作中置顶、官宣日期倒序；
+   5) 颜色直接复用 config.js 的 ARTIST_COLORS（团红渐变 + 三位成员专属应援色）。 */
 
 const BRAND_TABLE = 'brand_endorsements';
 const BRAND_LOCAL_KEY = 'onerland_brand_endorsements_v1';
@@ -18,6 +19,7 @@ const brandState = {
   category: 'all',
   editorId: null,
   loading: false,
+  syncing: false,
   error: ''
 };
 
@@ -57,29 +59,24 @@ function brandIsActiveValue(value) {
 
 function normalizeBrandRecord(row) {
   const r = row || {};
-  const category = BRAND_CATEGORIES.includes(String(r.category || '').trim())
-    ? String(r.category).trim()
-    : BRAND_CATEGORIES[0];
+  const rawCategory = String(r.artist || r.category || '').trim();
+  const category = BRAND_CATEGORIES.includes(rawCategory) ? rawCategory : BRAND_CATEGORIES[0];
   const activeRaw = r.isActive !== undefined ? r.isActive : r.is_active;
   return {
     id: String(r.id || '').trim(),
-    brand: String(r.brand || r.name || '').trim(),
+    brand: String(r.brand_name || r.brand || r.name || '').trim(),
     title: String(r.title || r.role || '').trim(),
     category,
     isActive: brandIsActiveValue(activeRaw),
     announceDate: String(r.announce_date || r.announceDate || '').trim().slice(0, 10),
-    period: String(r.period || '').trim(),
+    period: String(r.period_text || r.period || '').trim(),
     note: String(r.note || '').trim(),
     officialUrl: String(r.official_url || r.officialUrl || '').trim(),
     createdAt: String(r.created_at || r.createdAt || '').trim()
   };
 }
 
-function brandNewId() {
-  return `local-brand-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-// ===== 本机降级存储：created / overrides / deleted =====
+// ===== 历史本机草稿：只作为“待同步副本”，不再参与云端列表渲染 =====
 function readBrandLocalStore() {
   try {
     const raw = localStorage.getItem(BRAND_LOCAL_KEY);
@@ -95,35 +92,33 @@ function readBrandLocalStore() {
   }
 }
 
-function writeBrandLocalStore(store) {
+function clearBrandLocalStore() {
   try {
-    localStorage.setItem(BRAND_LOCAL_KEY, JSON.stringify({
-      created: store.created || [],
-      overrides: store.overrides || {},
-      deleted: store.deleted || []
-    }));
+    localStorage.removeItem(BRAND_LOCAL_KEY);
     return true;
   } catch (e) {
     return false;
   }
 }
 
-function applyBrandOverlay(baseList) {
+function brandLocalDraftRecords() {
   const store = readBrandLocalStore();
-  const deleted = new Set(store.deleted);
-  const list = (Array.isArray(baseList) ? baseList : [])
-    .filter(item => item && item.id && !deleted.has(item.id))
-    .map(item => (store.overrides[item.id] ? normalizeBrandRecord(store.overrides[item.id]) : item));
-  store.created.forEach(row => {
+  const seen = new Set();
+  const list = [];
+  const push = row => {
     const item = normalizeBrandRecord(row);
-    if (!item.id || deleted.has(item.id)) return;
-    const idx = list.findIndex(x => x.id === item.id);
-    if (idx >= 0) list[idx] = item;
-    else list.push(item);
+    if (!item.brand) return;
+    const key = item.id || `${item.brand}|${item.title}|${item.createdAt}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    list.push(item);
+  };
+  store.created.forEach(push);
+  Object.keys(store.overrides || {}).forEach(id => {
+    const row = store.overrides[id];
+    if (row && typeof row === 'object') push(Object.assign({ id }, row));
   });
-  return list
-    .map(normalizeBrandRecord)
-    .filter(item => item.id && item.brand);
+  return list;
 }
 
 function brandSortValue(item) {
@@ -140,12 +135,54 @@ function sortBrands(list) {
 }
 
 function getBrands() {
-  return sortBrands(applyBrandOverlay(brandRemoteRows));
+  return sortBrands(
+    (Array.isArray(brandRemoteRows) ? brandRemoteRows : [])
+      .map(normalizeBrandRecord)
+      .filter(item => item.id && item.brand)
+  );
 }
 
 function getBrand(id) {
   const key = String(id || '');
   return getBrands().find(item => item.id === key) || null;
+}
+
+function brandRpcError(status, info, raw) {
+  const err = new Error('brand-rpc-failed-' + status);
+  err.status = status;
+  err.code = String((info && (info.code || info.error_code)) || '');
+  err.detail = String((info && (info.message || info.details || info.hint || info.error)) || raw || '').trim();
+  return err;
+}
+
+function brandFriendlyError(err) {
+  if (!err) return '未知错误';
+  const status = Number(err.status || 0);
+  const code = String(err.code || '');
+  const detail = String(err.detail || err.message || '').trim();
+  if (err.message === 'admin-key-cancelled') return '已取消输入管理员密码，本次操作未写入云端。';
+  if (code === 'PGRST205' || /Could not find the table|relation .* does not exist/i.test(detail)) {
+    return `云端表 ${BRAND_TABLE} 不存在。请先到 Supabase SQL Editor 执行 supabase/brand_endorsements.sql。`;
+  }
+  if (code === 'PGRST202' || /Could not find the function|function .* does not exist/i.test(detail)) {
+    return '云端管理员 RPC 不存在或参数不匹配。请重新执行最新的 supabase/brand_endorsements.sql。';
+  }
+  if (status === 401 || status === 403 || code === '42501' || /invalid.*(key|password)|口令|密码|permission denied/i.test(detail)) {
+    return `管理员口令校验未通过：${detail || '请确认与全站解锁口令一致。'}`;
+  }
+  if (/Failed to fetch|NetworkError|Load failed/i.test(detail)) {
+    return '网络请求失败，请检查网络后重试；本次操作未写入云端。';
+  }
+  return detail || `请求失败（HTTP ${status || '未知'}）`;
+}
+
+function brandReportError(action, err) {
+  const message = `${action}失败：${brandFriendlyError(err)}`;
+  brandState.error = message;
+  try { if (typeof toastError === 'function') toastError(message); } catch (e) { /* ignore */ }
+  try { window.alert(message); } catch (e) { /* ignore */ }
+  if (brandState.editorId === null) renderBrandPage();
+  return message;
 }
 
 // ===== 云端读取（匿名 SELECT）=====
@@ -158,20 +195,28 @@ function brandRestHeaders() {
 }
 
 async function fetchBrandRemote() {
-  if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) return { ok: false, rows: [] };
-  if (typeof fetch !== 'function') return { ok: false, rows: [] };
+  if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) {
+    return { ok: false, rows: [], error: 'Supabase 未配置（缺少 SUPABASE_URL）' };
+  }
+  if (typeof fetch !== 'function') return { ok: false, rows: [], error: '当前浏览器不支持 fetch' };
   const controller = typeof AbortController === 'function' ? new AbortController() : null;
-  const timer = controller ? setTimeout(() => controller.abort(), 4500) : null;
+  const timer = controller ? setTimeout(() => controller.abort(), 8000) : null;
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${BRAND_TABLE}?select=*`, {
       headers: brandRestHeaders(),
       signal: controller ? controller.signal : undefined
     });
-    if (!res.ok) return { ok: false, rows: [] };
+    if (!res.ok) {
+      let raw = '';
+      let info = null;
+      try { raw = await res.text(); } catch (e) { raw = ''; }
+      try { info = raw ? JSON.parse(raw) : null; } catch (e) { info = null; }
+      return { ok: false, rows: [], error: brandFriendlyError(brandRpcError(res.status, info, raw)) };
+    }
     const rows = await res.json();
     return { ok: true, rows: Array.isArray(rows) ? rows : [] };
   } catch (e) {
-    return { ok: false, rows: [] };
+    return { ok: false, rows: [], error: brandFriendlyError(e) };
   } finally {
     if (timer) clearTimeout(timer);
   }
@@ -188,7 +233,9 @@ async function loadBrands(force) {
       brandRemoteRows = result.rows;
       brandLoadedRemote = true;
     } else {
-      brandState.error = brandLoadedRemote ? '云端同步失败，正在展示本机缓存' : '';
+      brandRemoteRows = [];
+      brandLoadedRemote = false;
+      brandState.error = `云端读取失败：${result.error || '未知错误'}`;
     }
     brandState.loading = false;
     renderBrandPage();
@@ -200,24 +247,35 @@ async function loadBrands(force) {
   }
 }
 
-// ===== 管理员写入（复用 /api/admin 统一口令）=====
-async function brandAdminWrite(action, id, payload) {
-  if (typeof fetch !== 'function') return { ok: false };
-  const headers = typeof getAdminRequestHeaders === 'function'
-    ? getAdminRequestHeaders()
-    : { 'Content-Type': 'application/json' };
-  try {
-    const res = await fetch('/api/admin', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ action, id: id || undefined, payload: payload || {} })
-    });
-    if (!res.ok) return { ok: false, status: res.status };
-    const data = await res.json().catch(() => null);
-    return { ok: true, data };
-  } catch (e) {
-    return { ok: false };
+// ===== 云端写入：管理员口令 RPC，失败必须明确报错，不写本机伪装成功 =====
+async function brandAdminRpc(fnName, params) {
+  if (typeof checkinAdminRpc === 'function') return checkinAdminRpc(fnName, params);
+  const key = typeof getSecurityAdminKey === 'function'
+    ? String(getSecurityAdminKey() || '').trim()
+    : '';
+  if (!key) throw new Error('admin-key-cancelled');
+  return brandRpc(fnName, Object.assign({}, params || {}, { p_admin_key: key }));
+}
+
+async function brandRpc(fnName, params) {
+  if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) {
+    const err = new Error('brand-rpc-offline');
+    err.detail = 'Supabase 未配置（缺少 SUPABASE_URL）';
+    throw err;
   }
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
+    method: 'POST',
+    headers: Object.assign({}, brandRestHeaders(), { 'Content-Type': 'application/json' }),
+    body: JSON.stringify(params || {})
+  });
+  if (!res.ok) {
+    let raw = '';
+    let info = null;
+    try { raw = await res.text(); } catch (e) { raw = ''; }
+    try { info = raw ? JSON.parse(raw) : null; } catch (e) { info = null; }
+    throw brandRpcError(res.status, info, raw);
+  }
+  return res.json().catch(() => null);
 }
 
 // ===== 筛选与卡片 =====
@@ -333,6 +391,7 @@ function renderBrandPage() {
   }
   const items = brandFilteredList();
   const all = getBrands();
+  const localDraftCount = brandIsAdmin() ? brandLocalDraftRecords().length : 0;
   body.innerHTML = `
     <div class="brand-toolbar">
       <div class="brand-toolbar-copy">
@@ -341,17 +400,21 @@ function renderBrandPage() {
       </div>
       ${brandIsAdmin() ? `<div class="brand-admin-toolbar">
         <button type="button" class="brand-add-btn" onclick="openBrandEditor()">+ 新增商务合作</button>
+        ${localDraftCount ? `<button type="button" class="brand-sync-btn" onclick="syncLocalBrandsToCloud()">☁️ 将本机商务记录一键同步到云端（${localDraftCount}）</button>` : ''}
+        <button type="button" class="brand-refresh-btn" onclick="loadBrands(true)">🔄 刷新云端</button>
         <span class="brand-admin-hint">🔓 管理员已解锁</span>
       </div>` : ''}
     </div>
     <div class="brand-filter-bar" id="brand-filter-bar"></div>
-    ${brandState.loading && !all.length ? '<div class="brand-empty">⏳ 正在同步商务档案…</div>' : (items.length
+    ${brandState.loading && !all.length ? '<div class="brand-empty">⏳ 正在从 Supabase 读取商务档案…</div>' : (items.length
       ? `<div class="brand-grid">${items.map(brandCardHtml).join('')}</div>`
-      : `<div class="brand-empty">${all.length
-        ? '当前筛选下没有商务记录，换个状态或合作对象看看吧～'
-        : (brandIsAdmin()
-          ? '商务档案还是空的：点「+ 新增商务合作」记录第一条代言吧～'
-          : '商务档案整理中，敬请期待～')}</div>`)}
+      : `<div class="brand-empty">${brandState.error && !all.length
+        ? '☁️ 云端商务档案读取失败，请按下方提示处理后再刷新。'
+        : (all.length
+          ? '当前筛选下没有商务记录，换个状态或合作对象看看吧～'
+          : (brandIsAdmin()
+            ? '商务档案还是空的：点「+ 新增商务合作」记录第一条代言吧～'
+            : '商务档案整理中，敬请期待～'))}</div>`)}
     ${brandState.error ? `<p class="brand-sync-note">⚠️ ${brandEsc(brandState.error)}</p>` : ''}
   `;
   renderBrandFilters();
@@ -461,6 +524,49 @@ function closeBrandEditor() {
   renderBrandPage();
 }
 
+function brandCloudRow(item) {
+  return {
+    brand_name: String(item.brand || '').trim(),
+    title: String(item.title || '').trim(),
+    artist: BRAND_CATEGORIES.includes(item.category) ? item.category : BRAND_CATEGORIES[0],
+    is_active: Boolean(item.isActive),
+    period_text: String(item.period || '').trim() || null,
+    note: String(item.note || '').trim() || null,
+    official_url: String(item.officialUrl || '').trim() || null,
+    announce_date: String(item.announceDate || '').trim().slice(0, 10) || null
+  };
+}
+
+function brandRpcParams(item) {
+  const row = brandCloudRow(item);
+  return {
+    p_brand_name: row.brand_name,
+    p_title: row.title,
+    p_artist: row.artist,
+    p_is_active: row.is_active,
+    p_period_text: row.period_text,
+    p_note: row.note,
+    p_official_url: row.official_url,
+    p_announce_date: row.announce_date
+  };
+}
+
+function brandRpcRow(data) {
+  const row = data && data.row ? data.row : (Array.isArray(data) ? data[0] : data);
+  if (!row || !row.id) return null;
+  return normalizeBrandRecord(row);
+}
+
+function brandUpsertRemote(saved) {
+  if (!saved || !saved.id) return;
+  const idx = brandRemoteRows.findIndex(x => String(x.id) === String(saved.id));
+  if (idx >= 0) brandRemoteRows[idx] = Object.assign({}, brandRemoteRows[idx], brandCloudRow(saved), {
+    id: saved.id,
+    created_at: saved.createdAt || brandRemoteRows[idx].created_at
+  });
+  else brandRemoteRows.push(Object.assign({ id: saved.id, created_at: saved.createdAt || new Date().toISOString() }, brandCloudRow(saved)));
+}
+
 async function submitBrandEditor() {
   if (!brandIsAdmin()) {
     if (typeof toastError === 'function') toastError('管理员状态已失效，请重新解锁');
@@ -503,44 +609,35 @@ async function submitBrandEditor() {
   }
 
   const isEdit = Boolean(brandState.editorId);
-  const id = isEdit ? brandState.editorId : brandNewId();
-  const payload = {
-    brand,
+  const id = isEdit ? brandState.editorId : '';
+  const record = normalizeBrandRecord({
+    id,
+    brand_name: brand,
     title,
-    category,
+    artist: category,
     is_active: isActive,
     announce_date: announceDate || null,
-    period: period || null,
+    period_text: period || null,
     note: note || null,
     official_url: url || null
-  };
-  const record = normalizeBrandRecord({ id, ...payload });
+  });
+  const params = brandRpcParams(record);
+  if (isEdit) params.p_id = id;
 
-  const remote = await brandAdminWrite(isEdit ? 'updateBrand' : 'createBrand', id, payload);
-  const store = readBrandLocalStore();
-  let finalId = id;
-  if (remote.ok) {
-    const rows = Array.isArray(remote.data) ? remote.data : (remote.data ? [remote.data] : []);
-    const saved = rows.length ? normalizeBrandRecord(rows[0]) : record;
-    if (saved.id) finalId = saved.id;
-    const idx = brandRemoteRows.findIndex(x => String(x.id) === id);
-    if (idx >= 0) brandRemoteRows[idx] = saved;
-    else brandRemoteRows.push(saved);
-    store.created = store.created.filter(r => String(r.id) !== id);
-    delete store.overrides[id];
-    store.deleted = store.deleted.filter(x => x !== id);
-    writeBrandLocalStore(store);
-    if (typeof showToast === 'function') showToast(isEdit ? '商务合作已更新' : '商务合作已新增');
-  } else {
-    const idx = store.created.findIndex(r => String(r.id) === id);
-    if (idx >= 0) store.created[idx] = { ...record };
-    else if (isEdit) store.overrides[id] = { ...record };
-    else store.created.push({ ...record });
-    writeBrandLocalStore(store);
-    if (typeof showToast === 'function') showToast('已保存到本机（云端商务表未就绪时自动降级）');
+  try {
+    const data = await brandAdminRpc(
+      isEdit ? 'admin_update_brand_endorsement' : 'admin_create_brand_endorsement',
+      params
+    );
+    const saved = brandRpcRow(data) || record;
+    brandUpsertRemote(saved);
+    brandState.editorId = null;
+    brandState.error = '';
+    renderBrandPage();
+    if (typeof showToast === 'function') showToast(isEdit ? '☁️ 商务合作已更新到云端' : '☁️ 商务合作已新增到云端');
+  } catch (err) {
+    brandReportError(isEdit ? '更新商务合作' : '新增商务合作', err);
   }
-  brandState.editorId = null;
-  renderBrandPage();
 }
 
 async function toggleBrandStatus(itemId) {
@@ -553,34 +650,21 @@ async function toggleBrandStatus(itemId) {
   const item = getBrand(id);
   if (!item) return;
   const next = !item.isActive;
-  const payload = {
-    brand: item.brand,
-    title: item.title,
-    category: item.category,
-    is_active: next,
-    announce_date: item.announceDate || null,
-    period: item.period || null,
-    note: item.note || null,
-    official_url: item.officialUrl || null
-  };
-  const record = { ...item, isActive: next };
-  const remote = await brandAdminWrite('updateBrand', id, payload);
-  const store = readBrandLocalStore();
-  if (remote.ok) {
-    const rows = Array.isArray(remote.data) ? remote.data : (remote.data ? [remote.data] : []);
-    const saved = rows.length ? normalizeBrandRecord(rows[0]) : normalizeBrandRecord(record);
-    const idx = brandRemoteRows.findIndex(x => String(x.id) === id);
-    if (idx >= 0) brandRemoteRows[idx] = saved;
-    delete store.overrides[id];
-    writeBrandLocalStore(store);
-  } else {
-    const idx = store.created.findIndex(r => String(r.id) === id);
-    if (idx >= 0) store.created[idx] = { ...record };
-    else store.overrides[id] = { ...record };
-    writeBrandLocalStore(store);
+  try {
+    const data = await brandAdminRpc('admin_set_brand_endorsement_status', {
+      p_id: id,
+      p_is_active: next
+    });
+    const saved = brandRpcRow(data) || Object.assign({}, item, { isActive: next });
+    brandUpsertRemote(saved);
+    brandState.error = '';
+    renderBrandPage();
+    if (typeof showToast === 'function') {
+      showToast(next ? `☁️ 已切换为「🟢 正在合作中」：${item.brand}` : `☁️ 已切换为「⚪ 合作已结束」：${item.brand}`);
+    }
+  } catch (err) {
+    brandReportError('切换商务合作状态', err);
   }
-  renderBrandPage();
-  if (typeof showToast === 'function') showToast(next ? `已切换为「🟢 正在合作中」：${item.brand}` : `已切换为「⚪ 合作已结束」：${item.brand}`);
 }
 
 async function deleteBrand(itemId) {
@@ -592,18 +676,64 @@ async function deleteBrand(itemId) {
   }
   const item = getBrand(id);
   if (!confirm(`确认彻底删除「${item ? item.brand : '这条'}」的商务记录？删除后无法恢复。`)) return;
-  const remote = await brandAdminWrite('deleteBrand', id, {});
-  const store = readBrandLocalStore();
-  store.created = store.created.filter(r => String(r.id) !== id);
-  delete store.overrides[id];
-  if (!store.deleted.includes(id)) store.deleted.push(id);
-  writeBrandLocalStore(store);
-  brandRemoteRows = brandRemoteRows.filter(x => String(x.id) !== id);
-  renderBrandPage();
-  if (remote.ok) {
-    if (typeof showToast === 'function') showToast(`已彻底删除「${item ? item.brand : '商务记录'}」`);
-  } else if (typeof showToast === 'function') {
-    showToast('已从本机彻底删除（云端商务表未就绪时自动降级）');
+  try {
+    await brandAdminRpc('admin_delete_brand_endorsement', { p_id: id });
+    brandRemoteRows = brandRemoteRows.filter(x => String(x.id) !== id);
+    brandState.error = '';
+    renderBrandPage();
+    if (typeof showToast === 'function') showToast(`☁️ 已从云端彻底删除「${item ? item.brand : '商务记录'}」`);
+  } catch (err) {
+    brandReportError('删除商务合作', err);
+  }
+}
+
+// ===== 本机历史草稿 → Supabase 批量上云 =====
+async function syncLocalBrandsToCloud() {
+  if (!brandIsAdmin()) {
+    if (typeof toastError === 'function') toastError('请先解锁管理员口令后再同步本机记录');
+    return;
+  }
+  if (brandState.syncing) return;
+  const drafts = brandLocalDraftRecords();
+  if (!drafts.length) {
+    if (typeof showToast === 'function') showToast('本机没有待同步的商务记录');
+    return;
+  }
+  const remoteIds = new Set(getBrands().map(item => item.id));
+  const remoteKeys = new Set(getBrands().map(item => `${item.brand}|${item.title}|${item.announceDate}`));
+  const updates = [];
+  const inserts = [];
+  drafts.forEach(item => {
+    if (item.id && remoteIds.has(item.id)) updates.push(item);
+    else if (!remoteKeys.has(`${item.brand}|${item.title}|${item.announceDate}`)) inserts.push(item);
+  });
+
+  brandState.syncing = true;
+  try {
+    for (let i = 0; i < updates.length; i++) {
+      const params = brandRpcParams(updates[i]);
+      params.p_id = updates[i].id;
+      await brandAdminRpc('admin_update_brand_endorsement', params);
+    }
+    if (inserts.length) {
+      await brandAdminRpc('admin_import_brand_endorsements', {
+        p_rows: inserts.map(brandCloudRow)
+      });
+    }
+    clearBrandLocalStore();
+    brandState.error = '';
+    await loadBrands(true);
+    const total = updates.length + inserts.length;
+    if (typeof showToast === 'function') {
+      showToast(total
+        ? `☁️ 已同步 ${total} 条本机商务记录到云端`
+        : '☁️ 本机记录与云端重复，已清理本机临时缓存');
+    }
+  } catch (err) {
+    brandReportError('同步本机商务记录到云端', err);
+  } finally {
+    brandState.syncing = false;
+    renderBrandPage();
   }
 }
 
@@ -652,7 +782,8 @@ function openBrandModal(status) {
   modal.classList.remove('hidden');
   document.body.classList.add('travel-modal-open');
   renderBrandPage();
-  if (!brandLoadPromise && !brandLoadedRemote && !readBrandLocalStore().created.length) loadBrands();
+  // 打开弹窗必须以云端为准重新拉取；若已有请求在途则复用它，避免重复请求。
+  loadBrands(!brandLoadPromise);
   const body = modal.querySelector('#brand-modal-body');
   if (body) body.scrollTop = 0;
 }
@@ -676,6 +807,7 @@ window.closeBrandEditor = closeBrandEditor;
 window.submitBrandEditor = submitBrandEditor;
 window.toggleBrandStatus = toggleBrandStatus;
 window.deleteBrand = deleteBrand;
+window.syncLocalBrandsToCloud = syncLocalBrandsToCloud;
 window.loadBrands = loadBrands;
 window.getBrands = getBrands;
 window.getBrand = getBrand;

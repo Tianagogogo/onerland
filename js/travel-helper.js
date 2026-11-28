@@ -357,37 +357,10 @@ function checkinProofIsLink(proof) {
   return /^https?:\/\//i.test(String(proof || ''));
 }
 
-// 成员分流检索：自动拼精准搜索词
-function checkinMemberKeyword(city, member) {
-  const c = String(city || '').trim();
-  const m = String(member || 'ONER全员').trim();
-  return `${m} ${c} 同款 探店`.replace(/\s+/g, ' ');
-}
-
+// 成员筛选项：保留顶部 ONER全员 / 岳岳 / 木子洋 / 灵超 切换
 function setCheckinMemberFilter(member) {
   checkinState.memberFilter = CHECKIN_MEMBERS.includes(member) ? member : 'ONER全员';
   renderCheckinSection();
-}
-
-function copyCheckinMemberKeyword() {
-  const text = checkinMemberKeyword(checkinState.city, checkinState.memberFilter);
-  const ok = () => showToast(`已复制：${text}`);
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(ok).catch(() => fallbackCopy());
-  } else fallbackCopy();
-  function fallbackCopy() {
-    try {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      const done = document.execCommand('copy');
-      document.body.removeChild(ta);
-      if (done) ok(); else toastError('复制失败，请手动选择文字复制');
-    } catch (e) { toastError('复制失败，请手动选择文字复制'); }
-  }
 }
 
 function toggleCheckinForm() {
@@ -729,14 +702,13 @@ function renderCheckinSection() {
   const city = String(checkinState.city || box.dataset.city || '').trim();
   const spots = checkinState.spots;
   const pending = isAdmin ? checkinState.pending : [];
-  const keyword = checkinMemberKeyword(city, checkinState.memberFilter);
   const memberChips = CHECKIN_MEMBERS.map(m =>
     `<button type="button" class="checkin-chip ${checkinState.memberFilter === m ? 'is-active' : ''}" onclick="setCheckinMemberFilter('${travelEsc(m)}')">${travelEsc(m)}</button>`
   ).join('');
 
   box.innerHTML = `
     <div class="checkin-member-bar">
-      <div class="checkin-member-title">🔍 成员同款检索 <span class="checkin-member-sub">· 自动拼精准关键词</span></div>
+      <div class="checkin-member-title">🔍 成员同款检索</div>
       <div class="checkin-chip-row">${memberChips}</div>
     </div>
 
@@ -782,15 +754,6 @@ function renderCheckinSection() {
               </div>`).join('')}</div>`
           : `<div class="checkin-empty">暂无待审核投稿</div>`) : ''}
       </div>` : ''}
-
-    <div class="checkin-keyword-box">
-      <div class="checkin-keyword-label">🔎 关键词预览</div>
-      <div class="checkin-keyword">${travelEsc(keyword)}</div>
-      <div class="checkin-member-actions">
-        <a class="checkin-action-primary" href="https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(keyword)}" target="_blank" rel="noopener noreferrer">↗️ 跳转小红书搜索</a>
-        <button type="button" class="checkin-action-ghost" onclick="copyCheckinMemberKeyword()">📋 复制关键词</button>
-      </div>
-    </div>
   `;
 }
 
@@ -1571,7 +1534,6 @@ window.submitCheckinSpot = submitCheckinSpot;
 window.openCheckinProof = openCheckinProof;
 window.openCheckinProofPreview = openCheckinProofPreview;
 window.setCheckinMemberFilter = setCheckinMemberFilter;
-window.copyCheckinMemberKeyword = copyCheckinMemberKeyword;
 window.toggleCheckinPending = toggleCheckinPending;
 window.adminReviewCheckin = adminReviewCheckin;
 window.adminRejectCheckin = adminRejectCheckin;

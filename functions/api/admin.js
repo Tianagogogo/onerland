@@ -198,25 +198,25 @@ const BRAND_CATEGORIES = new Set(['ONER全员', '岳岳', '木子洋', '灵超']
 
 function sanitizeBrandPayload(payload) {
   const p = payload || {};
-  const brand = String(p.brand || '').trim().slice(0, 60);
+  const brandName = String(p.brand_name || p.brand || '').trim().slice(0, 60);
   const title = String(p.title || '').trim().slice(0, 40);
-  const category = String(p.category || '').trim();
+  const artist = String(p.artist || p.category || '').trim();
   const activeRaw = p.is_active;
   const isActive = !(activeRaw === false || activeRaw === 0 || activeRaw === 'false' || activeRaw === '0');
   const announceDate = String(p.announce_date || '').trim().slice(0, 10);
-  const period = String(p.period || '').trim().slice(0, 60);
+  const periodText = String(p.period_text || p.period || '').trim().slice(0, 60);
   const note = String(p.note || '').trim().slice(0, 300);
   const officialUrl = String(p.official_url || '').trim().slice(0, 400);
-  if (!brand || !title || !BRAND_CATEGORIES.has(category)) return null;
+  if (!brandName || !title || !BRAND_CATEGORIES.has(artist)) return null;
   if (announceDate && !/^\d{4}-\d{2}-\d{2}$/.test(announceDate)) return null;
   if (officialUrl && !/^https?:\/\//i.test(officialUrl)) return null;
   return {
-    brand,
+    brand_name: brandName,
     title,
-    category,
+    artist,
     is_active: isActive,
     announce_date: announceDate || null,
-    period: period || null,
+    period_text: periodText || null,
     note: note || null,
     official_url: officialUrl || null,
   };
