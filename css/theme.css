@@ -363,8 +363,9 @@ select::-moz-focus-inner { border: 0; }
   height: 100%;
   object-fit: cover;
   object-position: center 18%; /* 偏上焦点防切头 */
-  opacity: 0;
-  transition: transform 0.25s ease, opacity 0.28s ease;
+  /* 不再用 opacity:0 做淡入：Safari 缓存命中时漏 onload 会让海报永久透明 */
+  opacity: 1;
+  transition: transform 0.25s ease;
 }
 .poster-square-box img.is-loaded { opacity: 1; }
 @media (prefers-reduced-motion: reduce) {

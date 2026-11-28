@@ -2119,6 +2119,17 @@ function renderTourCards() {
   restoreFooterTabs();
   hydrateSecurityVoteBlocks();
   updateCountdowns();
+
+  // 档案页前 6 张海报：eager 预加载 + 点亮（缓存命中时 onload 可能不触发）
+  if (typeof preloadPosterImages === 'function') {
+    const urls = Array.from(document.querySelectorAll('#tour-grid .poster-square-box img, #archive-timeline-list .poster-square-box img'))
+      .map(img => img.getAttribute('src'))
+      .filter(Boolean);
+    preloadPosterImages(urls, 6);
+  }
+  if (typeof ensurePosterImagesVisible === 'function') {
+    [0, 80, 300, 900].forEach(ms => setTimeout(() => ensurePosterImagesVisible(), ms));
+  }
 }
 
 

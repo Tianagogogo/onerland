@@ -624,7 +624,18 @@ function compressTimetableImage(file, maxEdge = 2560, quality = 0.92) {
 
 // ================= 海报加载策略：仅真实裂图时降级，不做超时掐断 =================
 function degradePosterImage(img) {
-  if (!img || img.dataset.degraded === '1') return;
+  if (!img) return;
+  const src = String(img.getAttribute('src') || '').trim();
+  // 空 src / about:blank 不算加载失败，保持原样（避免误显示裂图封面）
+  if (!src || src === 'about:blank') return;
+  // 已经成功解码的图片：强制显示，绝不被兜底遮挡
+  if (img.complete && img.naturalWidth > 0) {
+    img.classList.add('is-loaded');
+    img.style.display = 'block';
+    img.style.opacity = '1';
+    return;
+  }
+  if (img.dataset.degraded === '1') return;
   img.dataset.degraded = '1';
   const box = img.closest ? img.closest('.poster-square-box') : null;
   if (box) {
@@ -649,14 +660,47 @@ function handlePosterImageError(img) {
   degradePosterImage(img);
 }
 
-// 海报属性：首屏前 4 张立即加载并提权，其余懒加载；Base64 图片不加跨域属性
+// 海报属性：首屏前 6 张一律 eager 并发下载（开屏期间就开始拉），其余懒加载
 function posterImgAttrs(src, index) {
   const isDataUrl = /^data:/i.test(String(src || ''));
-  const priority = typeof index === 'number' && index < 4
+  const eager = typeof index === 'number' && index < 6;
+  const priority = eager
     ? 'loading="eager" fetchpriority="high"'
     : 'loading="lazy"';
   return `${priority} decoding="async"${isDataUrl ? '' : ' referrerpolicy="no-referrer"'}`;
 }
+
+// 首屏海报静默预加载：开屏动画播放期间就进入内存缓存，撤掉遮罩即可见
+function preloadPosterImages(urls, limit) {
+  const max = typeof limit === 'number' ? limit : 6;
+  const seen = new Set();
+  (Array.isArray(urls) ? urls : []).slice(0, max).forEach(raw => {
+    const url = String(raw || '').trim();
+    if (!url || seen.has(url) || /^data:/i.test(url)) return;
+    seen.add(url);
+    try {
+      const img = new Image();
+      img.referrerPolicy = 'no-referrer';
+      img.decoding = 'async';
+      img.src = url;
+    } catch (e) { /* ignore */ }
+  });
+}
+
+// 缓存命中兜底：图片早已 complete 时 onload 可能不触发，这里强制点亮，避免长期透明
+function ensurePosterImagesVisible(root) {
+  const scope = root && root.querySelectorAll ? root : document;
+  scope.querySelectorAll('.poster-square-box img').forEach(img => {
+    if (img.dataset && img.dataset.degraded === '1') return;
+    if (img.complete && img.naturalWidth > 0) {
+      img.classList.add('is-loaded');
+      img.style.display = 'block';
+      img.style.opacity = '1';
+    }
+  });
+}
+window.ensurePosterImagesVisible = ensurePosterImagesVisible;
+window.preloadPosterImages = preloadPosterImages;
 
 // 座位图/视野大图不随列表预加载，点击时按 id 单独查询云端记录
 async function openSeatMapForShow(cloudId, fallbackUrl, caption) {

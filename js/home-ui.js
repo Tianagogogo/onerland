@@ -266,9 +266,14 @@ let splashFinished = false;
 
 function finishSplashNow() {
   const el = document.getElementById('app-splash-screen');
+  if (typeof ensurePosterImagesVisible === 'function') ensurePosterImagesVisible();
   if (!el) return;
   el.classList.add('is-hiding');
   setTimeout(() => el.remove(), SPLASH_FADE_MS + 50);
+  // 遮罩撤掉后再补两轮，覆盖 Safari 缓存命中漏 onload 的情况
+  [0, 120, 600].forEach(ms => setTimeout(() => {
+    if (typeof ensurePosterImagesVisible === 'function') ensurePosterImagesVisible();
+  }, ms));
 }
 
 function hideSplashScreen() {
@@ -283,6 +288,7 @@ function hideSplashScreen() {
       return !r || (r.top < (window.innerHeight || 800) && r.bottom > 0);
     });
   const waitImg = img => new Promise(resolve => {
+    if (img.complete && img.naturalWidth > 0) return resolve();
     if (img.complete) return resolve();
     const done = () => { img.removeEventListener('load', done); img.removeEventListener('error', done); resolve(); };
     img.addEventListener('load', done);
@@ -648,6 +654,14 @@ function renderUpcomingMiniTimeline() {
     title: String(item.city || item.title || '音乐节').replace(/['"<>]/g, '')
   }));
   homeTimelineRecords = list;
+  // 开屏期间就并发预加载首屏海报（前 6 张），撤遮罩即可见
+  if (typeof preloadPosterImages === 'function') {
+    preloadPosterImages(list.map(it => it.posterUrl), 6);
+  }
+  if (typeof ensurePosterImagesVisible === 'function') {
+    ensurePosterImagesVisible(box);
+    [0, 80, 300, 900].forEach(ms => setTimeout(() => ensurePosterImagesVisible(box), ms));
+  }
   box.querySelectorAll('[data-tl-action]').forEach(btn => {
     btn.addEventListener('click', ev => {
       ev.stopPropagation();
