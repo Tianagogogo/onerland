@@ -123,6 +123,9 @@ function syncAuthState() {
   if (typeof updateAuthButtonUI === 'function') updateAuthButtonUI();
   // 💬 页脚「📬 查看反馈箱」入口只在管理员密码解锁后出现
   if (typeof refreshFeedbackEntryPoints === 'function') refreshFeedbackEntryPoints();
+
+  // 🍜 同款打卡：解锁 / 锁定后立即刷新待审核队列（弹窗开着也能即时出现）
+  try { if (typeof refreshCheckinAdminState === 'function') refreshCheckinAdminState(); } catch (e) { /* ignore */ }
 }
 
 function saveGuestNicknameFromModal() {

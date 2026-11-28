@@ -1,12 +1,14 @@
 -- ============================================================
--- 🍜 城市同款打卡点（city_checkin_spots）
--- 访客投稿 → 待审核（对外完全静默）；管理员审核 / 免审直发
--- 驳回 = 物理 DELETE，不留痕迹
--- 可直接整段复制到 Supabase SQL Editor 运行
+-- 🍜 同款打卡：建表 + RLS + 全量 RPC（幂等，可反复执行）
+-- 访客投稿 → status='pending'（对外静默）
+-- 管理员：全站待审核队列 / 通过 / 驳回物理删除 / 免审直发
+-- 口令与安检投票、反馈箱、抢票表完全一致：security_admin_config.key_sha256
+-- 参数名与前端 100% 对齐：p_admin_key / p_city / p_members / p_category
+--                         p_spot_name / p_note / p_proof_data / p_device_id / p_id / p_action
 -- ============================================================
 create extension if not exists pgcrypto;
 
--- ---------- 1) 建表 ----------
+-- ---------- 1) 建表 + 补齐缺失列 ----------
 create table if not exists public.city_checkin_spots (
   id uuid primary key default gen_random_uuid(),
   city text not null default '',
@@ -20,7 +22,7 @@ create table if not exists public.city_checkin_spots (
   created_at timestamptz not null default now()
 );
 
--- 兼容旧表结构：缺失列补齐
+alter table public.city_checkin_spots add column if not exists id uuid default gen_random_uuid();
 alter table public.city_checkin_spots add column if not exists city text not null default '';
 alter table public.city_checkin_spots add column if not exists members text[] not null default array['ONER全员']::text[];
 alter table public.city_checkin_spots add column if not exists category text not null default '🍜 餐厅美食';
@@ -31,17 +33,28 @@ alter table public.city_checkin_spots add column if not exists status text not n
 alter table public.city_checkin_spots add column if not exists device_id text not null default '';
 alter table public.city_checkin_spots add column if not exists created_at timestamptz not null default now();
 
--- 状态约束
+-- 历史脏数据修正：空状态 / 大写状态统一归入 pending，避免管理员队列漏记录
+update public.city_checkin_spots
+   set status = 'pending'
+ where status is null or btrim(status) = '' or lower(btrim(status)) not in ('pending', 'approved');
+
+update public.city_checkin_spots set status = lower(btrim(status))
+ where status <> lower(btrim(status));
+
+alter table public.city_checkin_spots alter column status set default 'pending';
+
 alter table public.city_checkin_spots drop constraint if exists city_checkin_spots_status_chk;
 alter table public.city_checkin_spots
   add constraint city_checkin_spots_status_chk check (status in ('pending', 'approved'));
 
 create index if not exists city_checkin_spots_city_status_idx
   on public.city_checkin_spots (city, status, created_at desc);
+create index if not exists city_checkin_spots_status_created_idx
+  on public.city_checkin_spots (status, created_at asc);
 create index if not exists city_checkin_spots_device_idx
   on public.city_checkin_spots (device_id, created_at desc);
 
--- ---------- 2) RLS：禁止匿名直接读写删改底层表 ----------
+-- ---------- 2) RLS：只允许通过 RPC（security definer）访问 ----------
 alter table public.city_checkin_spots enable row level security;
 
 drop policy if exists city_checkin_no_select on public.city_checkin_spots;
@@ -51,9 +64,7 @@ drop policy if exists city_checkin_no_delete on public.city_checkin_spots;
 
 revoke all on table public.city_checkin_spots from anon, authenticated;
 
--- ---------- 3) 管理员口令校验（复用 security_admin_config） ----------
--- 与安检投票 / 反馈箱 / 抢票表完全同一套口令：security_admin_config.key_sha256
--- 前端传 p_admin_key（已 btrim），这里同样 btrim 后 sha256 比对，失败抛 28000 → HTTP 403
+-- ---------- 3) 管理员口令校验（与全站共用同一张表） ----------
 create or replace function public._checkin_admin_ok(p_admin_key text)
 returns boolean
 language plpgsql
@@ -105,7 +116,7 @@ as $$
   limit 200;
 $$;
 
--- ---------- 5) 访客投稿：默认 pending，静默入库 ----------
+-- ---------- 5) 访客投稿：强制 pending ----------
 create or replace function public.submit_checkin_spot(
   p_city text,
   p_members text[],
@@ -128,19 +139,21 @@ declare
   v_proof text := coalesce(p_proof_data, '');
   v_device text := btrim(coalesce(p_device_id, ''));
   v_members text[];
-  v_recent int;
+  v_recent int := 0;
   v_id uuid;
 begin
-  if v_city = '' then raise exception 'city_required'; end if;
-  if v_name = '' then raise exception 'spot_name_required'; end if;
-  if length(v_name) > 30 then raise exception 'spot_name_too_long'; end if;
-  if length(v_note) > 60 then raise exception 'note_too_long'; end if;
-  if length(v_proof) > 280000 then raise exception 'proof_too_large'; end if;
-  if v_proof <> '' and v_proof !~ '^(data:image/|https?://)' then raise exception 'proof_invalid'; end if;
+  if v_city = '' then raise exception 'city_required' using errcode = '22023'; end if;
+  if v_name = '' then raise exception 'spot_name_required' using errcode = '22023'; end if;
+  if length(v_name) > 30 then raise exception 'spot_name_too_long' using errcode = '22023'; end if;
+  if length(v_note) > 60 then raise exception 'note_too_long' using errcode = '22023'; end if;
+  if length(v_proof) > 280000 then raise exception 'proof_too_large' using errcode = '22023'; end if;
+  if v_proof <> '' and v_proof !~ '^(data:image/|https?://)' then
+    raise exception 'proof_invalid' using errcode = '22023';
+  end if;
 
   if v_cat = '' then v_cat := '🍜 餐厅美食'; end if;
   if v_cat not in ('🍜 餐厅美食', '☕ 咖啡甜品', '📸 拍照地标') then
-    raise exception 'category_invalid';
+    raise exception 'category_invalid' using errcode = '22023';
   end if;
 
   select coalesce(array_agg(distinct m), array['ONER全员']::text[])
@@ -152,7 +165,6 @@ begin
     v_members := array['ONER全员']::text[];
   end if;
 
-  -- 同一设备 24 小时最多 3 条
   if v_device <> '' then
     select count(*) into v_recent
     from public.city_checkin_spots
@@ -160,19 +172,21 @@ begin
       and created_at > now() - interval '24 hours'
       and status in ('pending', 'approved');
     if v_recent >= 3 then
-      raise exception 'rate_limited';
+      raise exception 'rate_limited' using errcode = '22023';
     end if;
   end if;
 
-  insert into public.city_checkin_spots (city, members, category, spot_name, note, proof_data, status, device_id)
-  values (v_city, v_members, v_cat, v_name, v_note, v_proof, 'pending', v_device)
+  insert into public.city_checkin_spots
+    (city, members, category, spot_name, note, proof_data, status, device_id)
+  values
+    (v_city, v_members, v_cat, v_name, v_note, v_proof, 'pending', v_device)
   returning id into v_id;
 
   return jsonb_build_object('ok', true, 'id', v_id, 'status', 'pending');
 end;
 $$;
 
--- ---------- 6) 管理员：待审核队列 ----------
+-- ---------- 6) 管理员：全站待审核队列（不限城市） ----------
 create or replace function public.admin_get_pending_checkin_spots(p_admin_key text)
 returns table (
   id uuid,
@@ -197,11 +211,11 @@ begin
     from public.city_checkin_spots s
     where s.status = 'pending'
     order by s.created_at asc
-    limit 300;
+    limit 500;
 end;
 $$;
 
--- ---------- 7) 管理员审核：通过 / 驳回（物理删除） ----------
+-- ---------- 7) 管理员：通过 / 驳回（物理删除） ----------
 create or replace function public.admin_review_checkin_spot(p_id uuid, p_action text, p_admin_key text)
 returns jsonb
 language plpgsql
@@ -215,22 +229,20 @@ begin
   perform public._checkin_admin_ok(p_admin_key);
 
   if v_action = 'approve' then
-    update public.city_checkin_spots
-       set status = 'approved'
-     where id = p_id;
+    update public.city_checkin_spots set status = 'approved' where id = p_id;
     get diagnostics v_count = row_count;
-    if v_count = 0 then raise exception 'not_found'; end if;
+    if v_count = 0 then raise exception 'not_found' using errcode = 'P0002'; end if;
     return jsonb_build_object('ok', true, 'action', 'approved', 'id', p_id);
   end if;
 
   if v_action in ('reject', 'delete') then
     delete from public.city_checkin_spots where id = p_id;
     get diagnostics v_count = row_count;
-    if v_count = 0 then raise exception 'not_found'; end if;
+    if v_count = 0 then raise exception 'not_found' using errcode = 'P0002'; end if;
     return jsonb_build_object('ok', true, 'action', 'deleted', 'id', p_id);
   end if;
 
-  raise exception 'action_invalid';
+  raise exception 'action_invalid' using errcode = '22023';
 end;
 $$;
 
@@ -262,16 +274,18 @@ declare
 begin
   perform public._checkin_admin_ok(p_admin_key);
 
-  if v_city = '' then raise exception 'city_required'; end if;
-  if v_name = '' then raise exception 'spot_name_required'; end if;
-  if length(v_name) > 30 then raise exception 'spot_name_too_long'; end if;
-  if length(v_note) > 60 then raise exception 'note_too_long'; end if;
-  if length(v_proof) > 280000 then raise exception 'proof_too_large'; end if;
-  if v_proof <> '' and v_proof !~ '^(data:image/|https?://)' then raise exception 'proof_invalid'; end if;
+  if v_city = '' then raise exception 'city_required' using errcode = '22023'; end if;
+  if v_name = '' then raise exception 'spot_name_required' using errcode = '22023'; end if;
+  if length(v_name) > 30 then raise exception 'spot_name_too_long' using errcode = '22023'; end if;
+  if length(v_note) > 60 then raise exception 'note_too_long' using errcode = '22023'; end if;
+  if length(v_proof) > 280000 then raise exception 'proof_too_large' using errcode = '22023'; end if;
+  if v_proof <> '' and v_proof !~ '^(data:image/|https?://)' then
+    raise exception 'proof_invalid' using errcode = '22023';
+  end if;
 
   if v_cat = '' then v_cat := '🍜 餐厅美食'; end if;
   if v_cat not in ('🍜 餐厅美食', '☕ 咖啡甜品', '📸 拍照地标') then
-    raise exception 'category_invalid';
+    raise exception 'category_invalid' using errcode = '22023';
   end if;
 
   select coalesce(array_agg(distinct m), array['ONER全员']::text[])
@@ -283,15 +297,17 @@ begin
     v_members := array['ONER全员']::text[];
   end if;
 
-  insert into public.city_checkin_spots (city, members, category, spot_name, note, proof_data, status, device_id)
-  values (v_city, v_members, v_cat, v_name, v_note, v_proof, 'approved', v_device)
+  insert into public.city_checkin_spots
+    (city, members, category, spot_name, note, proof_data, status, device_id)
+  values
+    (v_city, v_members, v_cat, v_name, v_note, v_proof, 'approved', v_device)
   returning id into v_id;
 
   return jsonb_build_object('ok', true, 'id', v_id, 'status', 'approved');
 end;
 $$;
 
--- ---------- 9) 授权与 schema 刷新 ----------
+-- ---------- 9) 授权 + 刷新 PostgREST schema 缓存 ----------
 grant execute on function public.get_approved_checkin_spots(text) to anon, authenticated;
 grant execute on function public.submit_checkin_spot(text, text[], text, text, text, text, text) to anon, authenticated;
 grant execute on function public.admin_get_pending_checkin_spots(text) to anon, authenticated;

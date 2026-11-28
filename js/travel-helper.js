@@ -149,7 +149,9 @@ const checkinState = {
   proofKb: 0,
   pendingOpen: false,
   memberFilter: 'ONER全员',
-  adminKeyStale: false
+  adminKeyStale: false,
+  pendingLoading: false,
+  pendingError: ''
 };
 
 function checkinIsAdmin() {
@@ -462,18 +464,58 @@ async function loadCheckinSpots(city, force) {
   renderCheckinSection();
 }
 
+// 待审核队列：全站所有城市（不按当前场次筛选），管理员解锁即拉取
 async function loadCheckinPending() {
-  if (!checkinIsAdmin()) { checkinState.pending = []; checkinState.adminKeyStale = false; return; }
+  if (!checkinIsAdmin()) {
+    checkinState.pending = [];
+    checkinState.adminKeyStale = false;
+    checkinState.pendingError = '';
+    return;
+  }
+  if (checkinState.pendingLoading) return;
   const key = getCheckinAdminKey();
-  if (!key) { checkinState.pending = []; checkinState.adminKeyStale = true; return; }
+  if (!key) {
+    checkinState.pending = [];
+    checkinState.adminKeyStale = true;
+    checkinState.pendingError = 'no-key';
+    return;
+  }
+  checkinState.pendingLoading = true;
   try {
     const data = await checkinRpc('admin_get_pending_checkin_spots', { p_admin_key: key });
     checkinState.pending = Array.isArray(data) ? data : [];
     checkinState.adminKeyStale = false;
+    checkinState.pendingError = '';
+    // 有待审就直接展开，避免管理员以为“看不到投稿”
+    if (checkinState.pending.length) checkinState.pendingOpen = true;
   } catch (e) {
     checkinState.pending = [];
     checkinState.adminKeyStale = isCheckinAuthError(e);
+    checkinState.pendingError = checkinState.adminKeyStale ? 'auth' : 'failed';
+    try {
+      console.warn('[checkin] admin_get_pending_checkin_spots 失败', {
+        status: e && e.status, code: e && e.code, detail: e && e.detail, message: e && e.message
+      });
+    } catch (err) { /* ignore */ }
+  } finally {
+    checkinState.pendingLoading = false;
+    renderCheckinSection();
   }
+}
+
+// 解锁 / 锁定 / 打开弹窗后统一刷新：保证「先解锁再开弹窗」与「先开弹窗再解锁」都能看到队列
+function refreshCheckinAdminState() {
+  const modal = document.getElementById('checkin-modal');
+  if (!modal || modal.classList.contains('hidden')) return;
+  if (!checkinIsAdmin()) {
+    checkinState.pending = [];
+    checkinState.pendingOpen = false;
+    checkinState.pendingError = '';
+    renderCheckinSection();
+    return;
+  }
+  renderCheckinSection();
+  loadCheckinPending();
 }
 
 // 待审核区「重新输入口令」：一次弹框 → 写入全站统一通道 → 只重拉一次
@@ -543,8 +585,15 @@ async function submitCheckinSpot() {
     await loadCheckinSpots(city, true);
   } catch (e) {
     const msg = String(e && e.message || '');
+    try {
+      console.warn('[checkin] 投稿提交失败', {
+        fn: isAdmin ? 'admin_create_checkin_spot' : 'submit_checkin_spot',
+        status: e && e.status, code: e && e.code, detail: e && e.detail, message: msg
+      });
+    } catch (err) { /* ignore */ }
     if (msg === 'admin-key-cancelled') toastError('已取消：未提供有效的管理员口令');
     else if (isCheckinAuthError(e) || /Unauthorized/i.test(msg)) toastError('管理员口令未通过校验，请用顶部解锁的同一口令重试');
+    else if (e && e.detail) toastError(`提交失败：${e.detail}（${e.status || 'RPC'}）`);
     else toastError(msg.indexOf('rpc-failed') >= 0 ? '提交失败：后台接口未就绪或已达投稿上限' : `提交失败：${msg}`);
     if (btn) { btn.disabled = false; btn.textContent = isAdmin ? '➕ 免审发布' : '📮 提交审核'; }
   }
@@ -713,9 +762,10 @@ function renderCheckinSection() {
     ${isAdmin ? `
       <div class="checkin-admin">
         <button type="button" class="checkin-admin-head" onclick="toggleCheckinPending()">
-          ⏳ 待审核同款投稿（${pending.length} 条） <span>${checkinState.pendingOpen ? '▴' : '▾'}</span>
+          ⏳ 待审核同款投稿（${checkinState.pendingLoading ? '…' : pending.length} 条） <span>${checkinState.pendingOpen ? '▴' : '▾'}</span>
         </button>
         ${checkinState.adminKeyStale ? `<div class="checkin-empty">🔑 管理员口令未通过校验，<button type="button" class="checkin-link-btn" onclick="retryCheckinAdminKey()">点此重新输入</button></div>` : ''}
+        ${(!checkinState.adminKeyStale && checkinState.pendingError === 'failed') ? `<div class="checkin-empty">⚠️ 待审核队列拉取失败，<button type="button" class="checkin-link-btn" onclick="loadCheckinPending()">点此重试</button></div>` : ''}
         ${checkinState.pendingOpen ? (pending.length
           ? `<div class="checkin-list">${pending.map(sp => `
               <div class="checkin-row is-pending">
@@ -1206,6 +1256,7 @@ function openCheckinHelper(show) {
   const body = modal.querySelector('#checkin-body');
   if (body) body.scrollTop = 0;
   loadCheckinSpots(checkinState.city, true);
+  if (checkinIsAdmin()) loadCheckinPending();
 }
 
 function openCheckinFromButton(btn) {
@@ -1287,4 +1338,6 @@ window.adminRejectCheckin = adminRejectCheckin;
 window.deleteApprovedCheckin = deleteApprovedCheckin;
 window.renderCheckinSection = renderCheckinSection;
 window.retryCheckinAdminKey = retryCheckinAdminKey;
+window.loadCheckinPending = loadCheckinPending;
+window.refreshCheckinAdminState = refreshCheckinAdminState;
 window.getCheckinAdminKey = getCheckinAdminKey;
