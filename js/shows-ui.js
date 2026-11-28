@@ -1826,7 +1826,7 @@ function setFooterTab(tab, trigger, event) {
   }
   if (tab === 'seats') {
     const seatEventId = card.dataset.showCard;
-    if (seatEventId && typeof openTicketSeatPanel === 'function') openTicketSeatPanel(seatEventId, '');
+    if (seatEventId && typeof openTicketSeatPanel === 'function') openTicketSeatPanel(seatEventId, '', card.dataset.showVenue || '');
   }
   syncOpenDrawerRegistryFromState();
 }
@@ -2036,7 +2036,7 @@ function renderTourCards() {
           </div>`;
 
     return `
-      <div class="show-card p-4 rounded-2xl metal-card h-full flex flex-col gap-3 justify-between" data-show-card="${item.cloudId || idx}" style="--fan-theme:${getFanPrefThemeColor()}">
+      <div class="show-card p-4 rounded-2xl metal-card h-full flex flex-col gap-3 justify-between" data-show-card="${item.cloudId || idx}" data-show-venue="${String(cleanVenue || safeCity).replace(/"/g, '&quot;')}" style="--fan-theme:${getFanPrefThemeColor()}">
         <div class="flex gap-3.5">
           <div class="w-24 poster-square-box shrink-0">
             ${(() => { const raw = item.posterUrl || item.poster_url || item.poster || item.cover || item.image || ''; const ps = (typeof posterSrcFor === 'function') ? posterSrcFor(item, raw) : raw; return ps ? `<img src="${ps}" alt="${safeCity}" data-cap="${safeCity} · 演出海报" ${(typeof posterAttrsFor === 'function') ? posterAttrsFor(item, raw, idx) : posterImgAttrs(ps, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" onclick="event.stopPropagation(); openPosterLightbox(this.dataset.hdSrc || this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : ((typeof posterPlaceholderHtml === 'function') ? posterPlaceholderHtml(safeCity) : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`); })()}
