@@ -201,3 +201,55 @@ async function importOCRBatchShows() {
   alert(`已成功导入 ${payloads.length} 场演出！`);
   await loadTourData();
 }
+
+// ================= 音乐节时间表 OCR：识别 ONER / 成员上台时段 =================
+function normalizeOCRSlotText(text) {
+  return String(text || '')
+    .replace(/[：]/g, ':')
+    .replace(/[．]/g, '.')
+    .replace(/[ \t\u00a0]+/g, ' ');
+}
+
+function normalizeSlotClock(matchA, matchB) {
+  const pad = v => {
+    const [h, m] = String(v).split(/[:.]/);
+    return `${String(h).padStart(2, '0')}:${String(m || '00').padStart(2, '0')}`;
+  };
+  if (matchB) return `${pad(matchA)}-${pad(matchB)}`;
+  return pad(matchA);
+}
+
+// 从 OCR 全文中找「关键词所在行（或邻近行）」的时间段
+function parseArtistTimeSlotFromOCRText(rawText) {
+  const text = normalizeOCRSlotText(rawText);
+  if (!text) return '';
+  const keywords = ['ONER', '岳岳', '木子洋', '灵超', 'PINKRAY', 'KWIN', 'DIDI'];
+  const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
+  const rangeRe = /(\d{1,2}[:.]\d{2})\s*(?:-|~|—|–|至|to)\s*(\d{1,2}[:.]\d{2})/i;
+  const singleRe = /(\d{1,2}[:.]\d{2})/;
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (!keywords.some(k => line.toUpperCase().includes(k.toUpperCase()))) continue;
+    const range = line.match(rangeRe);
+    if (range) return normalizeSlotClock(range[1], range[2]);
+    // 同行只有开始时间：往后两行找时间段或结束时间
+    const nearby = [line, lines[i + 1] || '', lines[i + 2] || ''].join(' ');
+    const nearRange = nearby.match(rangeRe);
+    if (nearRange) return normalizeSlotClock(nearRange[1], nearRange[2]);
+    const single = line.match(singleRe);
+    if (single) return normalizeSlotClock(single[1]);
+  }
+  // 全文兜底：取第一个时间段
+  const globalRange = text.match(rangeRe);
+  return globalRange ? normalizeSlotClock(globalRange[1], globalRange[2]) : '';
+}
+
+async function recognizeTimetableSlot(dataUrl) {
+  if (!dataUrl) return '';
+  if (typeof Tesseract === 'undefined') return '';
+  const enhanced = /^data:image\//i.test(dataUrl)
+    ? await preprocessImageForLocalOCR(dataUrl).catch(() => dataUrl)
+    : dataUrl;
+  const res = await Tesseract.recognize(enhanced, 'chi_sim+eng');
+  return parseArtistTimeSlotFromOCRText(res && res.data ? res.data.text : '');
+}

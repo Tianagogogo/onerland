@@ -91,12 +91,20 @@ function renderAnniversaryCard() {
   const meetDays = isNaN(start) ? 0 : Math.max(1, Math.floor((Date.now() - start.getTime()) / 86400000));
 
   // 颜色实时跟随所选关联对象：单人=成员色，多选=所选成员顺滑渐变，含 ONER=全团红
-  // 统一走站内粉籍配色：团粉=ONER 红，唯粉=成员应援色，双担=双色渐变
+  // 统一走站内粉籍配色：团粉=ONER 红，唯粉=成员应援色，双人=双色渐变
   const accent = typeof getFanIdentityAccent === 'function'
     ? getFanIdentityAccent(ann.fanIdentity, targets)
     : (typeof getAnniversaryTargetAccent === 'function'
       ? getAnniversaryTargetAccent(targets)
       : { bg: 'var(--fan-theme)', solid: 'var(--fan-theme-solid)' });
+
+  const isGradientAccent = String(accent.bg || '').includes('gradient');
+  const gradientTextStyle = isGradientAccent
+    ? `background-image:${String(accent.bg).replace('135deg', '90deg')};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;`
+    : '';
+  const targetStyle = gradientTextStyle
+    ? `${gradientTextStyle}border-bottom:1px solid transparent;border-image:${accent.bg} 1;`
+    : '';
 
   const nextMeet = getNextMeetCountdown(targets);
   const meetText = nextMeet
@@ -138,16 +146,17 @@ function renderAnniversaryCard() {
           </div>
           <div class="text-base sm:text-lg font-bold text-slate-900 leading-relaxed">
             与 <button type="button" class="anniv-editable anniv-target-btn" title="点击切换关联对象"
+              style="${targetStyle}"
               onclick="openAnniversaryTargetPicker(event)">${escapeAnnivText(targetLabel)}</button>
             ${actionHtml}
             的第 <button type="button" class="anniv-hot-number"
-              style="color:${accent.solid}"
+              style="${gradientTextStyle || `color:${accent.solid}`}"
               title="点击管理入坑 / 纪念日期 · 正数或倒计时 · 生日与自定义纪念日"
               aria-label="打开时光提醒与纪念日管理"
               onclick="openAnniversaryManager()">${meetDays}</button> 天
             <span class="text-slate-400">·</span>
             已点亮线下 <button type="button" class="anniv-hot-number"
-              style="color:${accent.solid}"
+              style="${gradientTextStyle || `color:${accent.solid}`}"
               title="点击查看我的线下足迹，快速点亮或补录观演记录"
               aria-label="打开我的线下足迹"
               onclick="switchMainTab('footprint')">${AppState.footprints.length}</button> 面
@@ -190,7 +199,7 @@ function openAnniversaryTargetPicker(event) {
       ? `background:${opt.accent}`
       : `background:${opt.accent}`;
     return `<button type="button" data-identity="${opt.id}" class="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 ${on ? 'font-bold text-slate-900' : 'text-slate-600'}">
-      <span>${on ? '✓ ' : ''}${opt.label}</span><span class="w-2.5 h-2.5 rounded-full shrink-0" style="${dot}"></span>
+      <span>${on ? '✓ ' : ''}${opt.target}</span><span class="w-2.5 h-2.5 rounded-full shrink-0" style="${dot}"></span>
     </button>`;
   }).join('');
   menu.innerHTML = `${optionHtml}
@@ -202,7 +211,7 @@ function openAnniversaryTargetPicker(event) {
     if (pick) {
       const opt = options.find(o => o.id === pick.dataset.identity);
       if (opt) {
-        // 只显示对象名（团粉→ONER，唯粉(灵超)→灵超，双担→岳岳 & 木子洋），不带括号
+        // 只显示对象名（团粉→ONER，唯粉(灵超)→灵超，双人→岳岳 & 木子洋），不带括号
         saveAnniversaryState({ fanIdentity: opt.id, targets: [opt.target] });
       }
       closeAnniversaryTargetPicker();
@@ -437,6 +446,7 @@ function buildHomeTimelineList() {
     venue: item.venue || '',
     date: String(item.show_date || '').slice(0, 10),
     posterUrl: item.posterUrl || item.poster_url || item.poster || item.cover || item.cover_url || item.image || '',
+    slot: item.slot || item.timeSlot || item.time_slot || '',
     cloudId: item.cloudId
   }));
 
@@ -451,6 +461,7 @@ function buildHomeTimelineList() {
     venue: item.venue || '',
     date: String(item.showDate || '').slice(0, 10),
     posterUrl: item.posterUrl || item.poster_url || item.poster || item.cover || item.cover_url || item.image || '',
+    slot: item.slot || item.timeSlot || item.time_slot || '',
     cloudId: item.cloudId,
     isArchive: true
   }));
@@ -508,7 +519,7 @@ function renderUpcomingMiniTimeline() {
               <span class="text-[10px] px-1.5 py-0.5 rounded text-white font-semibold shrink-0" style="background:${badge}">${displayArtist}</span>
               <span class="font-bold text-sm text-slate-900 truncate">${safeTitle}</span>
             </div>
-            <p class="text-xs text-slate-500 truncate mt-0.5">🗓️ ${item.date} ${weekday} · 📍 ${item.venue || '场馆待定'}</p>
+            <p class="text-xs text-slate-500 truncate mt-0.5">🗓️ ${item.date} ${weekday} · 📍 ${item.venue || '场馆待定'}${item.slot ? ` · <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-900 text-white text-[10px] font-semibold">⏰ ${String(item.slot).replace(/[<>\"']/g, '')}</span>` : ''}</p>
           </div>
         </div>
         <div class="flex items-center gap-1.5 shrink-0">

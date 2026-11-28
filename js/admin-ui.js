@@ -14,13 +14,32 @@ function renderAdminScheduleThumbs() {
 }
 
 async function handleAdminScheduleFiles(event) {
-  for (const file of Array.from(event.target.files || [])) {
+  const files = Array.from(event.target.files || []);
+  let firstDataUrl = '';
+  for (const file of files) {
     // 时间表：最长边 2560px、质量 0.92，保留两天拼图里的小字
     const dataUrl = await compressTimetableImage(file, 2560, 0.92);
     adminScheduleImgs.push(dataUrl);
+    if (!firstDataUrl) firstDataUrl = dataUrl;
   }
   event.target.value = '';
   renderAdminScheduleThumbs();
+  // 自动 OCR：识别时间表里 ONER / 岳岳 / 木子洋 / 灵超 的上台时段并回填
+  if (!firstDataUrl || typeof recognizeTimetableSlot !== 'function') return;
+  const statusEl = document.getElementById('adm-schedule-ocr-status');
+  if (statusEl) { statusEl.classList.remove('hidden'); statusEl.textContent = '🔍 正在识别时间表中的艺人时段…'; }
+  try {
+    const slot = await recognizeTimetableSlot(firstDataUrl);
+    const slotInput = document.getElementById('adm-slot');
+    if (slot && slotInput) {
+      slotInput.value = slot;
+      if (statusEl) statusEl.textContent = `✅ 已识别艺人时段：${slot}（可手动微调）`;
+    } else if (statusEl) {
+      statusEl.textContent = '⚠️ 未识别到明确时段，可手动填写「音乐节演出时段」';
+    }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = `⚠️ 时段识别失败：${e.message || '网络异常'}，可手动填写`;
+  }
 }
 
 function addAdminScheduleUrl() {

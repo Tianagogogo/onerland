@@ -233,9 +233,9 @@ function getFanIdentityOptions() {
     { id: 'solo:岳岳', label: '唯粉(岳岳)', target: '岳岳', members: ['岳岳'], accent: getMemberHex('岳岳'), solid: getMemberHex('岳岳') },
     { id: 'solo:木子洋', label: '唯粉(木子洋)', target: '木子洋', members: ['木子洋'], accent: getMemberHex('木子洋'), solid: getMemberHex('木子洋') },
     { id: 'solo:灵超', label: '唯粉(灵超)', target: '灵超', members: ['灵超'], accent: getMemberHex('灵超'), solid: getMemberHex('灵超') },
-    { id: 'cp:岳岳+木子洋', label: '双担(岳岳·木子洋)', target: '岳岳 & 木子洋', members: ['岳岳', '木子洋'], accent: buildCpGradient('岳岳', '木子洋'), solid: getMemberHex('岳岳') },
-    { id: 'cp:岳岳+灵超', label: '双担(岳岳·灵超)', target: '岳岳 & 灵超', members: ['岳岳', '灵超'], accent: buildCpGradient('岳岳', '灵超'), solid: getMemberHex('岳岳') },
-    { id: 'cp:木子洋+灵超', label: '双担(木子洋·灵超)', target: '木子洋 & 灵超', members: ['木子洋', '灵超'], accent: buildCpGradient('木子洋', '灵超'), solid: getMemberHex('木子洋') }
+    { id: 'cp:岳岳+木子洋', label: '双人(岳岳·木子洋)', target: '岳岳 & 木子洋', members: ['岳岳', '木子洋'], accent: buildCpGradient('岳岳', '木子洋'), solid: getMemberHex('岳岳') },
+    { id: 'cp:岳岳+灵超', label: '双人(岳岳·灵超)', target: '岳岳 & 灵超', members: ['岳岳', '灵超'], accent: buildCpGradient('岳岳', '灵超'), solid: getMemberHex('岳岳') },
+    { id: 'cp:木子洋+灵超', label: '双人(木子洋·灵超)', target: '木子洋 & 灵超', members: ['木子洋', '灵超'], accent: buildCpGradient('木子洋', '灵超'), solid: getMemberHex('木子洋') }
   ];
 }
 
