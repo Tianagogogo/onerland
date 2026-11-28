@@ -2416,6 +2416,14 @@ function renderArchiveTimeline() {
       venue: item.venue
     }) >= 0;
     const venueStats = computeVenueExperienceStats(item.venue);
+    const planChipHtml = (typeof isShowEnded === 'function' ? !isShowEnded(item) : (typeof isShowUpcomingOrToday === 'function' && isShowUpcomingOrToday(item.showDate)))
+      ? (() => {
+          const pk = planShowKeyOf(item.cloudId, item.venue, safeTitle, item.showDate).replace(/['"<>]/g, '');
+          const on = isShowPlanned(pk);
+          return `<button type="button" class="plan-chip ${on ? 'is-active' : ''}" aria-pressed="${on ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); togglePlannedShowFromCard(this, '${pk}')">${on ? '✓ 计划前往' : '🎫 计划前往'}</button>`;
+        })()
+      : '';
+    const footprintChipHtml = `<button type="button" title="添加或查看该场足迹（仅存本机）" onclick="event.stopPropagation(); recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="plan-chip footprint-chip ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已点亮足迹' : '+ 足迹'}</button>`;
 
     return `
       <div class="show-card archive-strip p-4 rounded-2xl metal-card space-y-3">
@@ -2427,15 +2435,9 @@ function renderArchiveTimeline() {
             <div class="min-w-0 space-y-1 archive-strip-body">
               <div class="archive-title-row">
                 <span class="text-[10px] px-2 py-0.5 rounded text-white font-semibold shrink-0" style="background:${badge}">${item.artist}</span>
-                <div class="archive-top-actions">
-                  ${(typeof isShowEnded === 'function' ? !isShowEnded(item) : (typeof isShowUpcomingOrToday === 'function' && isShowUpcomingOrToday(item.showDate)))
-                    ? (() => {
-                        const pk = planShowKeyOf(item.cloudId, item.venue, safeTitle, item.showDate).replace(/['"<>]/g, '');
-                        const on = isShowPlanned(pk);
-                        return `<button type="button" class="plan-chip ${on ? 'is-active' : ''}" aria-pressed="${on ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); togglePlannedShowFromCard(this, '${pk}')">${on ? '✓ 计划前往' : '🎫 计划前往'}</button>`;
-                      })()
-                    : ''}
-                  <button type="button" title="添加或查看该场足迹（仅存本机）" onclick="event.stopPropagation(); recordFootprintFromShow('${safeTitle}', '${item.showDate}', '${item.venue}', '${item.artist}')" class="plan-chip footprint-chip ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已点亮足迹' : '+ 足迹'}</button>
+                <div class="archive-top-actions archive-top-actions--mobile">
+                  ${planChipHtml}
+                  ${footprintChipHtml}
                 </div>
               </div>
               <span class="archive-strip-title font-bold text-sm text-slate-900 leading-snug">${safeTitle}</span>
@@ -2448,6 +2450,7 @@ function renderArchiveTimeline() {
           </div>
           <div class="flex items-center gap-1.5 flex-wrap justify-start sm:justify-end w-full sm:w-auto sm:shrink-0">
             ${hasSeries ? `<button type="button" data-theme="${safeJumpTheme}" onclick="openSeriesModal(this.dataset.theme)" class="tour-action-btn tour-action-btn--mini font-medium">${isFest ? '🎪 音乐节合集' : `🏛️ 专题页${seriesCount > 1 ? ` (${seriesCount}场)` : ''}`} ↗</button>` : ''}
+            <span class="archive-inline-actions">${planChipHtml}${footprintChipHtml}</span>
             <button type="button" class="tour-action-btn tour-action-btn--mini" data-travel-btn data-city="${attrEsc(getArchiveCity(item) || '')}" data-venue="${attrEsc(item.venue || '')}" data-date="${attrEsc(String(item.showDate || '').slice(0, 10))}" data-title="${attrEsc(safeTitle)}" onclick="event.stopPropagation(); openTravelHelperFromButton(this)">🚄 出行比价</button>
             <button type="button" data-tour-toggle="vexp-arc-drawer-${idx}" class="tour-action-btn tour-action-btn--mini">📊 场馆体验<span class="hidden sm:inline text-[10px] opacity-70 ml-1">${venueStats.total}${venueStats.unlocked ? '' : '/5'}</span></button>
             ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="archive" data-edit-title="${safeTitle.replace(/"/g, '&quot;')}" data-edit-date="${String(item.showDate || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini edit-soft-btn">✏️ 编辑</button>` : ''}

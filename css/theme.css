@@ -3991,3 +3991,15 @@ input.seat-select { background-image: none; }
   max-width: 100%;
   padding: 0 14px;
 }
+
+/* ================= 🏛️ 档案卡：计划前往 / 足迹 桌面端回到右侧功能行 ================= */
+.archive-inline-actions {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+@media (min-width: 769px) {
+  .archive-inline-actions { display: inline-flex; }
+  .archive-top-actions--mobile { display: none !important; }
+}
