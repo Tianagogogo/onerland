@@ -531,16 +531,16 @@ function renderUpcomingMiniTimeline() {
               <span class="text-[10px] px-1.5 py-0.5 rounded text-white font-semibold shrink-0" style="background:${badge}">${displayArtist}</span>
               <span class="timeline-card-title font-bold text-sm text-slate-900 leading-snug break-words">${safeTitle}</span>
             </div>
-            <div class="timeline-card-meta text-xs text-slate-500 mt-1 leading-relaxed">
-              <span class="timeline-meta-date">🗓️ ${item.date} ${weekday}</span>
-              <span class="timeline-meta-venue" title="${String(item.venue || '场馆待定').replace(/["<>]/g, '')}">📍 ${item.venue || '场馆待定'}</span>
+            <div class="timeline-card-meta text-xs text-slate-500 mt-1">
+              <div class="timeline-meta-line timeline-meta-date">📅 ${item.date} ${weekday}</div>
+              <div class="timeline-meta-line timeline-meta-venue" title="${String(item.venue || '场馆待定').replace(/["<>]/g, '')}">📍 ${item.venue || '场馆待定'}</div>
             </div>
             ${item.slot ? `<div class="timeline-slot-row"><span class="timeline-slot-badge">⏰ ${String(item.slot).replace(/[<>"']/g, '')}</span></div>` : ''}
           </div>
         </div>
         <div class="timeline-card-actions flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-end flex-wrap pt-1.5 sm:pt-0 border-t border-slate-200/70 sm:border-0">
           ${item === pinned
-            ? `<span class="timeline-next-badge text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap">⚡ 下一场 · 距开演 ${Math.max(0, Math.ceil((item.ts - todayTs) / 86400000))} 天</span>`
+            ? `<span class="timeline-next-badge text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap">⚡ 下一场</span>`
             : `<span class="text-[10px] px-1.5 py-0.5 rounded ${isFuture ? 'bg-white border border-slate-300 text-slate-600' : 'bg-slate-100 text-slate-500'}">${isFuture ? '待开演' : '已落幕'}</span>`}
           ${(typeof item.cloudId === 'number' && !item.isArchive) ? `<button type="button" onclick="exportShowICS(${item.cloudId})" class="tour-action-btn tour-action-btn--mini" title="导出日历提醒">📅 日历</button>` : ''}
           <button type="button" onclick="switchMainTab('shows')" class="tour-action-btn tour-action-btn--mini">详情</button>

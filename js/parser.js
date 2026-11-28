@@ -220,36 +220,75 @@ function normalizeSlotClock(matchA, matchB) {
 }
 
 // 从 OCR 全文中找「关键词所在行（或邻近行）」的时间段
+// 兼容双行堆叠时间表：开始时间在上、结束时间在下、中间无横杠（如 18:00 / 18:40 上下两行）
 function parseArtistTimeSlotFromOCRText(rawText) {
   const text = normalizeOCRSlotText(rawText);
   if (!text) return '';
   const keywords = ['ONER', '岳岳', '木子洋', '灵超', 'PINKRAY', 'KWIN', 'DIDI'];
   const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
   const rangeRe = /(\d{1,2}[:.]\d{2})\s*(?:-|~|—|–|至|to)\s*(\d{1,2}[:.]\d{2})/i;
-  const singleRe = /(\d{1,2}[:.]\d{2})/;
+  const singleRe = /(\d{1,2}[:.]\d{2})/g;
+  const collectClocks = raw => {
+    const out = [];
+    let m;
+    const re = new RegExp(singleRe.source, 'g');
+    while ((m = re.exec(raw)) !== null) out.push(m[1]);
+    return out;
+  };
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
     if (!keywords.some(k => line.toUpperCase().includes(k.toUpperCase()))) continue;
     const range = line.match(rangeRe);
     if (range) return normalizeSlotClock(range[1], range[2]);
-    // 同行只有开始时间：往后两行找时间段或结束时间
-    const nearby = [line, lines[i + 1] || '', lines[i + 2] || ''].join(' ');
-    const nearRange = nearby.match(rangeRe);
+    // 上下堆叠 / 邻近两行：把关键词行及其后 2 行拼成窗口，优先取完整区间
+    const windowLines = [line, lines[i + 1] || '', lines[i + 2] || ''];
+    const windowText = windowLines.join(' ');
+    const nearRange = windowText.match(rangeRe);
     if (nearRange) return normalizeSlotClock(nearRange[1], nearRange[2]);
+    // 无横杠：窗口内相邻两个独立时间点自动拼接为区间（18:00 + 18:40 => 18:00-18:40）
+    const clocks = collectClocks(windowText);
+    if (clocks.length >= 2) return normalizeSlotClock(clocks[0], clocks[1]);
     const single = line.match(singleRe);
-    if (single) return normalizeSlotClock(single[1]);
+    if (single) return normalizeSlotClock(single[0]);
   }
-  // 全文兜底：取第一个时间段
+  // 全文兜底：先找区间，再找上下相邻的两个时间点
   const globalRange = text.match(rangeRe);
-  return globalRange ? normalizeSlotClock(globalRange[1], globalRange[2]) : '';
+  if (globalRange) return normalizeSlotClock(globalRange[1], globalRange[2]);
+  const allClocks = collectClocks(text);
+  if (allClocks.length >= 2 && allClocks[0] !== allClocks[1]) {
+    return normalizeSlotClock(allClocks[0], allClocks[1]);
+  }
+  return '';
+}
+
+function loadImageAsDataURL(src) {
+  return new Promise(resolve => {
+    if (!/^https?:/i.test(String(src || ''))) return resolve(src);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      } catch (e) {
+        resolve(src);
+      }
+    };
+    img.onerror = () => resolve(src);
+    img.src = src;
+  });
 }
 
 async function recognizeTimetableSlot(dataUrl) {
   if (!dataUrl) return '';
   if (typeof Tesseract === 'undefined') return '';
-  const enhanced = /^data:image\//i.test(dataUrl)
-    ? await preprocessImageForLocalOCR(dataUrl).catch(() => dataUrl)
-    : dataUrl;
+  const normalizedSrc = await loadImageAsDataURL(dataUrl);
+  const enhanced = /^data:image\//i.test(normalizedSrc)
+    ? await preprocessImageForLocalOCR(normalizedSrc).catch(() => normalizedSrc)
+    : normalizedSrc;
   const res = await Tesseract.recognize(enhanced, 'chi_sim+eng');
   return parseArtistTimeSlotFromOCRText(res && res.data ? res.data.text : '');
 }
