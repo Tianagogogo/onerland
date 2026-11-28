@@ -1736,7 +1736,7 @@ function removeLocalBuddyIntent(cloudId, entryId, event) {
   return withdrawBuddyIntent(cloudId, entryId, event);
 }
 
-// 搭子卡片配色与全站粉籍主题保持一致（CP 模式仅两位成员官方色）
+// 搭子卡片配色与全站属性主题保持一致（CP 模式仅两位成员官方色）
 function getBuddyTheme() {
   return getFanPrefThemeColor();
 }
@@ -2014,7 +2014,7 @@ function renderTourCards() {
         ? `<span class="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-white/80 border border-slate-300 text-slate-700 animate-pulse">🎤 Live 进行中</span>`
         : '';
 
-    // 通透冷银灰玻璃条：倒计时数字用粉籍应援色
+    // 通透冷银灰玻璃条：倒计时数字用应援色
     const timePanel = isSale
       ? `
       <div class="countdown-glass p-2 space-y-1">
@@ -2099,7 +2099,7 @@ function renderTourCards() {
 
           <div class="p-2.5 rounded-lg bg-white border border-slate-200 space-y-2.5">
             <div class="flex items-center justify-between flex-wrap gap-1.5">
-              <span class="font-semibold text-slate-700">我的粉籍属性：</span>
+              <span class="font-semibold text-slate-700">我的属性：</span>
               <div class="inline-flex gap-1.5 flex-wrap">
                 ${[['group', '团粉'], ['solo', '唯粉'], ['cp', 'CP偏好']].map(([val, label]) => {
                   const active = pref.biasType === val;

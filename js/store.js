@@ -191,7 +191,7 @@ window.ARTIST_COLORS = window.ARTIST_COLORS || {
   '坤音娱乐': { id: 'QINS', bg: '#1e293b', hex: '#1e293b' }
 };
 
-// ================= 粉籍应援色（CP 严格双色渐变） =================
+// ================= 应援色（CP 严格双色渐变） =================
 // 只有三位成员的官方应援色参与渐变，ONER 红永远不进入 CP 渐变。
 const MEMBER_COLOR_FALLBACKS = { '岳岳': '#9C73EF', '木子洋': '#F90092', '灵超': '#32B5E1' };
 const ONER_THEME = { first: '#DD0514', second: '#8D0D0E' };
@@ -290,11 +290,11 @@ function saveAnniversaryState(patch = {}) {
       !document.getElementById('anniversary-manager-modal')?.classList.contains('hidden')) {
     renderAnniversaryManager();
   }
-  // 🔗 首页人物变更 → 与足迹页粉籍/应援色联动（静默同步或弹统一提醒）
+  // 🔗 首页人物变更 → 与足迹页属性/应援色联动（静默同步或弹统一提醒）
   const changedTarget = Object.prototype.hasOwnProperty.call(patch, 'targets')
     || Object.prototype.hasOwnProperty.call(patch, 'fanIdentity');
   if (changedTarget && typeof onHomeFandomTargetChanged === 'function') {
-    try { onHomeFandomTargetChanged(prevTarget); } catch (e) { console.warn('粉籍联动失败:', e); }
+    try { onHomeFandomTargetChanged(prevTarget); } catch (e) { console.warn('属性联动失败:', e); }
   }
 }
 
@@ -346,7 +346,7 @@ function getAnniversaryAccentColor(ev) {
   if (ev && ev.builtinKey && ANNIVERSARY_ACCENT_MAP[ev.builtinKey]) {
     return ANNIVERSARY_ACCENT_MAP[ev.builtinKey];
   }
-  return getFanThemeHexes()[0] || '#DD0514'; // 自定义纪念日跟随全局粉籍主色
+  return getFanThemeHexes()[0] || '#DD0514'; // 自定义纪念日跟随全局属性主色
 }
 
 // 关联对象激活态应援色：ONER 全团红渐变，其余成员各自官方色
@@ -356,7 +356,7 @@ function getAnniversaryTargetColor(member) {
   return hex;
 }
 
-// ================= 站内统一粉籍身份（与找搭子/身份标签共用同一套命名与应援色） =================
+// ================= 站内统一属性身份（与找搭子/身份标签共用同一套命名与应援色） =================
 function getFanIdentityOptions() {
   return [
     { id: 'group', label: '团粉', target: 'ONER', members: [], accent: ARTIST_COLORS['ONER'].bg, solid: ARTIST_COLORS['ONER'].hex },
@@ -373,7 +373,7 @@ function getFanIdentityOption(id) {
   return getFanIdentityOptions().find(opt => opt.id === id) || null;
 }
 
-// 纪念日卡片配色：优先按所选粉籍身份取色，找不到再回退对象色
+// 纪念日卡片配色：优先按所选属性身份取色，找不到再回退对象色
 function getFanIdentityAccent(identityId, fallbackTargets) {
   const opt = getFanIdentityOption(identityId);
   if (opt) return { bg: opt.accent, solid: opt.solid };
@@ -1365,7 +1365,7 @@ async function loadTourData() {
   renderLoadedTourData();
 }
 
-// ================= 本地粉籍与自定义标签管理 =================
+// ================= 本地属性与自定义标签管理 =================
 function getFanPrefState() {
   const defaultPref = {
     biasType: 'group',
@@ -2872,7 +2872,7 @@ function computeVenueExperienceStats(venueName) {
   };
 }
 
-// 首屏就把粉籍应援色写入全局 CSS 变量，避免导航/徽章先闪默认红
+// 首屏就把应援色写入全局 CSS 变量，避免导航/徽章先闪默认红
 if (typeof document !== 'undefined') {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', syncGlobalFanTheme);

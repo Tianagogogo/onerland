@@ -6,12 +6,12 @@ function renderFootprintPage() {
   syncFootprintVisualTheme();
 }
 
-// 同步足迹模块的视觉主题（与全局粉籍应援色共用同一套 CSS 变量）
+// 同步足迹模块的视觉主题（与全局应援色共用同一套 CSS 变量）
 function syncFootprintVisualTheme() {
   syncGlobalFanTheme();
 }
 
-// 1. 粉籍绝对本地化设置器（零上传、零统计、零公开）
+// 1. 属性绝对本地化设置器（零上传、零统计、零公开）
 function renderLocalFanPrefBox() {
   const box = document.getElementById('local-fan-pref-box');
   if (!box) return;
@@ -27,7 +27,7 @@ function renderLocalFanPrefBox() {
     <div class="p-4 sm:p-5 rounded-2xl metal-card space-y-4 relative z-10">
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h3 class="text-sm font-bold text-slate-900">🛡️ 个人粉籍偏好设置（100% 仅存本机浏览器）</h3>
+          <h3 class="text-sm font-bold text-slate-900">🛡️ 个人属性偏好设置（100% 仅存本机浏览器）</h3>
           <p class="text-[11px] text-slate-500 mt-0.5">服务器零存储、零统计、不对外展示，杜绝拉踩引战。CP 模式仅使用所选两位成员的官方应援色。</p>
         </div>
         <label class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 cursor-pointer">
@@ -209,7 +209,7 @@ function showProvinceFootprints(province) {
 
 // 2. 观演足迹记录与 SVG 连线轨迹图
 function recordFootprintFromShow(title, date, venue, artist = 'ONER') {
-  // 新增足迹前先做一次首页对象 ⇄ 足迹粉籍的一致性检测（本会话已选「保持各自独立」则跳过）
+  // 新增足迹前先做一次首页对象 ⇄ 足迹属性的一致性检测（本会话已选「保持各自独立」则跳过）
   if (typeof checkFandomConflict === 'function') {
     try { checkFandomConflict(); } catch (e) { /* ignore */ }
   }
@@ -413,7 +413,7 @@ function renderFootprintMapAndList() {
   `;
 }
 
-// 3. 纯前端 Canvas 纪念票根生成器（统一复古液态银白灰拟物质感，不取海报/粉籍色）
+// 3. 纯前端 Canvas 纪念票根生成器（统一复古液态银白灰拟物质感，不取海报/属性色）
 let ticketShowRecords = [];
 
 function escapeTicketHtml(text) {
@@ -462,7 +462,7 @@ function handleTicketFieldInput() {
   renderTicketCanvasPreview();
 }
 
-// ---- 复古液态银白灰拟物质感（固定配色，不随海报 / 粉籍变化） ----
+// ---- 复古液态银白灰拟物质感（固定配色，不随海报 / 属性变化） ----
 const TICKET_SILVER = {
   top: '#F8FAFC',
   mid: '#E2E8F0',

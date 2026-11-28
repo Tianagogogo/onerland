@@ -10,7 +10,7 @@ const GEMINI_KEY_STORAGE = 'onerland_gemini_api_key';
 // 纯本地隐私存储键（绝不上云）
 const LOCAL_KEYS = {
   ARTISTS: 'onerland_custom_artists_v3',
-  FAN_PREF: 'onerland_local_fan_pref_v1',       // 粉籍偏好（唯粉/CP/团粉）
+  FAN_PREF: 'onerland_local_fan_pref_v1',       // 属性偏好（唯粉/CP/团粉）
   FOOTPRINTS: 'onerland_local_footprints_v1',   // 个人观演足迹记录
   ANNIVERSARY: 'onerland_local_anniversary_v1', // 本地纪念日配置
   EXPERIENCES: 'onerland_local_venue_exp_v1'    // 本地私密场馆体验日记

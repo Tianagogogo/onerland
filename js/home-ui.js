@@ -107,7 +107,7 @@ function renderAnniversaryCard() {
   const meetDays = isNaN(start) ? 0 : Math.max(1, Math.floor((Date.now() - start.getTime()) / 86400000));
 
   // 颜色实时跟随所选关联对象：单人=成员色，多选=所选成员顺滑渐变，含 ONER=全团红
-  // 统一走站内粉籍配色：团粉=ONER 红，唯粉=成员应援色，双人=双色渐变
+  // 统一走站内属性配色：团粉=ONER 红，唯粉=成员应援色，双人=双色渐变
   const accent = typeof getFanIdentityAccent === 'function'
     ? getFanIdentityAccent(ann.fanIdentity, targets)
     : (typeof getAnniversaryTargetAccent === 'function'
@@ -211,7 +211,7 @@ function openAnniversaryTargetPicker(event) {
   const ann = AppState.anniversary;
   const options = (typeof getFanIdentityOptions === 'function' ? getFanIdentityOptions() : []);
   const targets = Array.isArray(ann.targets) && ann.targets.length ? ann.targets : ['ONER'];
-  // 当前粉籍：优先存下来的 identity；老数据按对象名推断
+  // 当前属性：优先存下来的 identity；老数据按对象名推断
   const current = ann.fanIdentity || (targets[0] === 'ONER' ? 'group' : `solo:${targets[0]}`);
   const btn = event && event.currentTarget;
   const rect = btn && btn.getBoundingClientRect ? btn.getBoundingClientRect() : { left: 20, bottom: 120, top: 100 };

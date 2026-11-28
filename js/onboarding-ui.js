@@ -118,7 +118,7 @@
             <span class="onb-step-no">1</span>
             <div>
               <div class="onb-step-title">设主推 · 联动应援色</div>
-              <div class="onb-step-desc">顶部点昵称 / 对象切换主推，全站应援色与足迹粉籍一起联动。</div>
+              <div class="onb-step-desc">顶部点昵称 / 对象切换主推，全站应援色与足迹属性一起联动。</div>
             </div>
           </div>
           <div class="onb-step">
