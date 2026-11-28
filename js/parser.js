@@ -198,8 +198,12 @@ async function importOCRBatchShows() {
     return alert(`批量导入失败：${e.message}`);
   }
   document.getElementById('adm-ocr-batch-box').classList.add('hidden');
-  showToast(`已成功导入 ${payloads.length} 场演出`);
-  await loadTourData();
+  if (typeof resetAdminForm === 'function') resetAdminForm();
+  if (typeof closeModalWithToast === 'function') closeModalWithToast('hidden-admin-modal', '✅ 演出信息已保存并同步上线');
+  else showToast(`已成功导入 ${payloads.length} 场演出`);
+  Promise.resolve()
+    .then(() => loadTourData())
+    .catch(err => console.warn('导入后刷新数据失败:', err));
 }
 
 // ================= 音乐节时间表 OCR：识别 ONER / 成员上台时段 =================

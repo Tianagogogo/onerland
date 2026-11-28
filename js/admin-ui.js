@@ -262,7 +262,6 @@ async function submitAdminQuickPost() {
       } else {
         await adminApi('createTicket', payload);
       }
-      await loadTourData();
     } else {
       const showDate = dateOrTime || new Date().toISOString().slice(0, 10);
       const existing = AppState.cloudArchives.find(a => String(a.cloudId) === String(AppState.editingTicketId));
@@ -293,13 +292,19 @@ async function submitAdminQuickPost() {
       } else {
         await adminApi('createTicket', payload);
       }
-      await loadTourData();
     }
 
+    // 保存成功 → 先立刻收起管理台/编辑弹窗，再后台静默刷新数据（重字段查询慢，不能拖住关闭）
     resetAdminForm();
-    renderAdminTodoQueue();
-    // 保存成功 → 收起管理台弹窗 + 轻量提示，页面数据已在 loadTourData 后刷新
-    closeModalWithToast('hidden-admin-modal', '已保存并同步至云端');
+    closeModalWithToast('hidden-admin-modal', '✅ 演出信息已保存并同步上线');
+    if (typeof loadTourData === 'function') {
+      Promise.resolve()
+        .then(() => loadTourData())
+        .then(() => { if (typeof renderAdminTodoQueue === 'function') renderAdminTodoQueue(); })
+        .catch(err => console.warn('保存后刷新数据失败:', err));
+    } else if (typeof renderAdminTodoQueue === 'function') {
+      renderAdminTodoQueue();
+    }
   } catch (e) {
     // 失败时保持弹窗与已填内容
     toastError(`操作失败：${e.message}`);

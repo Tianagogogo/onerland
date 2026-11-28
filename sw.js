@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onerland-pwa-v93';
+const CACHE_NAME = 'onerland-pwa-v94';
 const IMAGE_CACHE_NAME = 'onerland-images-v3';
 const STATIC_ASSETS = [
   './',
