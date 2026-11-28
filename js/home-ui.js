@@ -665,15 +665,24 @@ function handleHomeTimelineAction(action, idx, btn) {
   }
 
   if (action === 'security') {
-    let html = '';
-    if (typeof buildVenueExperienceDrawerHTML === 'function') {
-      html = buildVenueExperienceDrawerHTML(rec.venue || rec.city, `tl-vexp-${idx}`, `tl-vexp-${rec.cloudId || idx}`, safeTitle, 'archive', {
-        showDate: rec.date,
-        artist: rec.artist,
-        city: rec.city
-      });
+    // 直接复用档案页同款安检标签投票渲染：这里只放渲染宿主，
+    // buildVenueExperienceDrawerHTML 返回的外层是 hidden 抽屉，塞进来会变空白框
+    const showKey = (typeof buildShowKey === 'function')
+      ? buildShowKey(rec.venue || rec.city, safeTitle)
+      : `${rec.venue || rec.city}::${safeTitle}`;
+    const safeKey = showKey.replace(/['"<>]/g, '');
+    toggleHomeTimelinePanel(card, 'security', `
+      <div class="tl-quick-panel-inner tl-sec-panel">
+        <div data-security-vote data-show-key="${safeKey}" data-venue="${safeVenue}">
+          <div class="tl-sec-loading">⏳ 正在同步全场安检投票…</div>
+        </div>
+        <button type="button" class="tl-sec-more" onclick="event.stopPropagation(); switchMainTab('shows')">在「档案」查看完整安检记录 ↗</button>
+      </div>`);
+    const host = card.querySelector('.tl-quick-panel [data-security-vote]');
+    if (host) host.dataset.ready = '0';
+    if (typeof hydrateSecurityVoteBlocks === 'function') {
+      try { hydrateSecurityVoteBlocks(); } catch (e) { /* ignore */ }
     }
-    toggleHomeTimelinePanel(card, 'security', `<div class="tl-quick-panel-inner">${html || '<div class="tl-quick-panel-body">暂无可记录的安检体验数据。</div>'}</div>`);
     return;
   }
 

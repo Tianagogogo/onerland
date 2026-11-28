@@ -1330,3 +1330,20 @@ select::-moz-focus-inner { border: 0; }
   .security-tag-chip { height: 25px; padding: 0 8px; font-size: 10.5px; }
   .security-tag-grid { gap: 5px; }
 }
+
+/* 首页微时间轴：安检标签投票面板（与档案页同款渲染，去掉隐藏抽屉外壳） */
+.tl-sec-panel { padding: 8px; }
+.tl-sec-panel .security-vote-panel { border-radius: 10px; }
+.tl-sec-loading { font-size: 11px; color: #94a3b8; padding: 6px 2px; }
+.tl-sec-more {
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: #64748b;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.tl-sec-more:hover { color: #0f172a; }
