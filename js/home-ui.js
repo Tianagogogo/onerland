@@ -756,7 +756,6 @@ function handleHomeTimelineDateClick(idx) {
   }
   try {
     exportShowICS(rec.cloudId);
-    showToast('已生成日历文件 .ics，双击即可导入系统日历');
   } catch (e) {
     toastError(`日历生成失败：${e.message}`);
   }

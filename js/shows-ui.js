@@ -365,6 +365,45 @@ function togglePlannedShowFromCard(btn, key) {
   showToast(on ? '已加入「计划前往」，不计入已观演' : '已取消「计划前往」');
 }
 
+function calIcsStamp(d) {
+  // ICS 标准使用 UTC 时间（末尾 Z），各日历客户端会自动换算为本地时区
+  return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+}
+// 生成符合 RFC5545 / Apple Calendar 严格规范的 .ics 文本
+function buildShowICS(item, state, label, start, end) {
+  const escIcs = v => String(v == null ? '' : v)
+    .replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+  const summary = `🎫 ONERLAND提醒：${item.city} - ${label}`;
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//ONERLAND//Calendar//CN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:onerland-${item.cloudId}-${label.indexOf('抢票') === 0 ? 'sale' : 'show'}@onerland.pages.dev`,
+    `DTSTAMP:${calIcsStamp(new Date())}`,
+    `DTSTART:${calIcsStamp(start)}`,
+    `DTEND:${calIcsStamp(end)}`,
+    `SUMMARY:${escIcs(summary)}`,
+    `LOCATION:${escIcs(item.venue || item.city || '')}`,
+    `DESCRIPTION:${escIcs(`艺人：${item.artist || ''}\n地点：${item.venue || ''}\n场次：${item.show_date || ''} ${item.show_time || ''}`)}`,
+    'BEGIN:VALARM',
+    'TRIGGER:-P1D',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${escIcs('明天就是 ' + label + ' 啦，记得确认行程')}`,
+    'END:VALARM',
+    'BEGIN:VALARM',
+    'TRIGGER:-PT2H',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${escIcs('还有 2 小时开场，出发啦！')}`,
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ];
+  return lines.join('\r\n') + '\r\n';
+}
+
 function exportShowICS(cloudId) {
   const item = AppState.cloudTickets.find(t => String(t.cloudId) === String(cloudId));
   if (!item) return;
@@ -375,28 +414,45 @@ function exportShowICS(cloudId) {
   if (isNaN(targetTs)) return alert('该场次暂无精确时间，无法生成日历');
   const start = new Date(targetTs);
   const end = new Date(start.getTime() + 45 * 60000);
-  const fmt = d => {
-    // ICS 标准使用 UTC 时间（末尾 Z），各日历客户端会自动换算为本地时区
-    return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-  };
   const label = firstRound ? `抢票(${firstRound.round_name})` : '演出开演';
-  const ics = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0',
-    'PRODID:-//ONERLAND//Show Reminder//CN',
-    'BEGIN:VEVENT',
-    `UID:onerland-${item.cloudId}-${firstRound ? 'sale' : 'show'}@onerland.pages.dev`,
-    `DTSTAMP:${fmt(new Date())}`,
-    `SUMMARY:🎫 ONERLAND提醒：${item.city} - ${label}`,
-    `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`,
-    `LOCATION:${item.venue}`,
-    `DESCRIPTION:艺人：${item.artist}\\n地点：${item.venue}`,
-    'BEGIN:VALARM', 'TRIGGER:-PT15M', 'ACTION:DISPLAY', 'DESCRIPTION:还有15分钟！', 'END:VALARM',
-    'END:VEVENT', 'END:VCALENDAR'
-  ].join('\r\n');
+  const ics = buildShowICS(item, state, label, start, end);
+  const fileName = `${String(item.city || 'ONERLAND')}-${label}.ics`;
+  const ua = navigator.userAgent || '';
+
+  // 1) 微信 / 微博内置浏览器：无法唤起系统日历，给出手动打开提示
+  if (/MicroMessenger|Weibo/i.test(ua)) {
+    showToast('📱 微信内无法直接唤起系统日历，请点击右上角 ⋯ 选择「在 Safari / 默认浏览器中打开」后再点日期即可一键联动日历');
+    return 'inline-browser';
+  }
+
+  // 2) 手机端：不用 download / blob（会存进文件管理器），data URI 直连唤起系统日历
+  if (/iPhone|iPad|iPod|Android/i.test(ua)) {
+    const dataUri = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+    try {
+      const a = document.createElement('a');
+      a.href = dataUri;
+      a.rel = 'noopener';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      window.location.href = dataUri;
+    }
+    showToast('📅 正在唤起系统日历，请确认添加并允许提醒');
+    return 'system-calendar';
+  }
+
+  // 3) 电脑端：沿用 blob + download 下载 .ics
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
-  a.download = `${item.city}-${label}.ics`;
+  a.href = url;
+  a.download = fileName;
   a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  showToast('已生成日历文件 .ics，双击即可导入系统日历');
+  return 'downloaded';
 }
 
 const slotTimers = {};
