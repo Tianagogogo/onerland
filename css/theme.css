@@ -4093,3 +4093,16 @@ input.seat-select { background-image: none; }
   .ticket-save-card { padding: 12px 11px 10px; }
   .ticket-save-actions button { height: 32px; font-size: 11.5px; }
 }
+
+/* 🎟️ 抢票表 v4：短选项三级联动（每框 ≤10 项） */
+.seat-combo--triple { grid-template-columns: 1fr 1fr 1fr; }
+.seat-combo select:disabled {
+  opacity: .55;
+  background-image: none;
+  color: #94a3b8;
+}
+.seat-field + .seat-field .seat-combo + .seat-combo { margin-top: 6px; }
+@media (max-width: 420px) {
+  .seat-combo--triple { grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+  .seat-combo--triple .seat-select { font-size: 11px; padding-left: 6px; padding-right: 16px; }
+}

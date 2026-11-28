@@ -4,45 +4,163 @@
 
   window.SEAT_PLATFORMS = ['坤音商城', '大麦', '猫眼', '纷玩岛', '票星球', '秀动'];
 
-  // 票档 / 区域：第 1 框大类 + 第 2 框区号（组合拼接）
+  // 票档 / 区域：三级短选项（大类 → 字母/十位段 → 个位尾号），每框不超过 10 项
   const ZONE_MAINS = ['内场', '一层看台', '二层看台', '三层看台', '包厢区', '音乐节站区'];
-  // 二级联动：每个大类对应的专属区号白名单
-  const ZONE_SUB_MAP = (function () {
-    const floor = ['无细分区', 'VIP区', 'A区', 'B区', 'C区', 'D区', 'E区', 'F区',
-      'A1区', 'A2区', 'A3区', 'A4区', 'B1区', 'B2区', 'B3区', 'B4区',
-      'C1区', 'C2区', 'C3区', 'C4区', 'D1区', 'D2区', 'D3区', 'D4区'];
-    const makeNum = (base, to) => {
-      const list = ['无细分区'];
-      for (let i = 1; i <= to; i++) list.push(`${base + i}区`);
-      return list;
-    };
-    const boxes = ['无细分区', 'VIP包厢'];
-    for (let i = 1; i <= 20; i++) boxes.push(`${i}号包厢`);
-    return {
-      '内场': floor,
-      '一层看台': makeNum(100, 30).concat(['A区', 'B区', 'C区', 'D区']),
-      '二层看台': makeNum(200, 30),
-      '三层看台': makeNum(300, 30),
-      '包厢区': boxes,
-      '音乐节站区': ['通用站区', 'VIP前排区', 'A区', 'B区', '普通区']
-    };
-  })();
+  const TAIL_NONE = '无数字';
+  const DIGITS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
-  function zoneSubsOf(main) {
-    return ZONE_SUB_MAP[main] || ['无细分区'];
+  function standBase(main) {
+    return main === '一层看台' ? 1 : main === '二层看台' ? 2 : main === '三层看台' ? 3 : 0;
+  }
+  function zonePrefixesOf(main) {
+    if (main === '内场') return ['无细分区', 'VIP', 'A', 'B', 'C', 'D', 'E', 'F'];
+    if (main === '包厢区') return ['无细分区', 'VIP', '0x号', '1x号', '2x号'];
+    if (main === '音乐节站区') return ['通用站区', 'VIP前排', 'A区', 'B区', '普通区'];
+    const n = standBase(main);
+    if (!n) return ['无细分区'];
+    return ['无细分区', `${n}0x段`, `${n}1x段`, `${n}2x段`, `${n}3x段`, '字母看台'];
+  }
+  function zoneTailsOf(main, prefix) {
+    if (main === '内场') return [TAIL_NONE, '1', '2', '3', '4', '5', '6'];
+    if (!prefix || prefix === '无细分区') return [];
+    if (main === '包厢区') return prefix === 'VIP' ? [] : DIGITS.slice();
+    if (main === '音乐节站区') return [];
+    if (prefix === '字母看台') return ['A', 'B', 'C', 'D', 'E', 'F'];
+    return DIGITS.slice();
+  }
+  function composeZoneSub(main, prefix, tail) {
+    if (!prefix || prefix === '无细分区') return '无细分区';
+    if (main === '内场') return prefix + (tail && tail !== TAIL_NONE ? tail : '') + '区';
+    if (main === '包厢区') {
+      if (prefix === 'VIP') return 'VIP包厢';
+      const d = tail == null || tail === '' ? '0' : String(tail);
+      return `${prefix === '0x号' ? d : prefix.charAt(0) + d}号包厢`;
+    }
+    if (main === '音乐节站区') return prefix === 'VIP前排' ? 'VIP前排区' : prefix;
+    if (prefix === '字母看台') return `${tail || 'A'}区`;
+    const n = standBase(main);
+    return `${n}${prefix.charAt(1)}${tail == null || tail === '' ? '0' : tail}区`;
+  }
+  function composeZone(main, prefix, tail) {
+    if (!main) return '';
+    const sub = composeZoneSub(main, prefix, tail);
+    if (!sub || sub === '无细分区') return main;
+    return `${main} · ${sub}`;
+  }
+  // 反向拆解：区域字符串 → { 大类, 第2框, 第3框 }
+  function parseZoneSub(main, sub) {
+    const s = String(sub || '').trim();
+    if (!s || s === '无细分区') return { prefix: '无细分区', tail: main === '内场' ? TAIL_NONE : '' };
+    if (main === '内场') {
+      const m = /^(VIP|[A-F])(\d*)(区)$/.exec(s);
+      if (m) return { prefix: m[1], tail: m[2] || TAIL_NONE };
+      return { prefix: '无细分区', tail: TAIL_NONE };
+    }
+    if (main === '包厢区') {
+      if (s === 'VIP包厢') return { prefix: 'VIP', tail: '' };
+      const m = /^(\d{1,2})号包厢$/.exec(s);
+      if (m) {
+        const n = Number(m[1]);
+        const prefix = n < 10 ? '0x号' : n < 20 ? '1x号' : '2x号';
+        return { prefix, tail: String(n % 10) };
+      }
+      return { prefix: '无细分区', tail: '' };
+    }
+    if (main === '音乐节站区') {
+      if (/^[A-F]区$/.test(s)) return { prefix: s, tail: '' };
+      if (s === 'VIP前排区') return { prefix: 'VIP前排', tail: '' };
+      if (['通用站区', '普通区'].includes(s)) return { prefix: s, tail: '' };
+      return { prefix: '通用站区', tail: '' };
+    }
+    if (/^[A-F]区$/.test(s)) return { prefix: '字母看台', tail: s.charAt(0) };
+    const n = standBase(main);
+    if (n && new RegExp('^' + n + '[0-3]\\d区$').test(s)) {
+      return { prefix: `${n}${s.charAt(1)}x段`, tail: s.charAt(2) };
+    }
+    return { prefix: '无细分区', tail: '' };
+  }
+  function splitZone(zone) {
+    const raw = String(zone || '').trim();
+    let main = ZONE_MAINS[0];
+    let sub = '无细分区';
+    const idx = raw.indexOf(' · ');
+    if (idx > 0) {
+      const candidate = raw.slice(0, idx);
+      if (ZONE_MAINS.includes(candidate)) { main = candidate; sub = raw.slice(idx + 3); }
+    } else if (ZONE_MAINS.includes(raw)) {
+      main = raw;
+    } else if (raw) {
+      const hit = ZONE_MAINS.find(m => raw.indexOf(m) === 0);
+      main = hit || ZONE_MAINS[0];
+      if (hit) {
+        const rest = raw.slice(hit.length).replace(/^[\s·]+/, '').trim();
+        if (rest) sub = rest;
+      }
+    }
+    const parts = parseZoneSub(main, sub);
+    return { main, prefix: parts.prefix, tail: parts.tail, sub: composeZoneSub(main, parts.prefix, parts.tail) };
   }
 
-  // 排数 / 座号：两个数字组合下拉
-  const ROW_NOS = (function () {
-    const list = ['站区/无排号'];
-    for (let i = 1; i <= 35; i++) list.push(`${i}排`);
-    return list;
-  })();
-  const SEAT_NOS = (function () {
-    const list = ['不填具体座号'];
-    for (let i = 1; i <= 50; i++) list.push(`${i}号`);
-    return list;
-  })();
+  // 排数：号段 + 个位尾号
+  const ROW_SEGS = ['站区/无排号', '1-9排', '10-19排', '20-29排', '30-39排'];
+  function rowTailsOf(seg) {
+    if (!seg || seg === '站区/无排号') return [];
+    if (seg === '1-9排') return ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    return DIGITS.slice();
+  }
+  function composeRow(seg, tail) {
+    if (!seg || seg === '站区/无排号') return '站区/无排号';
+    if (seg === '1-9排') return `${tail || '1'}排`;
+    return `${parseInt(seg, 10) + Number(tail || '0')}排`;
+  }
+  // 座号：号段 + 个位尾号
+  const SEAT_SEGS = ['不填座号', '1-9号', '10-19号', '20-29号', '30-39号', '40-50号'];
+  function seatTailsOf(seg) {
+    if (!seg || seg === '不填座号') return [];
+    if (seg === '1-9号') return ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    return DIGITS.slice();
+  }
+  function composeSeatNo(seg, tail) {
+    if (!seg || seg === '不填座号') return '不填具体座号';
+    if (seg === '1-9号') return `${tail || '1'}号`;
+    return `${parseInt(seg, 10) + Number(tail || '0')}号`;
+  }
+  function splitSeat(detail) {
+    const s = String(detail || '');
+    let rowSeg = '站区/无排号';
+    let rowTail = '';
+    let seatSeg = '不填座号';
+    let seatTail = '';
+    const rm = /(\d{1,2})排/.exec(s);
+    if (rm) {
+      const n = Number(rm[1]);
+      if (n < 10) { rowSeg = '1-9排'; rowTail = String(n); }
+      else if (n < 20) { rowSeg = '10-19排'; rowTail = String(n % 10); }
+      else if (n < 30) { rowSeg = '20-29排'; rowTail = String(n % 10); }
+      else if (n < 40) { rowSeg = '30-39排'; rowTail = String(n % 10); }
+      else { rowSeg = '10-19排'; rowTail = String(n % 10); }
+    }
+    const nm = /(\d{1,2})号/.exec(s);
+    if (nm) {
+      const n = Number(nm[1]);
+      if (n < 10) { seatSeg = '1-9号'; seatTail = String(n); }
+      else if (n < 20) { seatSeg = '10-19号'; seatTail = String(n % 10); }
+      else if (n < 30) { seatSeg = '20-29号'; seatTail = String(n % 10); }
+      else if (n < 40) { seatSeg = '30-39号'; seatTail = String(n % 10); }
+      else { seatSeg = '40-50号'; seatTail = String(n % 10); }
+    }
+    return {
+      rowSeg, rowTail, seatSeg, seatTail,
+      row: composeRow(rowSeg, rowTail),
+      num: composeSeatNo(seatSeg, seatTail)
+    };
+  }
+  function composeSeat(row, num) {
+    const parts = [];
+    if (row && row !== '站区/无排号') parts.push(row);
+    if (num && num !== '不填具体座号') parts.push(num);
+    return parts.length ? parts.join(' ') : '站区/无排号';
+  }
 
   const ZONE_FILTERS = [
     { key: 'all', label: '全部区域', match: null },
@@ -97,42 +215,6 @@
     });
     if (!res.ok) throw new Error('rpc-failed-' + res.status);
     return res.json().catch(() => null);
-  }
-
-  function composeZone(main, sub) {
-    if (!main) return '';
-    if (!sub || sub === '无细分区') return main;
-    return `${main} · ${sub}`;
-  }
-  function splitZone(zone) {
-    const s = String(zone || '').trim();
-    const idx = s.indexOf(' · ');
-    if (idx > 0) {
-      const main = s.slice(0, idx);
-      const sub = s.slice(idx + 3);
-      const safeMain = ZONE_MAINS.includes(main) ? main : ZONE_MAINS[0];
-      return { main: safeMain, sub: zoneSubsOf(safeMain).includes(sub) ? sub : '无细分区' };
-    }
-    if (ZONE_MAINS.includes(s)) return { main: s, sub: '无细分区' };
-    const hit = ZONE_MAINS.find(m => s.indexOf(m) === 0);
-    return { main: hit || ZONE_MAINS[0], sub: '无细分区' };
-  }
-  function composeSeat(row, num) {
-    const parts = [];
-    if (row && row !== '站区/无排号') parts.push(row);
-    if (num && num !== '不填具体座号') parts.push(num);
-    return parts.length ? parts.join(' ') : '站区/无排号';
-  }
-  function splitSeat(detail) {
-    const s = String(detail || '');
-    const rm = s.match(/(\d{1,2})排/);
-    const nm = s.match(/(\d{1,2})号/);
-    const row = rm ? `${rm[1]}排` : '站区/无排号';
-    const num = nm ? `${nm[1]}号` : '不填具体座号';
-    return {
-      row: ROW_NOS.includes(row) ? row : '站区/无排号',
-      num: SEAT_NOS.includes(num) ? num : '不填具体座号'
-    };
   }
 
   function normalizeRow(r, i) {
@@ -227,7 +309,7 @@
     const own = getLocalOwn(key);
     const formOpen = Boolean(window.ticketSeatFormOpen[key]);
     const ownZone = splitZone(own && own.zone);
-    const ownSeat = splitSeat(own && (own.seatDetail || own.seat));
+    const ownSeat = splitSeat(own && (own.seatDetail || own.seat_detail || own.seat));
 
     const toolbar = `
       <div class="seat-toolbar">
@@ -285,17 +367,22 @@
             value="${own ? esc(own.seconds) : ''}" placeholder="如 8" class="seat-select seat-intensity" />
         </label>
         <div class="seat-field">
-          <span>票档 / 区域（大类 + 区号）</span>
-          <div class="seat-combo">
-            <select id="seat-zone-main-${key}" class="seat-select" onchange="onSeatZoneMainChange('${key}', event)">${seatOptionsHTML(ZONE_MAINS, ownZone.main)}</select>
-            <select id="seat-zone-sub-${key}" class="seat-select">${seatOptionsHTML(zoneSubsOf(ownZone.main), ownZone.sub)}</select>
+          <span>票档 / 区域（大类 · 号段 · 尾号）</span>
+          <div class="seat-combo seat-combo--triple">
+            <select id="seat-zone-main-${key}" class="seat-select" onchange="onSeatZoneMainChange('${key}')">${seatOptionsHTML(ZONE_MAINS, ownZone.main)}</select>
+            <select id="seat-zone-prefix-${key}" class="seat-select" onchange="onSeatZonePrefixChange('${key}')">${seatOptionsHTML(zonePrefixesOf(ownZone.main), ownZone.prefix)}</select>
+            <select id="seat-zone-tail-${key}" class="seat-select" ${zoneTailsOf(ownZone.main, ownZone.prefix).length ? '' : 'disabled'}>${seatOptionsHTML(zoneTailsOf(ownZone.main, ownZone.prefix).length ? zoneTailsOf(ownZone.main, ownZone.prefix) : ['—'], ownZone.tail)}</select>
           </div>
         </div>
         <div class="seat-field">
-          <span>排数 / 座号</span>
+          <span>排数 / 座号（号段 + 尾号）</span>
           <div class="seat-combo">
-            <select id="seat-row-${key}" class="seat-select">${seatOptionsHTML(ROW_NOS, ownSeat.row)}</select>
-            <select id="seat-number-${key}" class="seat-select">${seatOptionsHTML(SEAT_NOS, ownSeat.num)}</select>
+            <select id="seat-row-seg-${key}" class="seat-select" onchange="onSeatRowSegChange('${key}')">${seatOptionsHTML(ROW_SEGS, ownSeat.rowSeg)}</select>
+            <select id="seat-row-tail-${key}" class="seat-select" ${rowTailsOf(ownSeat.rowSeg).length ? '' : 'disabled'}>${seatOptionsHTML(rowTailsOf(ownSeat.rowSeg).length ? rowTailsOf(ownSeat.rowSeg) : ['—'], ownSeat.rowTail)}</select>
+          </div>
+          <div class="seat-combo">
+            <select id="seat-number-seg-${key}" class="seat-select" onchange="onSeatNumberSegChange('${key}')">${seatOptionsHTML(SEAT_SEGS, ownSeat.seatSeg)}</select>
+            <select id="seat-number-tail-${key}" class="seat-select" ${seatTailsOf(ownSeat.seatSeg).length ? '' : 'disabled'}>${seatOptionsHTML(seatTailsOf(ownSeat.seatSeg).length ? seatTailsOf(ownSeat.seatSeg) : ['—'], ownSeat.seatTail)}</select>
           </div>
         </div>
         <div class="seat-form-actions">
@@ -319,40 +406,93 @@
     const platform = document.getElementById(`seat-platform-${key}`)?.value || '';
     const secondsRaw = document.getElementById(`seat-seconds-${key}`)?.value || '';
     const zoneMain = document.getElementById(`seat-zone-main-${key}`)?.value || '';
-    const zoneSub = document.getElementById(`seat-zone-sub-${key}`)?.value || '';
-    const rowNo = document.getElementById(`seat-row-${key}`)?.value || '';
-    const seatNo = document.getElementById(`seat-number-${key}`)?.value || '';
+    const zonePrefix = document.getElementById(`seat-zone-prefix-${key}`)?.value || '';
+    const zoneTailEl = document.getElementById(`seat-zone-tail-${key}`);
+    const zoneTail = zoneTailEl && !zoneTailEl.disabled ? zoneTailEl.value : '';
+    const rowSeg = document.getElementById(`seat-row-seg-${key}`)?.value || '';
+    const rowTailEl = document.getElementById(`seat-row-tail-${key}`);
+    const rowTail = rowTailEl && !rowTailEl.disabled ? rowTailEl.value : '';
+    const seatSeg = document.getElementById(`seat-number-seg-${key}`)?.value || '';
+    const seatTailEl = document.getElementById(`seat-number-tail-${key}`);
+    const seatTail = seatTailEl && !seatTailEl.disabled ? seatTailEl.value : '';
+    const rowNo = composeRow(rowSeg, rowTail);
+    const seatNo = composeSeatNo(seatSeg, seatTail);
     return {
       platform,
       secondsRaw: String(secondsRaw).trim(),
       seconds: Number(String(secondsRaw).trim()),
       zoneMain,
-      zoneSub,
+      zonePrefix,
+      zoneTail,
+      rowSeg,
+      rowTail,
+      seatSeg,
+      seatTail,
       rowNo,
       seatNo,
-      zone: composeZone(zoneMain, zoneSub),
+      zone: composeZone(zoneMain, zonePrefix, zoneTail),
       seatDetail: composeSeat(rowNo, seatNo)
     };
   }
 
-  // 大类切换时，第二个下拉即时重建为对应区号，重置为「无细分区」
+  // 三级联动：大类 → 字母/十位段 → 个位尾号
+  function fillSelect(el, list, preferred) {
+    if (!el) return;
+    if (!list.length) {
+      el.innerHTML = seatOptionsHTML(['—'], '—');
+      el.disabled = true;
+      return;
+    }
+    el.disabled = false;
+    const pick = list.includes(preferred) ? preferred : list[0];
+    el.innerHTML = seatOptionsHTML(list, pick);
+    el.value = pick;
+  }
+
   function onSeatZoneMainChange(showId) {
     const key = String(showId);
     const mainEl = document.getElementById(`seat-zone-main-${key}`);
-    const subEl = document.getElementById(`seat-zone-sub-${key}`);
-    if (!mainEl || !subEl) return;
-    const subs = zoneSubsOf(mainEl.value);
-    subEl.innerHTML = seatOptionsHTML(subs, '无细分区');
-    if (!subs.includes(subEl.value)) subEl.value = subs[0];
+    if (!mainEl) return;
+    const prefixes = zonePrefixesOf(mainEl.value);
+    fillSelect(document.getElementById(`seat-zone-prefix-${key}`), prefixes, prefixes[0]);
+    onSeatZonePrefixChange(key);
+  }
+
+  function onSeatZonePrefixChange(showId) {
+    const key = String(showId);
+    const main = document.getElementById(`seat-zone-main-${key}`)?.value || ZONE_MAINS[0];
+    const prefix = document.getElementById(`seat-zone-prefix-${key}`)?.value || '';
+    const tails = zoneTailsOf(main, prefix);
+    fillSelect(document.getElementById(`seat-zone-tail-${key}`), tails, tails[0]);
+  }
+
+  function onSeatRowSegChange(showId) {
+    const key = String(showId);
+    const seg = document.getElementById(`seat-row-seg-${key}`)?.value || '站区/无排号';
+    const tails = rowTailsOf(seg);
+    fillSelect(document.getElementById(`seat-row-tail-${key}`), tails, tails[0]);
+  }
+
+  function onSeatNumberSegChange(showId) {
+    const key = String(showId);
+    const seg = document.getElementById(`seat-number-seg-${key}`)?.value || '不填座号';
+    const tails = seatTailsOf(seg);
+    fillSelect(document.getElementById(`seat-number-tail-${key}`), tails, tails[0]);
   }
 
   function validateForm(f) {
     if (!Number.isInteger(f.seconds) || f.seconds < 0 || f.seconds > 600) return '请填写 0–600 之间的整数秒数';
     if (!window.SEAT_PLATFORMS.includes(f.platform)) return '请选择列表中的购票平台';
     if (!ZONE_MAINS.includes(f.zoneMain)) return '请选择票档区域大类';
-    if (!zoneSubsOf(f.zoneMain).includes(f.zoneSub)) return '请选择该区域对应的大类区号';
-    if (!ROW_NOS.includes(f.rowNo)) return '请选择排数';
-    if (!SEAT_NOS.includes(f.seatNo)) return '请选择座号';
+    if (!zonePrefixesOf(f.zoneMain).includes(f.zonePrefix)) return '请选择区域号段';
+    const tails = zoneTailsOf(f.zoneMain, f.zonePrefix);
+    if (tails.length && !tails.includes(f.zoneTail)) return '请选择区域尾号';
+    if (!ROW_SEGS.includes(f.rowSeg)) return '请选择排数段';
+    const rowTails = rowTailsOf(f.rowSeg);
+    if (rowTails.length && !rowTails.includes(f.rowTail)) return '请选择具体排数';
+    if (!SEAT_SEGS.includes(f.seatSeg)) return '请选择座号段';
+    const seatTails = seatTailsOf(f.seatSeg);
+    if (seatTails.length && !seatTails.includes(f.seatTail)) return '请选择具体座号';
     return '';
   }
 
@@ -495,6 +635,9 @@
   window.setSeatZoneFilter = setSeatZoneFilter;
   window.setSeatSort = setSeatSort;
   window.onSeatZoneMainChange = onSeatZoneMainChange;
+  window.onSeatZonePrefixChange = onSeatZonePrefixChange;
+  window.onSeatRowSegChange = onSeatRowSegChange;
+  window.onSeatNumberSegChange = onSeatNumberSegChange;
   window.submitSeatRow = openSeatConfirm;
   window.openSeatConfirm = openSeatConfirm;
   window.confirmSeatSubmit = confirmSeatSubmit;
