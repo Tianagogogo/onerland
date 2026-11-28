@@ -573,7 +573,7 @@ function renderUpcomingMiniTimeline() {
         </div>
         <div class="timeline-card-actions flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-end flex-wrap pt-1.5 sm:pt-0 border-t border-slate-200/70 sm:border-0">
           ${item === pinned
-            ? `<span class="timeline-next-badge text-[10px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap">⚡ 下一场</span>`
+            ? `<span class="timeline-next-badge text-[10px] px-1.5 py-0.5 rounded border">⚡ 下一场</span>`
             : `<span class="text-[10px] px-1.5 py-0.5 rounded ${isFuture ? 'bg-white border border-slate-300 text-slate-600' : 'bg-slate-100 text-slate-500'}">${isFuture ? '待开演' : '已落幕'}</span>`}
           <button type="button" onclick="switchMainTab('shows')" class="tour-action-btn tour-action-btn--mini">详情</button>
         </div>
