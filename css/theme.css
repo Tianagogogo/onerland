@@ -786,7 +786,7 @@ select::-moz-focus-inner { border: 0; }
   animation: splashBreathe 2.4s ease-in-out infinite;
 }
 .splash-logo {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: clamp(26px, 7vw, 44px);
   font-weight: 800;
   letter-spacing: 0.28em;
