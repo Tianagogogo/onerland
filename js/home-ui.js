@@ -771,12 +771,15 @@ function handleHomeTimelineAction(action, idx, btn) {
   const esc = v => String(v == null ? '' : v).replace(/['"<>]/g, '');
 
   if (action === 'traffic') {
-    const text = rec.transport || '暂无该场次的交通指南，可在「档案」中补充。';
-    toggleHomeTimelinePanel(card, 'traffic', `
-      <div class="tl-quick-panel-inner">
-        <div class="tl-quick-panel-title">🚇 交通与入场指南</div>
-        <div class="tl-quick-panel-body">${esc(text).replace(/\n/g, '<br />')}</div>
-      </div>`);
+    const text = String(rec.transport || '暂无该场次的交通指南，可在「档案」中补充。').replace(/[<>]/g, '');
+    closeHomeTimelinePanels();
+    if (typeof openShowFeatureModal === 'function') {
+      openShowFeatureModal({
+        title: `🚇 场馆交通指南${safeVenue ? ` · ${safeVenue}` : ''}`,
+        sub: [safeTitle, String(rec.date || '')].filter(Boolean).join(' · '),
+        html: `<div class="feature-text">${text.replace(/\n/g, '<br />')}</div>`
+      });
+    }
     return;
   }
 
@@ -801,17 +804,22 @@ function handleHomeTimelineAction(action, idx, btn) {
       ? buildShowKey(rec.venue || rec.city, safeTitle)
       : `${rec.venue || rec.city}::${safeTitle}`;
     const safeKey = showKey.replace(/['"<>]/g, '');
-    toggleHomeTimelinePanel(card, 'security', `
-      <div class="tl-quick-panel-inner tl-sec-panel">
-        <div data-security-vote data-show-key="${safeKey}" data-venue="${safeVenue}">
-          <div class="tl-sec-loading">⏳ 正在同步全场安检投票…</div>
-        </div>
-        <button type="button" class="tl-sec-more" onclick="event.stopPropagation(); switchMainTab('shows')">在「档案」查看完整安检记录 ↗</button>
-      </div>`);
-    const host = card.querySelector('.tl-quick-panel [data-security-vote]');
-    if (host) host.dataset.ready = '0';
-    if (typeof hydrateSecurityVoteBlocks === 'function') {
-      try { hydrateSecurityVoteBlocks(); } catch (e) { /* ignore */ }
+    closeHomeTimelinePanels();
+    if (typeof openShowFeatureModal === 'function') {
+      openShowFeatureModal({
+        title: `🛡️ 场馆安检体验${safeVenue ? ` · ${safeVenue}` : ''}`,
+        sub: [safeTitle, String(rec.date || '')].filter(Boolean).join(' · '),
+        html: `
+          <div class="tl-quick-panel-inner tl-sec-panel">
+            <div data-security-vote data-show-key="${safeKey}" data-venue="${safeVenue}">
+              <div class="tl-sec-loading">⏳ 正在同步全场安检投票…</div>
+            </div>
+            <button type="button" class="tl-sec-more" onclick="switchMainTab('shows')">在「档案」查看完整安检记录 ↗</button>
+          </div>`,
+        onOpen: () => {
+          if (typeof hydrateSecurityVoteBlocks === 'function') hydrateSecurityVoteBlocks();
+        }
+      });
     }
     return;
   }
@@ -821,8 +829,40 @@ function handleHomeTimelineAction(action, idx, btn) {
     if (typeof switchMainTab === 'function') switchMainTab('shows');
     const cid = rec.cloudId;
     window.setTimeout(() => {
+      const cardEl = cid != null ? document.querySelector(`[data-show-card="${String(cid)}"]`) : null;
+      const trigger = cardEl ? cardEl.querySelector('[data-footer-tab="buddy"]') : null;
+      if (trigger && typeof openCardFeatureModal === 'function') {
+        const panel = document.querySelector(`[data-buddy-card="${String(cid)}"]`);
+        if (panel) panel.dataset.ready = '0';
+        openCardFeatureModal(trigger, 'buddy');
+        return;
+      }
       const panel = document.querySelector(`[data-buddy-card="${String(cid)}"]`);
-      if (!panel) return;
+      // 该场次不在当前档案列表里时，退化成提示浮窗，绝不再往卡片内部塞面板
+      if (!panel) {
+        if (typeof openShowFeatureModal === 'function') {
+          openShowFeatureModal({
+            title: `🤝 同场观演找搭子${safeVenue ? ` · ${safeVenue}` : ''}`,
+            sub: [safeTitle, String(rec.date || '')].filter(Boolean).join(' · '),
+            html: `<div class="feature-text">这场演出的档案还在同步，稍后可在「档案」页对应卡片里发布或查看搭子信息。</div>`
+          });
+        }
+        return;
+      }
+      if (typeof openShowFeatureModal === 'function') {
+        openShowFeatureModal({
+          title: `🤝 同场观演找搭子 · ${safeTitle || safeVenue}`,
+          sub: [safeVenue, String(rec.date || '')].filter(Boolean).join(' · '),
+          panel: panel,
+          onOpen: () => {
+            window.__buddyActiveEventId = cid;
+            if (typeof refreshBuddyPanel === 'function' && cid != null) {
+              try { refreshBuddyPanel(String(cid)); } catch (e) { /* ignore */ }
+            }
+          }
+        });
+        return;
+      }
       panel.classList.remove('hidden');
       panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
       if (typeof refreshBuddyPanel === 'function' && cid != null) {

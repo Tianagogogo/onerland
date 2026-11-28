@@ -4440,3 +4440,43 @@ body.checkin-modal-open { overflow: hidden; }
   .checkin-quick-links { grid-template-columns: 1fr 1fr; gap: 6px; }
   .checkin-quick-links .travel-link:last-child { grid-column: 1 / -1; }
 }
+
+/* ================= 统一功能浮窗：交通 / 安检 / 找搭子 / 抢票 ================= */
+body.feature-modal-open { overflow: hidden; }
+.feature-modal { z-index: 9999; }
+.feature-shell { max-width: 680px; max-height: 82vh; }
+.feature-body {
+  padding: 12px 16px 16px;
+  gap: 10px;
+  max-height: 82vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.feature-body > .feature-panel {
+  display: block;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 12px;
+  background: #ffffff;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #334155;
+}
+.feature-html { font-size: 12px; line-height: 1.6; color: #334155; }
+.feature-html .tl-quick-panel-inner { padding: 0; }
+.feature-text { white-space: pre-line; }
+
+@media (max-width: 640px) {
+  .feature-modal { padding: 12px; align-items: center; }
+  .feature-modal .feature-shell {
+    max-width: 100%;
+    max-height: 86vh;
+    border-radius: 16px;
+    border-bottom: 1px solid rgba(203, 213, 225, 0.9);
+  }
+  .feature-body { padding: 10px 12px 14px; }
+}
+
+.feature-dup-heading { display: none !important; }

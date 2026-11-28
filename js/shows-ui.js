@@ -1902,7 +1902,12 @@ function bindFooterTabs() {
   document.addEventListener('click', event => {
     const trigger = event.target.closest('[data-footer-tab]');
     if (trigger) {
-      setFooterTab(trigger.dataset.footerTab, trigger, event);
+      const tab = trigger.dataset.footerTab;
+      if (MODAL_FOOTER_TABS.indexOf(tab) >= 0) {
+        openCardFeatureModal(trigger, tab, event);
+        return;
+      }
+      setFooterTab(tab, trigger, event);
       return;
     }
     // 点「知道了」或地图菜单项后收起
@@ -1929,7 +1934,7 @@ function bindFooterTabs() {
 // 重绘后恢复当前卡片的单选激活态（不重复触发日历下载）
 function restoreFooterTabs() {
   Object.entries(window.activeFooterTab || {}).forEach(([cardKey, tab]) => {
-    if (!tab) return;
+    if (!tab || MODAL_FOOTER_TABS.indexOf(tab) >= 0) return;
     const card = document.querySelector(`[data-show-card="${cardKey}"]`);
     if (!card) return;
     const btn = card.querySelector(`[data-footer-tab="${tab}"]`);
@@ -1946,6 +1951,156 @@ function restoreFooterTabs() {
 // 所有抽屉的展开态保存在组件外层状态里：整卡重绘后依然稳稳停在当前面板
 if (!window.openTourDrawers) window.openTourDrawers = new Set();
 
+// ================= 统一居中功能浮窗：交通 / 安检 / 找搭子 / 抢票 =================
+// 复用「出行比价 / 同款打卡」的 .travel-modal 外壳：毛玻璃遮罩 + 居中卡片 + × / Esc / 点遮罩关闭
+const MODAL_DRAWER_PREFIXES = ['guide-drawer-', 'vexp-tour-drawer-', 'buddy-drawer-', 'seat-drawer-'];
+const MODAL_FOOTER_TABS = ['traffic', 'venue', 'buddy', 'seats'];
+let featureModalCtx = null;
+
+function ensureFeatureModal() {
+  let modal = document.getElementById('show-feature-modal');
+  if (modal) return modal;
+  modal = document.createElement('div');
+  modal.id = 'show-feature-modal';
+  modal.className = 'travel-modal feature-modal hidden';
+  modal.innerHTML = `
+    <div class="travel-shell feature-shell" role="dialog" aria-modal="true" aria-label="演出功能浮窗">
+      <div class="travel-head">
+        <div class="travel-title-wrap">
+          <div class="travel-title" id="feature-title"></div>
+          <div class="travel-sub" id="feature-sub"></div>
+        </div>
+        <button type="button" class="travel-close" data-feature-close aria-label="关闭">✕</button>
+      </div>
+      <div class="travel-body feature-body" id="feature-body"></div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', event => {
+    if (event.target === modal || event.target.closest('[data-feature-close]')) closeShowFeatureModal();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !modal.classList.contains('hidden')) closeShowFeatureModal();
+  }, true);
+  return modal;
+}
+
+function closeShowFeatureModal() {
+  const modal = document.getElementById('show-feature-modal');
+  const ctx = featureModalCtx;
+  featureModalCtx = null;
+  if (modal) modal.classList.add('hidden');
+  document.body.classList.remove('feature-modal-open');
+  if (ctx) {
+    if (ctx.observer) {
+      try { ctx.observer.disconnect(); } catch (e) { /* ignore */ }
+    }
+    if (ctx.button) {
+      ctx.button.classList.remove('is-active');
+      ctx.button.setAttribute('aria-expanded', 'false');
+    }
+    if (ctx.panel) {
+      ctx.panel.classList.add('hidden');
+      if (ctx.parent && ctx.parent.isConnected) {
+        ctx.parent.insertBefore(ctx.panel, ctx.anchor && ctx.anchor.isConnected ? ctx.anchor : null);
+      }
+    }
+  }
+  const body = modal && modal.querySelector('#feature-body');
+  if (body) body.innerHTML = '';
+}
+
+function openShowFeatureModal(opts) {
+  const o = opts || {};
+  const modal = ensureFeatureModal();
+  if (featureModalCtx) closeShowFeatureModal();
+  const body = modal.querySelector('#feature-body');
+  const titleEl = modal.querySelector('#feature-title');
+  const subEl = modal.querySelector('#feature-sub');
+  if (titleEl) titleEl.textContent = o.title || '';
+  if (subEl) subEl.textContent = o.sub || '';
+  if (body) body.innerHTML = '';
+
+  let panel = null;
+  if (o.panel) {
+    panel = o.panel;
+    featureModalCtx = { panel, parent: panel.parentNode, anchor: panel.nextSibling, button: o.button || null };
+    panel.classList.remove('hidden');
+    panel.classList.add('feature-panel');
+    if (body) body.appendChild(panel);
+    stripDuplicateFeatureHeading(panel);
+    // 面板内部提交后会局部重渲染，观察并持续隐藏重复标题
+    try {
+      const observer = new MutationObserver(() => stripDuplicateFeatureHeading(panel));
+      observer.observe(panel, { childList: true, subtree: true });
+      featureModalCtx.observer = observer;
+    } catch (e) { /* ignore */ }
+  } else {
+    featureModalCtx = { button: o.button || null };
+    if (body) body.innerHTML = `<div class="feature-html">${o.html || ''}</div>`;
+  }
+
+  modal.classList.remove('hidden');
+  document.body.classList.add('feature-modal-open');
+  if (body) body.scrollTop = 0;
+  if (typeof o.onOpen === 'function') {
+    requestAnimationFrame(() => { try { o.onOpen(); } catch (e) { /* ignore */ } });
+  }
+}
+
+// 演出卡片：把原本卡片内展开的面板整体搬进浮窗（关闭后原样还回卡片并隐藏）
+const DUP_HEADING_KEYS = ['交通与入场指南', '公共场馆客观体验', '同场观演搭子界面', '抢票与座位对照表', '场馆安检体验'];
+// 面板内部自带的标题与浮窗标题重复，搬进浮窗后就地隐藏（只隐藏标题节点本身）
+function stripDuplicateFeatureHeading(panel) {
+  if (!panel) return;
+  panel.querySelectorAll('.font-bold, .font-semibold').forEach(el => {
+    const text = el.textContent || '';
+    if (DUP_HEADING_KEYS.some(k => text.indexOf(k) >= 0)) el.classList.add('feature-dup-heading');
+  });
+}
+
+function openCardFeatureModal(trigger, tab, event) {
+  if (event) {
+    if (event.stopPropagation) event.stopPropagation();
+    if (event.preventDefault) event.preventDefault();
+  }
+  const card = trigger.closest('[data-show-card]');
+  if (!card) return;
+  const venue = card.dataset.showVenue || '';
+  const titleEl = card.querySelector('.show-card-title');
+  const showTitle = titleEl ? titleEl.textContent.replace(/\s+/g, ' ').trim() : '';
+  const dateEl = card.querySelector('.meta-date-ics');
+  const dateText = dateEl ? dateEl.textContent.replace(/^[^\d]*/, '').trim() : '';
+  const panelId = trigger.dataset.tourToggle || '';
+  const panel = panelId ? document.getElementById(panelId) : null;
+  if (!panel) return toastError('内容还在加载，请稍后再点一次');
+
+  const base = { traffic: '🚇 场馆交通指南', venue: '🛡️ 场馆安检体验', buddy: '🤝 同场观演找搭子', seats: '🎟️ 抢票与座位对照表' };
+  let title = base[tab] || '演出功能';
+  const anchor = (tab === 'buddy' || tab === 'seats') ? (showTitle || venue) : venue;
+  if (anchor) title += ` · ${anchor}`;
+  const sub = [showTitle, dateText].filter(Boolean).join(' · ');
+
+  openShowFeatureModal({
+    title,
+    sub,
+    panel,
+    button: trigger,
+    onOpen: () => {
+      if (tab === 'venue' && typeof hydrateSecurityVoteBlocks === 'function') hydrateSecurityVoteBlocks();
+      if (tab === 'buddy') {
+        const cid = card.dataset.showCard;
+        window.__buddyActiveEventId = cid;
+        if (cid && typeof refreshBuddyPanel === 'function') refreshBuddyPanel(String(cid));
+      }
+      if (tab === 'seats') {
+        const cid = card.dataset.showCard;
+        if (cid && typeof openTicketSeatPanel === 'function') openTicketSeatPanel(String(cid));
+      }
+    }
+  });
+}
+
 function toggleTourPanel(button, panelId, event) {
   if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
   const panel = document.getElementById(panelId);
@@ -1961,6 +2116,10 @@ function toggleTourPanel(button, panelId, event) {
 function restoreOpenTourDrawers() {
   if (!window.openTourDrawers || !window.openTourDrawers.size) return;
   window.openTourDrawers.forEach(id => {
+    if (MODAL_DRAWER_PREFIXES.some(p => String(id).indexOf(p) === 0)) {
+      window.openTourDrawers.delete(id);
+      return;
+    }
     const panel = document.getElementById(id);
     if (!panel) return;
     panel.classList.remove('hidden');
@@ -2525,3 +2684,7 @@ function renderArchiveTimeline() {
   restoreOpenTourDrawers();
   hydrateSecurityVoteBlocks();
 }
+
+window.openShowFeatureModal = openShowFeatureModal;
+window.closeShowFeatureModal = closeShowFeatureModal;
+window.openCardFeatureModal = openCardFeatureModal;
