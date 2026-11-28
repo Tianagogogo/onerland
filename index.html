@@ -112,6 +112,12 @@
   <footer class="max-w-5xl mx-auto px-4 py-6 mt-4 border-t border-slate-300/70 text-[11px] text-slate-500 space-y-1 text-center">
     <p>ONERLAND 为非盈利、非商业粉丝档案与观演实用工具站，不接任何广告、会员、打赏或票务交易。</p>
     <p>站内演出海报版权归原经纪公司及主办方所有，仅作非商业信息索引展示；如有侵权请通过邮箱联系核实删除。</p>
+    <div id="footer-feedback-bar" class="flex items-center justify-center gap-2 pt-2 flex-wrap">
+      <button type="button" onclick="openFeedbackModal()" class="feedback-entry-btn">💬 帮助与反馈</button>
+      <button type="button" id="footer-feedback-inbox-btn" onclick="openAdminFeedbackInbox()" class="feedback-entry-btn hidden">
+        📬 查看反馈箱<span id="footer-feedback-badge" class="feedback-entry-badge hidden">0</span>
+      </button>
+    </div>
   </footer>
 
   <nav class="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-xl border-t border-slate-300 p-1.5 text-[11px]"><div class="nav-segment nav-segment--block">
@@ -353,6 +359,62 @@
     </div>
   </div>
 
+  <div id="feedback-modal" onclick="if(event.target===this)closeFeedbackModal()" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="chronicle-card rounded-2xl max-w-md w-full max-h-[86vh] overflow-y-auto p-5 space-y-4 bg-white text-xs">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-sm text-slate-900">💬 帮助与反馈</h3>
+        <button type="button" onclick="closeFeedbackModal()" class="text-slate-400 hover:text-slate-800">✕</button>
+      </div>
+
+      <section class="space-y-1.5">
+        <div class="font-bold text-slate-700">❓ 常见问题</div>
+        <ol class="feedback-help-list">
+          <li>数据免注册、存在当前浏览器本地，清理缓存前请先备份（导出备份）。</li>
+          <li>点击演出卡片上的日期，可一键把该场演出导入手机日历提醒。</li>
+          <li>换浏览器或换设备投票会自动合并去重，同一设备始终只算 1 票。</li>
+        </ol>
+      </section>
+
+      <section class="space-y-2 pt-1 border-t border-slate-200">
+        <div class="font-bold text-slate-700">✍️ 提交反馈留言</div>
+        <div class="feedback-cat-row">
+          <button type="button" data-fb-cat="bug" onclick="setFeedbackCategory('bug')" class="feedback-cat-chip is-active" aria-pressed="true">🐞 问题报错</button>
+          <button type="button" data-fb-cat="idea" onclick="setFeedbackCategory('idea')" class="feedback-cat-chip" aria-pressed="false">💡 功能建议</button>
+          <button type="button" data-fb-cat="info" onclick="setFeedbackCategory('info')" class="feedback-cat-chip" aria-pressed="false">🎤 场次/信息纠错</button>
+        </div>
+        <div class="space-y-1">
+          <textarea id="feedback-content" rows="4" maxlength="500" oninput="updateFeedbackCounter()"
+            placeholder="说说遇到的问题或想法（必填，最多 500 字）"
+            class="w-full px-2.5 py-2 rounded-lg border border-slate-300 bg-white text-[12px] leading-relaxed resize-y"></textarea>
+          <div class="flex justify-end"><span id="feedback-counter" class="feedback-counter">0/500</span></div>
+        </div>
+        <div class="space-y-1">
+          <label for="feedback-nick" class="text-[11px] font-semibold text-slate-700">称呼 / 备注（选填）</label>
+          <input id="feedback-nick" type="text" maxlength="30" autocomplete="off" placeholder="怎么称呼你（仅管理员可见）"
+            class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-[11px]" />
+        </div>
+        <p class="text-[10.5px] text-slate-500 leading-relaxed">匿名提交，不上传账号信息；留言仅管理员可见，站内不会公开展示。</p>
+        <button type="button" id="feedback-submit-btn" onclick="submitSiteFeedback()" class="tour-action-btn w-full font-semibold">提交反馈</button>
+      </section>
+    </div>
+  </div>
+
+  <div id="feedback-inbox-modal" onclick="if(event.target===this)this.classList.add('hidden')" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="chronicle-card rounded-2xl max-w-lg w-full max-h-[86vh] overflow-y-auto p-5 space-y-3 bg-white text-xs">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-sm text-slate-900">📬 管理员反馈箱</h3>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="loadAdminFeedbacks()" class="feedback-entry-btn">刷新</button>
+          <button type="button" onclick="document.getElementById('feedback-inbox-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-800">✕</button>
+        </div>
+      </div>
+      <p class="text-[11px] text-slate-500 leading-relaxed">仅管理员密码解锁后可见；数据由 RPC 校验口令后返回，普通访客在数据库层无任何读取权限。</p>
+      <div id="feedback-inbox-list" class="space-y-2">
+        <div class="text-xs text-slate-400 py-3 text-center">正在读取…</div>
+      </div>
+    </div>
+  </div>
+
   <script src="./js/config.js"></script>
   <script src="./js/store.js"></script>
   <script src="./js/home-ui.js"></script>
@@ -362,6 +424,7 @@
   <script src="./js/admin-ui.js"></script>
   <script src="./js/auth-ui.js"></script>
   <script src="./js/travel-helper.js"></script>
+  <script src="./js/feedback-ui.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
       // 刷新一次后清除标记，保证后续版本更新仍能自动刷新（10 秒后再放开，避免刷新循环）

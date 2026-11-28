@@ -121,6 +121,8 @@ function syncAuthState() {
   if (typeof renderTourCards === 'function') renderTourCards();
   if (typeof renderArchiveTimeline === 'function') renderArchiveTimeline();
   if (typeof updateAuthButtonUI === 'function') updateAuthButtonUI();
+  // 💬 页脚「📬 查看反馈箱」入口只在管理员密码解锁后出现
+  if (typeof refreshFeedbackEntryPoints === 'function') refreshFeedbackEntryPoints();
 }
 
 function saveGuestNicknameFromModal() {

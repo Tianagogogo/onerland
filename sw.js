@@ -1,4 +1,4 @@
-const CACHE_NAME = 'onerland-pwa-v76';
+const CACHE_NAME = 'onerland-pwa-v77';
 const IMAGE_CACHE_NAME = 'onerland-images-v3';
 const STATIC_ASSETS = [
   './',
@@ -12,7 +12,9 @@ const STATIC_ASSETS = [
   './js/parser.js',
   './js/footprint-ui.js',
   './js/admin-ui.js',
-  './js/auth-ui.js'
+  './js/auth-ui.js',
+  './js/travel-helper.js',
+  './js/feedback-ui.js'
 ];
 
 self.addEventListener('install', event => {
