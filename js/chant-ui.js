@@ -5,7 +5,7 @@
    3) 本机历史草稿可在管理员解锁后一键上传云端；
    4) 应援词正文用 [..] / 【..】 标记，渲染、长图、PDF 统一高亮；
    5) 1～5 星难度评价本机记录 + vote_chant_star RPC 全站聚合，再次点击同一星级即取消；
-   6) 长图走纯 Canvas 2D（devicePixelRatio ≥ 2），不引用任何跨域图片；
+   6) 长图走纯 Canvas 2D，逻辑宽 750px，按 iOS Safari 4096px 单边 / 1200 万像素红线自适配倍率，超长歌词自动分页出多张 PNG；
    7) PDF 走原生 window.print() + 专用打印排版，无第三方库。 */
 
 const CHANT_TABLE = 'fan_chants';
@@ -1903,20 +1903,56 @@ function chantRoundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-function buildChantLongImage(song) {
-  if (!song) return '';
-  const dpr = Math.max(2, Math.min(3, Math.round((window.devicePixelRatio || 1) * 1.5)));
-  const W = 900;
-  const padX = 64;
+const CHANT_IMAGE_WIDTH = 750;
+const CHANT_IMAGE_SAFE_SIDE = 4096;
+const CHANT_IMAGE_SAFE_PIXELS = 12000000;
+const CHANT_IMAGE_PAGE_TARGET_H = 3000;
+const CHANT_IMAGE_PAGE_MIN_H = 2400;
+const CHANT_IMAGE_SINGLE_BREAK_H = 3600;
+
+// 让逻辑尺寸在 iOS Safari 的单边 4096px 与 1200 万像素红线内出图
+function chantImageSafeScale(logicalW, logicalH, preferredScale) {
+  const maxScale = Math.min(2, Number(preferredScale) || 2);
+  for (let scale = maxScale; scale >= 0.35; scale -= 0.05) {
+    const s = Math.round(scale * 100) / 100;
+    const w = Math.max(1, Math.round(logicalW * s));
+    const h = Math.max(1, Math.round(logicalH * s));
+    if (w <= CHANT_IMAGE_SAFE_SIDE && h <= CHANT_IMAGE_SAFE_SIDE && w * h <= CHANT_IMAGE_SAFE_PIXELS) {
+      return { scale: s, width: w, height: h };
+    }
+  }
+  return null;
+}
+
+function chantImagePages() {
+  if (Array.isArray(window.__chantImagePages) && window.__chantImagePages.length) {
+    return window.__chantImagePages;
+  }
+  const legacy = String(window.__chantImageDataUrl || '');
+  return legacy ? [{ dataUrl: legacy, width: 0, height: 0 }] : [];
+}
+
+function chantImageFileName(baseName, index, total) {
+  const base = String(baseName || `ONERLAND-应援词-${Date.now()}`).replace(/\.png$/i, '');
+  const suffix = total > 1 ? `-${index + 1}of${total}` : '';
+  return `${base}${suffix}.png`;
+}
+
+// 超长歌词分页：每页按自然行边界断开，单页目标约 3000px 高（2400–3200px）
+function buildChantLongImages(song) {
+  if (!song) return [];
+  const W = CHANT_IMAGE_WIDTH;
+  const padX = 56;
   const innerW = W - padX * 2;
   const measure = document.createElement('canvas').getContext('2d');
+  if (!measure) return [];
 
-  const titleFont = '700 44px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
-  const metaFont = '400 24px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
-  const bodyFont = '450 32px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
-  const bodyBoldFont = '700 32px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
-  const singerFont = '700 22px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
-  const legendFont = '500 22px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+  const titleFont = '700 36px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+  const metaFont = '400 21px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+  const bodyFont = '450 28px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+  const bodyBoldFont = '700 28px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+  const singerFont = '700 20px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+  const legendFont = '500 19px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
   const fontFor = seg => ((seg && (seg.chant || /^member_/.test(String(seg.type || '')))) ? bodyBoldFont : bodyFont);
   const singerColor = type => {
     const key = String(type || '').replace('member_', '');
@@ -1924,33 +1960,129 @@ function buildChantLongImage(song) {
   };
 
   measure.font = bodyFont;
-  const blocks = song.lines.map(line => ({
-    chant: !!line.chant,
-    singer: String(line.singer || ''),
-    singerType: String(line.singerType || ''),
-    wrapped: chantWrapSegments(measure, Array.isArray(line.segments) ? line.segments : [{ text: chantLinePlain(line), chant: !!line.chant, type: line.chant ? 'chant' : 'normal' }], innerW - 10, fontFor)
-  }));
-
-  const headTop = 92;
-  const metaY = headTop + 66;
-  const legendY = metaY + 54;
-  const bodyStart = legendY + 56;
-  const bodyLineH = 54;
-  const singerH = 34;
-  let cursor = bodyStart;
-  blocks.forEach(b => {
-    if (b.singer) cursor += 16 + singerH + 10;
-    cursor += b.wrapped.length * bodyLineH;
-    cursor += b.chant ? 24 : 18;
+  const blocks = song.lines.map(line => {
+    const wrapped = chantWrapSegments(measure, Array.isArray(line.segments) ? line.segments : [{ text: chantLinePlain(line), chant: !!line.chant, type: line.chant ? 'chant' : 'normal' }], innerW - 10, fontFor);
+    const singer = String(line.singer || '');
+    const gap = line.chant ? 20 : 14;
+    return {
+      chant: !!line.chant,
+      singer,
+      singerType: String(line.singerType || ''),
+      wrapped,
+      gap,
+      isEnd: true,
+      height: (singer ? 14 + 30 + 8 : 0) + wrapped.length * 46 + gap
+    };
   });
-  const footY = cursor + 24;
-  const H = Math.round(footY + 78);
+
+  const headTop = 74;
+  const metaY = headTop + 54;
+  const legendY = metaY + 46;
+  const bodyStart = legendY + 48;
+  const bodyLineH = 46;
+  const singerH = 30;
+  const footerH = 72;
+  const layout = { W, padX, innerW, headTop, metaY, legendY, bodyStart, bodyLineH, singerH, footerH, titleFont, metaFont, bodyFont, bodyBoldFont, singerFont, legendFont, singerColor };
+  const totalBodyH = blocks.reduce((sum, b) => sum + b.height, 0);
+  const singleH = bodyStart + totalBodyH + footerH;
+  const needsPagination = singleH * 2 > CHANT_IMAGE_SINGLE_BREAK_H;
+
+  let pagesBlocks = [blocks];
+  let pageCount = 1;
+  let scaleForLayout = 2;
+  if (needsPagination) {
+    const targetLogicalH = Math.floor(CHANT_IMAGE_PAGE_TARGET_H / 2);
+    const minLogicalH = Math.ceil(CHANT_IMAGE_PAGE_MIN_H / 2);
+    const capacity = Math.max(240, targetLogicalH - bodyStart - footerH);
+    pageCount = Math.max(2, Math.ceil(totalBodyH / capacity));
+
+    // 把超过单页容量的单行歌词拆成安全的小块，避免一页被撑爆
+    const safeBlocks = [];
+    blocks.forEach(block => {
+      if (block.height <= capacity) { safeBlocks.push(block); return; }
+      let chunk = [];
+      let chunkH = block.singer ? 14 + singerH + 8 : 0;
+      let firstChunk = true;
+      const flushChunk = isEnd => {
+        if (!chunk.length) return;
+        const singer = firstChunk && block.singer ? block.singer : '';
+        safeBlocks.push({
+          chant: block.chant,
+          singer,
+          singerType: singer ? block.singerType : '',
+          wrapped: chunk,
+          gap: isEnd ? block.gap : 0,
+          isEnd,
+          height: chunkH + (isEnd ? block.gap : 0)
+        });
+        firstChunk = false;
+        chunk = [];
+        chunkH = 0;
+      };
+      block.wrapped.forEach(runs => {
+        if (chunk.length && chunkH + bodyLineH > capacity) flushChunk(false);
+        chunk.push(runs);
+        chunkH += bodyLineH;
+      });
+      flushChunk(true);
+    });
+
+    const total = safeBlocks.reduce((sum, b) => sum + b.height, 0);
+    const target = total / pageCount;
+    pagesBlocks = [];
+    let current = [];
+    let currentH = 0;
+    safeBlocks.forEach((block, idx) => {
+      if (current.length) {
+        const nextH = currentH + block.height;
+        const remainingAfter = total - nextH;
+        const pagesLeftAfterThis = pageCount - pagesBlocks.length - 1;
+        const breakForCapacity = nextH > capacity + 0.5;
+        const breakForBalance = nextH > target && remainingAfter <= capacity * pagesLeftAfterThis;
+        if (breakForCapacity || breakForBalance) {
+          pagesBlocks.push(current);
+          current = [];
+          currentH = 0;
+        }
+      }
+      current.push(block);
+      currentH += block.height;
+      if (idx === safeBlocks.length - 1) pagesBlocks.push(current);
+    });
+    if (!pagesBlocks.length) pagesBlocks = [safeBlocks];
+    pageCount = pagesBlocks.length;
+    scaleForLayout = 2;
+  }
+
+  const minPageLogicalH = needsPagination ? Math.ceil(CHANT_IMAGE_PAGE_MIN_H / scaleForLayout) : 0;
+  const pages = [];
+  for (let pageIndex = 0; pageIndex < pagesBlocks.length; pageIndex += 1) {
+    const pageBlocks = pagesBlocks[pageIndex];
+    let image = null;
+    for (const preferred of [scaleForLayout, 1.5, 1.1]) {
+      image = chantPaintChantImagePage(song, pageBlocks, pageIndex, pagesBlocks.length, layout, preferred, minPageLogicalH);
+      if (image) break;
+    }
+    if (!image) return [];
+    pages.push({ ...image, pageIndex, pageCount: pagesBlocks.length });
+  }
+  return pages;
+}
+
+function chantPaintChantImagePage(song, pageBlocks, pageIndex, pageCount, layout, preferredScale, minPageLogicalH) {
+  const { W, padX, innerW, headTop, metaY, legendY, bodyStart, bodyLineH, singerH, footerH, titleFont, metaFont, bodyFont, bodyBoldFont, singerFont, legendFont, singerColor } = layout;
+  const contentH = pageBlocks.reduce((sum, b) => sum + b.height, 0);
+  let H = Math.ceil(bodyStart + contentH + footerH);
+  if (pageCount > 1) H = Math.max(H, minPageLogicalH || 0);
+  const safe = chantImageSafeScale(W, H, preferredScale || 2);
+  if (!safe) return null;
 
   const canvas = document.createElement('canvas');
-  canvas.width = Math.round(W * dpr);
-  canvas.height = Math.round(H * dpr);
+  canvas.width = safe.width;
+  canvas.height = safe.height;
   const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
+  if (!ctx) return null;
+  ctx.scale(safe.scale, safe.scale);
 
   const bg = ctx.createLinearGradient(0, 0, W, H);
   bg.addColorStop(0, '#fdfdfb');
@@ -1960,12 +2092,17 @@ function buildChantLongImage(song) {
   ctx.fillRect(0, 0, W, H);
 
   ctx.fillStyle = '#c0392b';
-  ctx.fillRect(padX, headTop - 34, 64, 6);
+  ctx.fillRect(padX, headTop - 32, 58, 6);
 
-  ctx.fillStyle = '#1f2937';
+  let titleSize = 36;
   ctx.font = titleFont;
+  while (titleSize > 24 && ctx.measureText(String(song.title || '')).width > innerW) {
+    titleSize -= 1;
+    ctx.font = `700 ${titleSize}px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif`;
+  }
+  ctx.fillStyle = '#1f2937';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText(song.title, padX, headTop + 20);
+  ctx.fillText(String(song.title || ''), padX, headTop + 18);
 
   ctx.fillStyle = '#6b7280';
   ctx.font = metaFont;
@@ -1987,12 +2124,12 @@ function buildChantLongImage(song) {
 
   ctx.font = bodyFont;
   let y = bodyStart;
-  blocks.forEach(b => {
+  pageBlocks.forEach(b => {
     if (b.singer) {
-      y += 16;
+      y += 14;
       const color = singerColor(b.singerType);
       ctx.font = singerFont;
-      const tagW = Math.min(innerW, ctx.measureText(b.singer).width + 28);
+      const tagW = Math.min(innerW, ctx.measureText(b.singer).width + 26);
       ctx.globalAlpha = 0.13;
       ctx.fillStyle = color;
       chantRoundRect(ctx, padX, y, tagW, singerH, singerH / 2);
@@ -2002,8 +2139,8 @@ function buildChantLongImage(song) {
       ctx.lineWidth = 1.2;
       ctx.stroke();
       ctx.fillStyle = color;
-      ctx.fillText(b.singer, padX + 14, y + 23);
-      y += singerH + 10;
+      ctx.fillText(b.singer, padX + 13, y + 21);
+      y += singerH + 8;
     }
     b.wrapped.forEach(runs => {
       let x = padX;
@@ -2039,25 +2176,33 @@ function buildChantLongImage(song) {
       });
       y += bodyLineH;
     });
-    y += b.chant ? 24 : 18;
+    if (b.isEnd) y += b.gap || 0;
   });
 
+  const footLineY = H - footerH + 10;
   ctx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(padX, footY - 8);
-  ctx.lineTo(W - padX, footY - 8);
+  ctx.moveTo(padX, footLineY);
+  ctx.lineTo(W - padX, footLineY);
   ctx.stroke();
   ctx.fillStyle = '#9ca3af';
-  ctx.font = '400 20px "PingFang SC", "Hiragino Sans GB", sans-serif';
+  ctx.font = '400 16px "PingFang SC", "Hiragino Sans GB", sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('ONERLAND · ONER时光典藏纪念册', W / 2, footY + 30);
+  ctx.fillText('ONERLAND · ONER时光典藏纪念册', W / 2, H - 26);
+  if (pageCount > 1) {
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(100, 116, 139, 0.72)';
+    ctx.fillText(`${pageIndex + 1} / ${pageCount}`, W - padX, H - 26);
+  }
   ctx.textAlign = 'left';
 
   try {
-    return canvas.toDataURL('image/png');
+    const dataUrl = canvas.toDataURL('image/png');
+    if (!dataUrl || !dataUrl.startsWith('data:image/png') || dataUrl.length < 8000) return null;
+    return { dataUrl, width: safe.width, height: safe.height, scale: safe.scale, logicalHeight: H };
   } catch (e) {
-    return '';
+    return null;
   }
 }
 
@@ -2077,17 +2222,23 @@ function chantDataUrlToFile(dataUrl, fileName) {
 function saveChantLongImage(songId) {
   const song = getChantSong(songId);
   if (!song) return;
-  const dataUrl = buildChantLongImage(song);
-  if (!dataUrl) {
+  const pages = buildChantLongImages(song);
+  if (!pages.length) {
     if (typeof toastError === 'function') toastError('长图生成失败，请刷新页面后重试');
     return;
   }
-  window.__chantImageDataUrl = dataUrl;
-  window.__chantImageName = `ONERLAND-应援词-${song.title}-${Date.now()}.png`;
-  openChantImageModal(dataUrl, song);
+  const safeTitle = String(song.title || '应援词').replace(/[\\/:*?"<>|]/g, '-').trim() || '应援词';
+  window.__chantImagePages = pages;
+  window.__chantImageDataUrl = pages[0].dataUrl;
+  window.__chantImageName = `ONERLAND-应援词-${safeTitle}-${Date.now()}`;
+  openChantImageModal(pages, song);
 }
 
-function openChantImageModal(dataUrl, song) {
+function openChantImageModal(input, song) {
+  const pages = (Array.isArray(input) ? input : [{ dataUrl: String(input || '') }])
+    .filter(page => page && page.dataUrl);
+  if (!pages.length) return;
+  const total = pages.length;
   document.getElementById('chant-image-modal')?.remove();
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -2098,11 +2249,17 @@ function openChantImageModal(dataUrl, song) {
   modal.innerHTML = `
     <div class="ticket-save-card chant-image-card" role="dialog" aria-modal="true" aria-label="应援词长图已生成">
       <button type="button" class="ticket-save-close" aria-label="关闭" onclick="closeChantImageModal()">✕</button>
-      <div class="ticket-save-title">🖼️ 应援词长图已生成 · ${travelEsc(song ? song.title : '')}</div>
+      <div class="ticket-save-title">🖼️ 应援词长图已生成 · ${travelEsc(song ? song.title : '')}${total > 1 ? ` · 共 ${total} 张` : ''}</div>
       <div class="ticket-save-imgbox chant-image-box">
-        <img src="${dataUrl}" alt="ONERLAND 应援词长图" style="width:100%;display:block;border-radius:14px;-webkit-touch-callout:default" />
+        <div class="chant-image-pages">
+          ${pages.map((page, index) => `
+            <figure class="chant-image-page">
+              ${total > 1 ? `<figcaption>第 ${index + 1} / ${total} 张</figcaption>` : ''}
+              <img src="${page.dataUrl}" alt="ONERLAND 应援词长图${total > 1 ? ` 第 ${index + 1} 张` : ''}" loading="eager" draggable="false" />
+            </figure>`).join('')}
+        </div>
       </div>
-      <p class="ticket-save-hint">📱 长按图片即可保存到相册${isIOS ? '（Safari：长按后选「存储到“照片”」）' : '；桌面端可右键「将图像存储为…」'}</p>
+      <p class="ticket-save-hint">📱 ${total > 1 ? `共 ${total} 张长图，可自上而下逐张长按保存到相册` : '长按图片即可保存到相册'}${isIOS ? '（Safari：长按后选「存储到“照片”」）' : '；桌面端可右键「将图像存储为…」'}</p>
       <div class="ticket-save-actions">
         ${canShareFiles ? `<button type="button" class="ticket-save-share" onclick="shareChantImage()">📤 系统分享 / 存图</button>` : `<button type="button" class="ticket-save-share" onclick="downloadChantImage()">⬇️ 下载长图</button>`}
         <button type="button" class="ticket-save-done" onclick="closeChantImageModal()">完成</button>
@@ -2121,36 +2278,50 @@ function closeChantImageModal() {
 }
 
 function downloadChantImage() {
-  const dataUrl = window.__chantImageDataUrl;
-  if (!dataUrl) return;
+  const pages = chantImagePages();
+  if (!pages.length) return;
+  const total = pages.length;
+  const baseName = window.__chantImageName || `ONERLAND-应援词-${Date.now()}`;
   try {
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = window.__chantImageName || `ONERLAND-应援词-${Date.now()}.png`;
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    pages.forEach((page, index) => {
+      setTimeout(() => {
+        const a = document.createElement('a');
+        a.href = page.dataUrl;
+        a.download = chantImageFileName(baseName, index, total);
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }, index * 160);
+    });
+    if (total > 1 && typeof showToast === 'function') {
+      showToast(`正在逐张下载 ${total} 张长图；若被浏览器拦截，请长按图片保存`);
+    }
   } catch (e) {
     if (typeof toastError === 'function') toastError('下载失败，请长按图片保存');
   }
 }
 
 async function shareChantImage() {
-  const dataUrl = window.__chantImageDataUrl;
-  if (!dataUrl) return;
-  const file = chantDataUrlToFile(dataUrl, window.__chantImageName || `ONERLAND-应援词-${Date.now()}.png`);
-  if (!file || typeof navigator.share !== 'function') {
+  const pages = chantImagePages();
+  if (!pages.length) return;
+  const total = pages.length;
+  const baseName = window.__chantImageName || `ONERLAND-应援词-${Date.now()}`;
+  const files = pages
+    .map((page, index) => chantDataUrlToFile(page.dataUrl, chantImageFileName(baseName, index, total)))
+    .filter(Boolean);
+  if (!files.length || typeof navigator.share !== 'function') {
     downloadChantImage();
     if (typeof showToast === 'function') showToast('当前浏览器不支持直接分享，已尝试下载长图');
     return;
   }
   try {
-    if (typeof navigator.canShare === 'function' && !navigator.canShare({ files: [file] })) {
+    if (typeof navigator.canShare === 'function' && !navigator.canShare({ files })) {
       downloadChantImage();
+      if (typeof showToast === 'function') showToast('当前浏览器不支持多图分享，已尝试下载长图');
       return;
     }
-    await navigator.share({ files: [file], title: 'ONERLAND 应援词长图' });
+    await navigator.share({ files, title: 'ONERLAND 应援词长图' });
   } catch (e) {
     if (e && e.name === 'AbortError') return;
     downloadChantImage();
