@@ -51,7 +51,7 @@ const TRAVEL_CITIES = [
 const TRAVEL_ORIGIN_KEY = 'onerland_travel_origin_v1';
 // 热门出发城市快捷胶囊（点一下就切换出发地）
 const TRAVEL_HOT_CITIES = ['北京', '上海', '广州', '深圳', '成都', '杭州', '重庆', '武汉', '西安', '南京', '长沙', '合肥'];
-const travelHelperState = { show: null, origin: '北京', depart: '', ret: '' };
+const travelHelperState = { show: null, origin: '北京', depart: '', ret: '', openGroup: '' };
 
 function travelCityMeta(cityName) {
   const name = String(cityName || '').trim();
@@ -83,76 +83,74 @@ function setTravelOrigin(city) {
   try { localStorage.setItem(TRAVEL_ORIGIN_KEY, String(city || '')); } catch (e) { /* ignore */ }
 }
 
-// ---------- 各分区跳转链接 ----------
-function buildTravelLinks() {
+// ---------- 四大类一级入口 + 二级平台链接（只保留经验证的官方稳定入口） ----------
+// 原则：不拼接易失效的深层参数路径，优先官方首页/移动端首页，让用户在 App 内自行检索；
+// 行程关键词用「📋 一键复制」提供，粘贴即用。
+function buildTravelGroups() {
   const show = travelHelperState.show || {};
   const dest = travelCityMeta(show.city);
   const origin = travelCityMeta(travelHelperState.origin);
-  const venue = String(show.venue || dest.city || '').trim();
+  const venue = String(show.venue || dest.city || '').trim() || dest.city;
   const depart = travelHelperState.depart;
   const back = travelHelperState.ret;
-  const showDate = String(show.date || depart || '').slice(0, 10);
   const enc = encodeURIComponent;
+  const keyword = `${origin.city} → ${dest.city}${depart || back ? ` ${depart || ''}${back ? `至${back}` : ''}` : ''}${venue ? ` ${venue}` : ''}`.trim();
 
   return {
-    dest,
     origin,
-    flights: [
+    dest,
+    venue,
+    keyword: keyword.replace(/\s+/g, ' '),
+    groups: [
       {
-        label: '携程 · 特价机票日历',
-        desc: '低价日历 + 含税总价（移动端）',
-        url: `https://m.ctrip.com/html5/flight/oneway?departCity=${enc(origin.city)}&arriveCity=${enc(dest.city)}&departDate=${enc(depart)}`
+        id: 'flights',
+        icon: '✈️',
+        title: '机票',
+        hint: `${origin.city} → ${dest.city}${depart ? ` · ${depart}` : ''}`,
+        links: [
+          { label: '携程机票', desc: '移动端 H5 机票首页', url: 'https://m.ctrip.com/html5/flight/swift/index' },
+          { label: '去哪儿机票', desc: '多航司比价 / 中转', url: 'https://flight.qunar.com/' },
+          { label: '飞猪机票', desc: '阿里系运价与优惠', url: 'https://h5.m.taobao.com/trip/flight/search/index.html' }
+        ]
       },
       {
-        label: '去哪儿 · 特价机票',
-        desc: '多航司比价 / 中转方案（移动端）',
-        url: `https://m.flight.qunar.com/nkc/oneway?depCity=${enc(origin.city)}&arrCity=${enc(dest.city)}&depDate=${enc(depart)}`
+        id: 'trains',
+        icon: '🚄',
+        title: '高铁',
+        hint: `${origin.station || origin.city} → ${dest.station || dest.city}${depart ? ` · ${depart}` : ''}`,
+        links: [
+          { label: '铁路 12306 官方', desc: '官方余票与正晚点（移动端自适应）', url: 'https://www.12306.cn/index/' },
+          { label: '携程火车票', desc: '余票 / 票价对比', url: 'https://m.ctrip.com/webapp/train/' },
+          { label: '去哪儿火车票', desc: '车次耗时 / 中转组合', url: 'https://train.qunar.com/' }
+        ]
       },
       {
-        label: '飞猪 · 机票比价',
-        desc: '阿里系运价 + 优惠券（H5）',
-        url: `https://h5.m.taobao.com/trip/flight/search/index.html?depCity=${enc(origin.city)}&arrCity=${enc(dest.city)}&depDate=${enc(depart)}`
-      }
-    ],
-    trains: [
-      {
-        label: '携程 · 火车票余票/票价',
-        desc: '二等座 / 一等座对比（移动端）',
-        url: `https://m.ctrip.com/html5/train/list?from=${enc(origin.station || origin.city)}&to=${enc(dest.station || dest.city)}&date=${enc(depart)}`
+        id: 'local',
+        icon: '🚇',
+        title: '同城交通',
+        hint: `${venue} · 地铁 / 打车`,
+        links: [
+          {
+            label: '高德地图 · 路线 / 打车',
+            desc: `${venue} · 公交地铁优先（可唤醒 App）`,
+            url: `https://uri.amap.com/navigation?to=,,${enc(venue)}&mode=bus&src=onerland&callnative=1`
+          },
+          {
+            label: '百度地图 · 地铁换乘',
+            desc: `${venue} · 公交/地铁耗时（可唤醒 App）`,
+            url: `https://api.map.baidu.com/direction?destination=${enc(venue)}&mode=transit&output=html&src=webapp.onerland.onerland`
+          }
+        ]
       },
       {
-        label: '去哪儿 · 火车票查询',
-        desc: '车次耗时 / 中转组合（移动端）',
-        url: `https://m.train.qunar.com/nkc/station2station?fromStation=${enc(origin.city)}&toStation=${enc(dest.city)}&date=${enc(depart)}`
-      },
-      {
-        label: '铁路 12306 · 官方查询',
-        desc: '官方余票与正晚点',
-        url: `https://kyfw.12306.cn/otn/leftTicket/init?linktypeid=dc&fs=${enc(origin.station || origin.city)}&ts=${enc(dest.station || dest.city)}&date=${enc(depart)}`
-      }
-    ],
-    local: [
-      {
-        label: '高德地图 · 场馆路线 / 打车估价',
-        desc: `${venue || dest.city} · 公交地铁优先（可唤醒 App）`,
-        url: `https://uri.amap.com/navigation?to=,,${enc(venue || dest.city)}&mode=bus&src=onerland&callnative=1`
-      },
-      {
-        label: '百度地图 · 地铁换乘方案',
-        desc: '公交/地铁耗时 · 步行距离（可唤醒 App）',
-        url: `https://api.map.baidu.com/direction?destination=${enc(venue || dest.city)}&mode=transit&region=${enc(dest.city)}&output=html&src=onerland`
-      }
-    ],
-    hotels: [
-      {
-        label: '携程 · 场馆周边酒店',
-        desc: `${venue || dest.city} 附近 · ${showDate} 入住（移动端）`,
-        url: `https://m.ctrip.com/html5/hotel/list?city=${enc(dest.city)}&keyword=${enc(venue || dest.city)}&checkin=${enc(showDate)}&checkout=${enc(travelShiftDate(showDate, 1))}`
-      },
-      {
-        label: '去哪儿 · 场馆周边酒店',
-        desc: '步行 / 地铁直达筛选（移动端）',
-        url: `https://touch.qunar.com/hotel?city=${enc(dest.city)}&q=${enc(venue || dest.city)}&fromDate=${enc(showDate)}&toDate=${enc(travelShiftDate(showDate, 1))}`
+        id: 'hotels',
+        icon: '🏨',
+        title: '酒店',
+        hint: `${venue} 周边${show.date ? ` · ${String(show.date).slice(0, 10)} 入住` : ''}`,
+        links: [
+          { label: '携程酒店', desc: '移动端酒店首页', url: 'https://m.ctrip.com/webapp/hotel/' },
+          { label: '去哪儿酒店', desc: '酒店比价', url: 'https://hotel.qunar.com/' }
+        ]
       }
     ]
   };
@@ -259,7 +257,7 @@ function ensureTravelModal() {
 function renderTravelHelper() {
   const modal = ensureTravelModal();
   const show = travelHelperState.show || {};
-  const links = buildTravelLinks();
+  const data = buildTravelGroups();
   const sub = modal.querySelector('#travel-sub');
   const titleParts = [];
   const title = String(show.title || '').trim();
@@ -272,25 +270,32 @@ function renderTravelHelper() {
   sub.textContent = titleParts.join(' · ');
 
   const body = modal.querySelector('#travel-body');
-  body.innerHTML = `
-    <section class="travel-section">
-      <div class="travel-section-head">✈️ 特价机票直达 <span class="travel-hint">${travelEsc(links.origin.city)} → ${travelEsc(links.dest.city)}</span></div>
-      <div class="travel-link-grid">${travelLinkButtons(links.flights)}</div>
-      <div id="travel-price-slot" class="travel-price-slot"></div>
-    </section>
-    <section class="travel-section">
-      <div class="travel-section-head">🚄 高铁 / 动车车次与票价 <span class="travel-hint">${travelEsc(links.origin.station || links.origin.city)} → ${travelEsc(links.dest.station || links.dest.city)}</span></div>
-      <div class="travel-link-grid">${travelLinkButtons(links.trains)}</div>
-    </section>
-    <section class="travel-section">
-      <div class="travel-section-head">🚇 场馆同城交通（地铁 / 打车估价）</div>
-      <div class="travel-link-grid">${travelLinkButtons(links.local)}</div>
-    </section>
-    <section class="travel-section">
-      <div class="travel-section-head">🏨 场馆周边酒店房价对比 <span class="travel-hint">${travelEsc(String(show.date || '').slice(0, 10))} 入住</span></div>
-      <div class="travel-link-grid">${travelLinkButtons(links.hotels)}</div>
-    </section>
-  `;
+  body.innerHTML = data.groups.map(group => {
+    const open = travelHelperState.openGroup === group.id;
+    return `
+      <section class="travel-group ${open ? 'is-open' : ''}" data-group="${group.id}">
+        <button type="button" class="travel-group-head" aria-expanded="${open ? 'true' : 'false'}" onclick="toggleTravelGroup('${group.id}')">
+          <span class="travel-group-icon">${travelEsc(group.icon)}</span>
+          <span class="travel-group-title">${travelEsc(group.title)}</span>
+          <span class="travel-group-hint">${travelEsc(group.hint)}</span>
+          <span class="travel-group-count">${group.links.length}</span>
+          <span class="travel-group-chev">▾</span>
+        </button>
+        <div class="travel-group-panel ${open ? '' : 'hidden'}">
+          <button type="button" class="travel-copy-btn" data-copy-key="${travelEsc(group.id)}">📋 一键复制行程关键词</button>
+          <div class="travel-link-grid">${travelLinkButtons(group.links)}</div>
+        </div>
+      </section>
+    `;
+  }).join('');
+  body.querySelectorAll('[data-copy-key]').forEach(btn => {
+    btn.addEventListener('click', ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      copyTravelKeywords(btn.dataset.copyKey);
+    });
+  });
+
   const originSelectEl = modal.querySelector('#travel-origin');
   if (originSelectEl) originSelectEl.value = travelHelperState.origin;
   modal.querySelectorAll('[data-hot-city]').forEach(chip => {
@@ -298,6 +303,50 @@ function renderTravelHelper() {
   });
   modal.querySelector('#travel-depart').value = travelHelperState.depart;
   modal.querySelector('#travel-return').value = travelHelperState.ret;
+}
+
+// 手风琴：点开一个大类会收起其它大类（保持弹窗紧凑）
+function toggleTravelGroup(id) {
+  const next = travelHelperState.openGroup === id ? '' : id;
+  travelHelperState.openGroup = next;
+  const modal = document.getElementById('travel-helper-modal');
+  if (!modal) return;
+  modal.querySelectorAll('.travel-group').forEach(sec => {
+    const on = sec.dataset.group === next;
+    sec.classList.toggle('is-open', on);
+    const head = sec.querySelector('.travel-group-head');
+    if (head) head.setAttribute('aria-expanded', on ? 'true' : 'false');
+    sec.querySelector('.travel-group-panel')?.classList.toggle('hidden', !on);
+  });
+}
+
+// 复制行程关键词：优先 Clipboard API，失败退回 textarea 方案
+function copyTravelKeywords(groupId) {
+  const data = buildTravelGroups();
+  const group = data.groups.find(g => g.id === groupId);
+  let text = data.keyword;
+  if (group) text = `${group.icon} ${group.title}：${data.keyword}`;
+  const done = () => showToast(`已复制：${text}`);
+  const fallback = () => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (ok) done(); else toastError('复制失败，请手动选择文字复制');
+    } catch (e) {
+      toastError('复制失败，请手动选择文字复制');
+    }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(fallback);
+  } else {
+    fallback();
+  }
 }
 
 // 可选的官方公开数据参考价（未配置 Token 时完全跳过，不发任何请求）
@@ -348,6 +397,7 @@ function openTravelHelper(show) {
   travelHelperState.depart = date ? travelShiftDate(date, -1) : travelShiftDate('', 1);
   travelHelperState.ret = date ? travelShiftDate(date, 1) : travelShiftDate('', 2);
 
+  travelHelperState.openGroup = '';
   ensureTravelModal().classList.remove('hidden');
   document.body.classList.add('travel-modal-open');
   renderTravelHelper();
@@ -373,3 +423,5 @@ function closeTravelHelper() {
 window.openTravelHelper = openTravelHelper;
 window.openTravelHelperFromButton = openTravelHelperFromButton;
 window.closeTravelHelper = closeTravelHelper;
+window.toggleTravelGroup = toggleTravelGroup;
+window.copyTravelKeywords = copyTravelKeywords;

@@ -1134,17 +1134,33 @@ function renderThemeQuickBar() {
     themeMap.set(canonKey, entry);
   });
 
-  const btns = [];
+  const seriesBtns = [];
   themeMap.forEach(entry => {
     if (entry.count >= 2) {
-      const safe = String(entry.label).replace(/['"<>]/g, '');
-      btns.push(`<button type="button" data-theme="${safe}" onclick="openSeriesModal(this.dataset.theme)" class="text-xs px-2.5 py-1 rounded-full liquid-silver-btn font-medium">🏛️ ${safe}（${entry.count}场专题）↗</button>`);
+      const safe = String(entry.label).replace(/['"<>"]/g, '');
+      seriesBtns.push(`<button type="button" data-theme="${safe}" onclick="openSeriesModal(this.dataset.theme)" class="text-xs px-2.5 py-1 rounded-full liquid-silver-btn font-medium theme-series-btn">🏛️ ${safe}（${entry.count}场专题）↗</button>`);
     }
   });
-  if (festCount > 0) {
-    btns.push(`<button type="button" onclick="openSeriesModal('__ALL_FESTIVALS__')" class="text-xs tour-action-btn tour-action-btn--mini font-medium">🎪 全部音乐节聚合（${festCount}场）↗</button>`);
+  const festBtn = festCount > 0
+    ? `<button type="button" onclick="openSeriesModal('__ALL_FESTIVALS__')" class="text-xs tour-action-btn tour-action-btn--mini font-medium theme-fest-btn">🎪 音乐节合集（${festCount}场）↗</button>`
+    : '';
+  // 手机端：默认只展示最新 1 个巡演专题 + 音乐节合集，其余折叠进「更多专题」
+  const extras = seriesBtns.slice(1).map(html => html.replace('class="', 'class="theme-extra '));
+  const moreBtn = extras.length
+    ? `<button type="button" class="theme-more-btn" onclick="toggleThemeBarExpanded(this)" aria-expanded="false">更多专题 ▾</button>`
+    : '';
+  bar.innerHTML = [seriesBtns[0] || '', festBtn, ...extras, moreBtn].join('');
+}
+
+// 手机端「更多专题」展开/收起
+function toggleThemeBarExpanded(btn) {
+  const bar = document.getElementById('tour-themes-bar');
+  if (!bar) return;
+  const expanded = bar.classList.toggle('is-expanded');
+  if (btn) {
+    btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    btn.textContent = expanded ? '收起专题 ▴' : '更多专题 ▾';
   }
-  bar.innerHTML = btns.join('');
 }
 
 function openSeriesModal(themeKey) {
@@ -1950,17 +1966,14 @@ function renderTourCards() {
               <div class="flex items-center gap-1.5 flex-wrap min-w-0">
                 <span class="text-[11px] px-2 py-0.5 rounded text-white font-semibold" style="background:${badge}">${item.artist}</span>
                 <h3 class="show-card-title font-bold text-base text-slate-900 leading-snug break-words">${safeCity}</h3>
-                ${isUpcomingShow
-                  ? `<button type="button" class="plan-chip ${plannedShow ? 'is-active' : ''}" aria-pressed="${plannedShow ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); togglePlannedShowFromCard(this, '${planKey.replace(/['"<>]/g, '')}')">${plannedShow ? '✓ 计划前往' : '🎫 计划前往'}</button>`
-                  : ''}
                 ${statusBadge}
               </div>
-              <div class="show-card-actions flex items-center gap-1.5 shrink-0">
-                ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="ticket" data-edit-title="${safeCity.replace(/"/g, '&quot;')}" data-edit-date="${String(item.show_date || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini edit-soft-btn">✏️ 编辑</button>` : ''}
-                ${isUpcomingShow
-                  ? ''
-                  : `<button type="button" onclick="recordFootprintFromShow('${safeCity}', '${item.show_date}', '${cleanVenue}', '${item.artist}')" class="tour-action-btn tour-action-btn--mini ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已打卡' : '+ 足迹'}</button>`}
-              </div>
+            </div>
+            <div class="show-card-quick-row">
+              ${isUpcomingShow
+                ? `<button type="button" class="plan-chip ${plannedShow ? 'is-active' : ''}" aria-pressed="${plannedShow ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); togglePlannedShowFromCard(this, '${planKey.replace(/['"<>]/g, '')}')">${plannedShow ? '✓ 计划前往' : '🎫 计划前往'}</button>`
+                : `<button type="button" onclick="recordFootprintFromShow('${safeCity}', '${item.show_date}', '${cleanVenue}', '${item.artist}')" class="plan-chip ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已打卡' : '+ 足迹'}</button>`}
+              ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="ticket" data-edit-title="${safeCity.replace(/"/g, '&quot;')}" data-edit-date="${String(item.show_date || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini edit-soft-btn">✏️ 编辑</button>` : ''}
             </div>
             <p class="show-card-meta text-xs text-slate-500"><span>📍 ${item.venue}</span><span class="meta-sep"> ｜ </span><button type="button" class="meta-date-ics" title="点击添加到日历提醒" onclick="event.stopPropagation(); exportShowICS('${String(item.cloudId == null ? '' : item.cloudId).replace(/["'<>]/g, '')}')">🗓️ ${item.show_date}</button></p>
             ${item.prices ? `<p class="text-[11px] text-slate-600">💰 ${item.prices}</p>` : ''}

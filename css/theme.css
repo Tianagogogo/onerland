@@ -2044,3 +2044,147 @@ body.travel-modal-open { overflow: hidden; }
   .help-guide-summary { padding: 5px 8px; font-size: 11px; }
   .help-guide-points { font-size: 10.5px; line-height: 1.65; }
 }
+
+/* ================= 🚄 出行比价：四大类手风琴 ================= */
+.travel-group {
+  border-radius: 11px;
+  border: 1px solid rgba(148, 163, 184, 0.38);
+  background: linear-gradient(135deg, #ffffff 0%, #f5f8fb 100%);
+  overflow: hidden;
+}
+.travel-group + .travel-group { margin-top: 6px; }
+.travel-group.is-open {
+  border-color: rgba(148, 163, 184, 0.62);
+  box-shadow: inset 0 1px 0 #ffffff;
+}
+.travel-group-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 9px 11px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.travel-group-icon { font-size: 13px; line-height: 1; }
+.travel-group-title { font-size: 12px; font-weight: 700; color: #0f172a; flex: 0 0 auto; }
+.travel-group-hint {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 10.5px;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.travel-group-count {
+  flex: 0 0 auto;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #eef2f7;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #64748b;
+  font-size: 9.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.travel-group-chev { font-size: 10px; color: #94a3b8; transition: transform 0.16s ease; }
+.travel-group.is-open .travel-group-chev { transform: rotate(180deg); }
+.travel-group-panel { padding: 0 9px 9px; }
+.travel-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  margin: 2px 0 7px;
+  padding: 0 9px;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: linear-gradient(135deg, #ffffff 0%, #eef3f9 100%);
+  color: #475569;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.travel-copy-btn:hover { color: #0f172a; border-color: #94a3b8; }
+
+/* ================= 档案页：计划前往 / 足迹 与 编辑同一行 ================= */
+.show-card-quick-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+/* ================= 专题导航：手机端折叠历史专题 ================= */
+.theme-more-btn {
+  display: none;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  /* 1) 微时间轴底部 5 个快捷按钮：强制显示，禁止被任何规则隐藏 */
+  #home-upcoming-timeline > .timeline-card { height: auto !important; min-height: 0 !important; }
+  .timeline-card .tl-quick-bar {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    margin-top: 8px !important;
+    padding-top: 8px !important;
+    border-top: 1px solid rgba(148, 163, 184, 0.2) !important;
+    flex: 0 0 100% !important;
+    width: 100% !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  .timeline-card .tl-quick-btn {
+    display: inline-flex !important;
+    height: 25px;
+    padding: 0 8px;
+    font-size: 10.5px;
+  }
+  /* 卡片信息区与底部之间不再留空 */
+  .timeline-card,
+  .timeline-card-main,
+  .timeline-card-body { min-height: 0 !important; gap: 2px; }
+  .timeline-card-actions { margin-top: 2px !important; min-height: 0 !important; }
+
+  /* 2) 出行比价：去返程日期单列 + 手风琴更紧凑 */
+  .travel-group-head { padding: 8px 10px; }
+  .travel-group-title { font-size: 11.5px; }
+  .travel-group-hint { font-size: 10px; }
+  .travel-group-panel { padding: 0 8px 8px; }
+  .travel-copy-btn { width: 100%; justify-content: center; height: 26px; }
+
+  /* 3) 档案卡：计划前往/足迹 与 编辑 严格同一行左右对齐 */
+  .show-card .show-card-quick-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    margin-top: 6px !important;
+  }
+  .show-card .show-card-quick-row .plan-chip { margin-left: 0; }
+  .show-card .show-card-quick-row .edit-soft-btn { flex: 0 0 auto; margin-left: auto; }
+
+  /* 4) 专题导航：默认只留最新 1 个专题 + 音乐节合集，其余折叠 */
+  #tour-themes-bar .theme-extra { display: none; }
+  #tour-themes-bar.is-expanded .theme-extra { display: inline-flex; }
+  #tour-themes-bar .theme-more-btn { display: inline-flex; align-items: center; }
+}
