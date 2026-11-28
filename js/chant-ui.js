@@ -34,7 +34,7 @@ const CHANT_COLOR_TOKENS = (function () {
     members: {
       member_yueyue: ['岳岳', 'PINKRAY', '岳明辉'],
       member_muziyang: ['木子洋', 'KWIN', '李振洋'],
-      member_lingchao: ['灵超', 'DIDI', '李英超']
+      member_lingchao: ['灵超鹅', '灵超', 'DIDI', '李英超']
     }
   };
 })();
@@ -51,6 +51,22 @@ function chantMemberTypeFor(alias) {
   const key = String(alias || '').toLowerCase();
   const hit = CHANT_MEMBER_ALIASES.find(item => item.alias.toLowerCase() === key);
   return hit ? hit.type : '';
+}
+
+// 识别行首的演唱者段落标识：岳岳: / ONER 岳岳: / 木子洋: / 灵超鹅: / 合:
+function chantExtractSingerHeader(raw) {
+  const text = String(raw == null ? '' : raw);
+  if (!text) return null;
+  const re = /^((?:ONER\s*[·・\-]?\s*)?(?:岳明辉|岳岳|PINKRAY|木子洋|KWIN|李振洋|灵超鹅|灵超|DIDI|李英超|合|全员|ONER))\s*[:：]\s*/i;
+  const m = re.exec(text);
+  if (!m) return null;
+  const label = m[1].replace(/\s+/g, ' ').trim();
+  const name = label.replace(/^ONER\s*[·・\-]?\s*/i, '').trim() || label;
+  let type = 'group';
+  if (!/^(合|全员|ONER)$/i.test(name)) {
+    type = chantMemberTypeFor(name) || 'group';
+  }
+  return { label, type, rest: text.slice(m[0].length) };
 }
 
 // 把一段文字按成员人名拆成带 type 的片段（人名优先于团红）
@@ -98,8 +114,10 @@ function parseChantContent(text) {
   const rawLines = String(text == null ? '' : text).split(/\r?\n/);
   const lines = [];
   rawLines.forEach(raw => {
-    const lineText = String(raw || '').trim();
-    if (!lineText) return;
+    const rawLine = String(raw || '').trim();
+    if (!rawLine) return;
+    const singer = chantExtractSingerHeader(rawLine);
+    const lineText = singer ? singer.rest.trim() : rawLine;
     const segments = [];
     const re = /\[([^\]]+)\]|【([^】]+)】/g;
     let last = 0;
@@ -117,7 +135,7 @@ function parseChantContent(text) {
       const tail = lineText.slice(last);
       if (tail) segments.push(...chantExpandSegment(tail, false));
     }
-    if (!segments.length) segments.push({ text: lineText, chant: false, type: 'normal' });
+    if (!segments.length && lineText) segments.push({ text: lineText, chant: false, type: 'normal' });
     let plainText = '';
     let opened = false;
     segments.forEach(seg => {
@@ -129,7 +147,9 @@ function parseChantContent(text) {
     lines.push({
       segments,
       chant: segments.some(s => s.chant),
-      text: plainText
+      text: plainText,
+      singer: singer ? singer.label : '',
+      singerType: singer ? singer.type : ''
     });
   });
   return lines;
@@ -143,6 +163,8 @@ function chantLinePlain(line) {
 }
 
 function normalizeChantLine(line) {
+  const singer = line && line.singer ? String(line.singer) : '';
+  const singerType = line && line.singerType ? String(line.singerType) : '';
   if (line && Array.isArray(line.segments)) {
     const segments = [];
     line.segments.forEach(seg => {
@@ -155,12 +177,12 @@ function normalizeChantLine(line) {
       else segments.push(...chantExpandSegment(txt, chant));
     });
     if (!segments.length) segments.push({ text: '', chant: false, type: 'normal' });
-    return { segments, chant: segments.some(s => s.chant), text: chantLinePlain({ segments }) };
+    return { segments, chant: segments.some(s => s.chant), text: chantLinePlain({ segments }), singer, singerType };
   }
   const plain = chantLinePlain(line);
   const forced = !!(line && line.chant);
   const segments = plain ? chantExpandSegment(plain, forced) : [{ text: '', chant: forced, type: forced ? 'chant' : 'normal' }];
-  return { segments, chant: forced, text: plain };
+  return { segments, chant: forced, text: plain, singer, singerType };
 }
 
 function normalizeChantRecord(row) {
@@ -605,12 +627,27 @@ function chantSegmentsHtml(segments) {
   return html;
 }
 
+function chantSingerClass(type) {
+  const raw = String(type || '');
+  if (!raw || raw === 'group') return 'is-group';
+  return `is-${raw.replace('member_', '')}`;
+}
+
+function chantSingerTagHtml(line) {
+  if (!line || !line.singer) return '';
+  return `<p class="chant-singer"><span class="chant-singer-tag ${chantSingerClass(line.singerType)}">${travelEsc(line.singer)}</span></p>`;
+}
+
 function chantLineHtml(line) {
   const segs = Array.isArray(line.segments) ? line.segments : [{ text: chantLinePlain(line), chant: !!line.chant, type: line.chant ? 'chant' : 'normal' }];
   const inner = chantSegmentsHtml(segs);
-  return line.chant
-    ? `<p class="chant-line is-chant"><span class="chant-line-mark">应援</span>${inner}</p>`
-    : `<p class="chant-line">${inner}</p>`;
+  const singer = chantSingerTagHtml(line);
+  const hasBody = segs.some(seg => String(seg && seg.text || '').trim());
+  if (!hasBody) return singer;
+  const body = `<span class="chant-line-body">${inner}</span>`;
+  return singer + (line.chant
+    ? `<p class="chant-line is-chant"><span class="chant-line-mark">应援</span>${body}</p>`
+    : `<p class="chant-line">${body}</p>`);
 }
 
 function chantLinesHtml(song) {
@@ -1419,7 +1456,10 @@ async function deleteChantSong(songId) {
 function chantPlainText(song) {
   if (!song) return '';
   const head = `📣 ${song.title} · ${song.album || song.category} · ${song.category}`;
-  const body = song.lines.map(line => line.text || line.segments.map(s => s.text).join('')).join('\n');
+  const body = song.lines.map(line => {
+    const prefix = line.singer ? `${line.singer}: ` : '';
+    return prefix + (line.text || line.segments.map(s => s.text).join(''));
+  }).join('\n');
   return `${head}\n\n${body}\n\nONERLAND · ONER时光典藏纪念册`;
 }
 
@@ -1512,27 +1552,35 @@ function buildChantLongImage(song) {
 
   const titleFont = '700 44px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
   const metaFont = '400 24px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
-  const bodyFont = '400 28px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
-  const bodyBoldFont = '700 28px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+  const bodyFont = '450 32px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+  const bodyBoldFont = '700 32px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+  const singerFont = '700 22px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
   const legendFont = '500 22px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
   const fontFor = seg => ((seg && (seg.chant || /^member_/.test(String(seg.type || '')))) ? bodyBoldFont : bodyFont);
+  const singerColor = type => {
+    const key = String(type || '').replace('member_', '');
+    return CHANT_COLOR_TOKENS[key] || CHANT_COLOR_TOKENS.groupGradient[1];
+  };
 
   measure.font = bodyFont;
   const blocks = song.lines.map(line => ({
     chant: !!line.chant,
-    wrapped: chantWrapSegments(measure, Array.isArray(line.segments) ? line.segments : [{ text: chantLinePlain(line), chant: !!line.chant, type: line.chant ? 'chant' : 'normal' }], innerW - 28, fontFor)
+    singer: String(line.singer || ''),
+    singerType: String(line.singerType || ''),
+    wrapped: chantWrapSegments(measure, Array.isArray(line.segments) ? line.segments : [{ text: chantLinePlain(line), chant: !!line.chant, type: line.chant ? 'chant' : 'normal' }], innerW - 10, fontFor)
   }));
 
   const headTop = 92;
   const metaY = headTop + 66;
   const legendY = metaY + 54;
   const bodyStart = legendY + 56;
-  const bodyLineH = 48;
+  const bodyLineH = 54;
+  const singerH = 34;
   let cursor = bodyStart;
   blocks.forEach(b => {
-    cursor += b.chant ? 16 : 0;
+    if (b.singer) cursor += 16 + singerH + 10;
     cursor += b.wrapped.length * bodyLineH;
-    cursor += 16;
+    cursor += b.chant ? 24 : 18;
   });
   const footY = cursor + 24;
   const H = Math.round(footY + 78);
@@ -1577,42 +1625,60 @@ function buildChantLongImage(song) {
   ctx.fillText('高亮部分为粉丝应援词', padX + 108, legendY + 4);
 
   ctx.font = bodyFont;
-  let y = bodyStart + bodyLineH - 12;
+  let y = bodyStart;
   blocks.forEach(b => {
-    if (b.chant) {
-      const blockH = b.wrapped.length * bodyLineH + 8;
-      ctx.fillStyle = 'rgba(221, 5, 20, 0.06)';
-      chantRoundRect(ctx, padX - 14, y - bodyLineH + 4, innerW + 28, blockH, 12);
+    if (b.singer) {
+      y += 16;
+      const color = singerColor(b.singerType);
+      ctx.font = singerFont;
+      const tagW = Math.min(innerW, ctx.measureText(b.singer).width + 28);
+      ctx.globalAlpha = 0.13;
+      ctx.fillStyle = color;
+      chantRoundRect(ctx, padX, y, tagW, singerH, singerH / 2);
       ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.fillText(b.singer, padX + 14, y + 23);
+      y += singerH + 10;
     }
     b.wrapped.forEach(runs => {
       let x = padX;
+      let lineW = 0;
+      runs.forEach(run => {
+        const member = /^member_(yueyue|muziyang|lingchao)$/.test(String(run.type || ''));
+        ctx.font = (run.chant || member) ? bodyBoldFont : bodyFont;
+        lineW += ctx.measureText(run.text).width;
+      });
+      const baseline = y + Math.round(bodyLineH * 0.72);
+      if (b.chant && lineW > 0) {
+        ctx.fillStyle = 'rgba(221, 5, 20, 0.08)';
+        chantRoundRect(ctx, padX - 5, y + 3, Math.min(innerW + 10, lineW + 10), bodyLineH - 6, 8);
+        ctx.fill();
+      }
       runs.forEach(run => {
         const member = /^member_(yueyue|muziyang|lingchao)$/.test(String(run.type || ''));
         ctx.font = (run.chant || member) ? bodyBoldFont : bodyFont;
         const runW = ctx.measureText(run.text).width;
-        if (run.chant && run.text) {
-          ctx.fillStyle = 'rgba(221, 5, 20, 0.08)';
-          chantRoundRect(ctx, x - 3, y - bodyLineH + 10, runW + 6, bodyLineH - 8, 6);
-          ctx.fill();
-        }
         if (member) {
           const key = String(run.type).replace('member_', '');
-          ctx.fillStyle = CHANT_COLOR_TOKENS[key] || '#374151';
+          ctx.fillStyle = CHANT_COLOR_TOKENS[key] || '#1e293b';
         } else if (run.chant) {
           const g = ctx.createLinearGradient(x, 0, x + Math.max(runW, 1), 0);
           g.addColorStop(0, CHANT_COLOR_TOKENS.groupGradient[0]);
           g.addColorStop(1, CHANT_COLOR_TOKENS.groupGradient[1]);
           ctx.fillStyle = g;
         } else {
-          ctx.fillStyle = '#374151';
+          ctx.fillStyle = '#1e293b';
         }
-        ctx.fillText(run.text, x, y);
+        ctx.fillText(run.text, x, baseline);
         x += runW;
       });
       y += bodyLineH;
     });
-    y += b.chant ? 28 : 16;
+    y += b.chant ? 24 : 18;
   });
 
   ctx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
@@ -1747,7 +1813,15 @@ function chantPrintLineHtml(line) {
     }
   });
   if (opened) inner += '</span>';
-  return line.chant ? `<p class="chant-print-line is-chant">${inner}</p>` : `<p class="chant-print-line">${inner}</p>`;
+  const singer = line.singer
+    ? `<p class="chant-print-singer"><span class="chant-singer-tag ${chantSingerClass(line.singerType)}">${travelEsc(line.singer)}</span></p>`
+    : '';
+  const hasBody = segs.some(seg => String(seg && seg.text || '').trim());
+  if (!hasBody) return singer;
+  const body = `<span class="chant-print-body">${inner}</span>`;
+  return singer + (line.chant
+    ? `<p class="chant-print-line is-chant"><span class="chant-print-mark">应援</span>${body}</p>`
+    : `<p class="chant-print-line">${body}</p>`);
 }
 
 function buildChantPrintRoot(song) {
