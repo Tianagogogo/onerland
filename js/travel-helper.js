@@ -86,6 +86,122 @@ function setTravelOrigin(city) {
 // ---------- 四大类一级入口 + 二级平台链接（只保留经验证的官方稳定入口） ----------
 // 原则：不拼接易失效的深层参数路径，优先官方首页/移动端首页，让用户在 App 内自行检索；
 // 行程关键词用「📋 一键复制」提供，粘贴即用。
+
+// ===== 🏨 场馆地铁沿线高性价比住宿区 =====
+const VENUE_METRO_AREAS = [
+  { match: ['凯迪拉克', '五棵松'], station: '五棵松站（1 号线）', areas: ['五棵松地铁站周边', '万寿路—公主坟商圈', '玉泉路地铁站周边'] },
+  { match: ['北京展览馆', '北展'], station: '动物园站（4 号线）', areas: ['动物园地铁站周边', '西直门地铁站周边', '车公庄—阜成门商圈'] },
+  { match: ['国家体育馆', '鸟巢', '水立方'], station: '奥林匹克公园站（8 号线）', areas: ['奥林匹克公园地铁站周边', '北土城地铁站周边', '亚运村商圈'] },
+  { match: ['梅赛德斯', '世博'], station: '中华艺术宫站（8 号线）', areas: ['中华艺术宫地铁站周边', '耀华路地铁站周边', '世博大道商圈'] },
+  { match: ['东方体育中心'], station: '东方体育中心站（6/8/11 号线）', areas: ['东方体育中心地铁站周边', '三林地铁站周边', '前滩商圈'] },
+  { match: ['奥体中心', '西安奥体'], station: '奥体中心站（14 号线）', areas: ['奥体中心地铁站周边', '双寨地铁站周边', '浐灞商圈'] },
+  { match: ['凤凰山'], station: '杜家碾站（地铁 5 号线）', areas: ['杜家碾地铁站周边', '韦家碾地铁站周边', '金牛万达商圈'] },
+  { match: ['杭州奥体', '大莲花'], station: '奥体中心站（6/7 号线）', areas: ['奥体中心地铁站周边', '博览中心地铁站周边', '钱江世纪城商圈'] },
+  { match: ['深圳湾体育', '春茧'], station: '后海站（2/11 号线）', areas: ['后海地铁站周边', '科苑地铁站周边', '海岸城商圈'] },
+  { match: ['广州体育馆', '天河体育'], station: '体育西路站（1/3 号线）', areas: ['体育西路地铁站周边', '林和西地铁站周边', '天河城商圈'] },
+  { match: ['武汉体育中心'], station: '体育中心站（3 号线）', areas: ['体育中心地铁站周边', '沌阳大道地铁站周边', '经开万达商圈'] },
+  { match: ['南京奥体'], station: '奥体中心站（2/10 号线）', areas: ['奥体中心地铁站周边', '元通地铁站周边', '河西万达商圈'] },
+  { match: ['合肥', '少荃湖'], station: '少荃湖站（4 号线）', areas: ['少荃湖地铁站周边', '新海公园地铁站周边', '职教城商圈'] }
+];
+
+function getVenueMetroAreas(show) {
+  const venue = String((show && (show.venue || show.city)) || '').trim();
+  const city = String((show && show.city) || venue || '').replace(/[省市]$/g, '');
+  const hit = VENUE_METRO_AREAS.find(item => item.match.some(k => venue.includes(k)));
+  if (hit) {
+    return { station: hit.station, areas: hit.areas.map(a => ({ label: a, keyword: `${city} ${a}` })) };
+  }
+  const kw = venue.replace(/[（(].*?[)）]/g, '').slice(0, 12) || city;
+  return {
+    station: `${kw} 附近地铁站`,
+    areas: [
+      { label: `${kw} 地铁站周边`, keyword: `${city} ${kw} 地铁站 酒店` },
+      { label: `${city} 市中心地铁沿线`, keyword: `${city} 市中心 地铁 酒店` },
+      { label: `${city} 高铁站商圈`, keyword: `${city} 高铁站 酒店` }
+    ]
+  };
+}
+
+function hotelSearchLinks(city, keyword) {
+  const enc = encodeURIComponent;
+  return [
+    { platform: '携程', url: `https://hotels.ctrip.com/hotels/list?cityName=${enc(city)}&keyword=${enc(keyword)}&order=price` },
+    { platform: '美团', url: `https://i.meituan.com/hotel/?cityName=${enc(city)}&keyword=${enc(keyword)}&sort=price_asc` }
+  ];
+}
+
+// ===== 🍜 演出地美食 & 同款打卡 =====
+const FOOD_SPOTS_KEY = 'onerland_food_spots_v1';
+
+function readFoodSpots() {
+  try {
+    const raw = localStorage.getItem(FOOD_SPOTS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+function saveFoodSpots(list) {
+  try { localStorage.setItem(FOOD_SPOTS_KEY, JSON.stringify(list.slice(0, 200))); } catch (e) {}
+}
+
+function getFoodSpotsForCity(city) {
+  const key = String(city || '').trim();
+  return readFoodSpots().filter(s => String(s.city || '').trim() === key);
+}
+
+function addFoodSpot() {
+  const cityEl = document.getElementById('food-spot-city');
+  const nameEl = document.getElementById('food-spot-name');
+  const noteEl = document.getElementById('food-spot-note');
+  const city = (cityEl ? cityEl.value : '').trim();
+  const name = (nameEl ? nameEl.value : '').trim();
+  const note = (noteEl ? noteEl.value : '').trim();
+  if (!city || !name) return toastError('请填写城市和打卡地点名称');
+  const list = readFoodSpots();
+  list.unshift({ id: Date.now(), city, name, note, createdAt: new Date().toLocaleDateString() });
+  saveFoodSpots(list);
+  if (typeof showToast === 'function') showToast('✅ 已添加同款打卡点');
+  renderTravelHelper();
+}
+
+function removeFoodSpot(id) {
+  saveFoodSpots(readFoodSpots().filter(s => String(s.id) !== String(id)));
+  renderTravelHelper();
+}
+
+function buildFoodExtraHtml(city, venue) {
+  const c = String(city || '').replace(/[省市]$/g, '');
+  const spots = getFoodSpotsForCity(c);
+  const isAdmin = typeof AppState !== 'undefined' && AppState.isAdminPasswordVerified;
+  return `
+    <div class="food-spot-box">
+      <div class="text-[11px] font-semibold text-slate-700 mb-1.5">🍜 ${travelEsc(c)} 必吃榜 & 同款打卡</div>
+      <div class="flex flex-wrap gap-1.5 mb-2">
+        <a class="travel-hot-chip" href="https://www.dianping.com/search/keyword/0/0_${encodeURIComponent(c + ' 必吃榜')}" target="_blank" rel="noopener noreferrer">大众点评 · 必吃榜 ↗</a>
+        <a class="travel-hot-chip" href="https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(c + ' 必吃')}" target="_blank" rel="noopener noreferrer">小红书 · 城市美食 ↗</a>
+        <a class="travel-hot-chip" href="https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent('ONER ' + c + ' 同款打卡')}" target="_blank" rel="noopener noreferrer">成员同款打卡 ↗</a>
+      </div>
+      ${spots.length ? `<div class="space-y-1">${spots.map(sp => `
+        <div class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[11px] flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <div class="font-semibold text-slate-800">📍 ${travelEsc(sp.name)}</div>
+            ${sp.note ? `<div class="text-slate-500 mt-0.5">${travelEsc(sp.note)}</div>` : ''}
+          </div>
+          ${isAdmin ? `<button type="button" class="text-[10px] text-rose-600 shrink-0" onclick="removeFoodSpot('${travelEsc(sp.id)}')">删除</button>` : ''}
+        </div>`).join('')}</div>`
+        : `<div class="text-[11px] text-slate-400">还没有管理员录入的同款打卡点。</div>`}
+      ${isAdmin ? `
+        <div class="food-admin-form mt-2">
+          <input id="food-spot-city" type="text" value="${travelEsc(c)}" placeholder="城市" maxlength="10" />
+          <input id="food-spot-name" type="text" placeholder="餐厅 / 地标名称" maxlength="24" />
+          <input id="food-spot-note" type="text" placeholder="备注（成员同款菜 / 打卡点，可留空）" maxlength="40" />
+          <button type="button" class="travel-hot-chip" onclick="addFoodSpot()">➕ 添加打卡点</button>
+        </div>` : ''}
+    </div>
+  `;
+}
+
 function buildTravelGroups() {
   const show = travelHelperState.show || {};
   const dest = travelCityMeta(show.city);
@@ -149,15 +265,45 @@ function buildTravelGroups() {
         hint: `${venue} 周边${show.date ? ` · ${String(show.date).slice(0, 10)} 入住` : ''}`,
         links: [
           { label: '携程酒店', desc: '移动端酒店首页', url: 'https://m.ctrip.com/webapp/hotel/' },
-          { label: '去哪儿酒店', desc: '酒店比价', url: 'https://hotel.qunar.com/' }
-        ]
+          { label: '去哪儿酒店', desc: '酒店比价', url: 'https://hotel.qunar.com/' },
+          ...(() => {
+            const metro = getVenueMetroAreas(show);
+            return metro.areas.slice(0, 3).map(area => {
+              const links = hotelSearchLinks(dest.city, area.keyword);
+              return {
+                label: `🚇 ${area.label}`,
+                desc: `${metro.station} · 低价优先`,
+                url: links[0].url,
+                extraLinks: links.slice(1).map(x => ({ platform: `${area.label.replace('周边', '')} · ${x.platform}`, url: x.url }))
+              };
+            });
+          })()
+        ],
+        extraHtml: `<div class="text-[10px] text-slate-500 px-1">🚇 场馆地铁沿线住宿区：点开即按低价优先筛选，可在携程 / 美团之间对比同站价格。</div>`
+      },
+      {
+        id: 'food',
+        icon: '🍜',
+        title: '美食与同款打卡',
+        hint: `${dest.city} · 必吃榜 / 成员同款`,
+        links: [
+          { label: '大众点评 · 城市必吃榜', desc: `${dest.city} 本地特色美食排行`, url: `https://www.dianping.com/search/keyword/0/0_${enc(`${dest.city} 必吃榜`)}` },
+          { label: '小红书 · 城市美食', desc: `${dest.city} 探店与排队攻略`, url: `https://www.xiaohongshu.com/search_result?keyword=${enc(`${dest.city} 必吃`)}` },
+          { label: '小红书 · 成员同款打卡', desc: `ONER 去过的店 / 地标`, url: `https://www.xiaohongshu.com/search_result?keyword=${enc(`ONER ${dest.city} 同款打卡`)}` }
+        ],
+        extraHtml: buildFoodExtraHtml(dest.city, venue)
       }
     ]
   };
 }
 
 function travelLinkButtons(list) {
-  return list.map(item => `
+  const flat = [];
+  (list || []).forEach(item => {
+    flat.push(item);
+    (item.extraLinks || []).forEach(x => flat.push({ label: x.platform, desc: '同关键词 · 低价优先', url: x.url }));
+  });
+  return flat.map(item => `
     <a class="travel-link" href="${travelEsc(item.url)}" target="_blank" rel="noopener noreferrer">
       <span class="travel-link-label">${travelEsc(item.label)} <span class="travel-link-arrow">↗</span></span>
       <span class="travel-link-desc">${travelEsc(item.desc)}</span>
@@ -284,6 +430,8 @@ function renderTravelHelper() {
         <div class="travel-group-panel ${open ? '' : 'hidden'}">
           <button type="button" class="travel-copy-btn" data-copy-key="${travelEsc(group.id)}">📋 一键复制行程关键词</button>
           <div class="travel-link-grid">${travelLinkButtons(group.links)}</div>
+          ${group.extraHtml || ''}
+          ${(group.links || []).some(l => l.extraLinks && l.extraLinks.length) ? `<div class="text-[10px] text-slate-400 px-1">同一住宿区也可切到：${[...new Set([].concat(...(group.links || []).map(l => (l.extraLinks || []).map(x => x.platform))))].join(' / ') || '—'} 比价</div>` : ''}
         </div>
       </section>
     `;

@@ -3380,3 +3380,90 @@ body.phd-open { overflow: hidden; }
   .seat-table .seat-fast-badge { margin-left: 2px; padding: 0 3px; font-size: 8px; }
   .seat-form { grid-template-columns: 1fr; }
 }
+
+/* ================= 足迹：中国省份点亮地图 ================= */
+#footprint-china-map-card path:hover { filter: brightness(0.97); }
+.fp-province-chip {
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid #d5dde6;
+  background: #fff;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.fp-province-chip.is-active {
+  background: #1e293b;
+  border-color: #1e293b;
+  color: #fff;
+}
+
+/* ================= 出行比价：美食与同款打卡 ================= */
+.food-spot-box {
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid #dbe3ec;
+  background: linear-gradient(135deg, #fbfdff 0%, #f1f5f9 100%);
+}
+.food-admin-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.food-admin-form input {
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 12px;
+  background: #fff;
+  color: #1e293b;
+}
+.food-admin-form input:nth-child(3) { grid-column: 1 / -1; }
+@media (max-width: 768px) {
+  .food-admin-form { grid-template-columns: 1fr; }
+  .food-admin-form input:nth-child(3) { grid-column: auto; }
+}
+
+/* ================= 添加到手机桌面的轻量提示条 ================= */
+.install-hint-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 44rem;
+  margin: 0 auto 4px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 55%, #e2e8f0 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 2px 8px rgba(100, 116, 139, 0.14);
+  font-size: 11px;
+  line-height: 1.45;
+  color: #334155;
+}
+.install-hint-text { flex: 1 1 auto; min-width: 0; }
+.install-hint-steps { color: #64748b; }
+.install-hint-close {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (max-width: 768px) {
+  .install-hint-bar {
+    margin: 0 8px 6px;
+    border-radius: 14px;
+    font-size: 10.5px;
+  }
+}

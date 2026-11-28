@@ -126,6 +126,87 @@ window.updateFanPref = updateFanPref;
 window.toggleBiasMember = toggleBiasMember;
 window.renderFootprintPage = renderFootprintPage;
 
+
+// 🗺️ 中国省级行政区点亮地图（矢量轮廓 · 主推应援色高亮）
+function getFootprintProvinceStats(list) {
+  const stats = {};
+  (list || []).forEach(f => {
+    const province = typeof getProvinceOfCity === 'function' ? getProvinceOfCity(f.city) : '';
+    if (!province) return;
+    if (!stats[province]) stats[province] = { province, cities: new Set(), shows: [] };
+    if (f.city) stats[province].cities.add(String(f.city));
+    stats[province].shows.push(f);
+  });
+  return stats;
+}
+
+function renderChinaProvinceMap(list) {
+  const map = window.CHINA_PROVINCE_MAP;
+  if (!map || !map.provinces) return '';
+  const stats = getFootprintProvinceStats(list);
+  const litProvinces = Object.keys(stats);
+  const citySet = new Set();
+  (list || []).forEach(f => { if (f.city) citySet.add(String(f.city)); });
+  const themeC1 = (getComputedStyle(document.documentElement).getPropertyValue('--footprint-theme-solid').trim()) || '#C8102E';
+
+  const paths = Object.entries(map.provinces).map(([geoName, geo]) => {
+    const short = Object.keys(PROVINCE_GEO_KEY).find(k => PROVINCE_GEO_KEY[k] === geoName) || geoName;
+    const st = stats[short];
+    const lit = Boolean(st);
+    return `<path d="${geo.d}" data-province="${short}"
+      fill="${lit ? 'url(#fp-province-lit)' : '#eef2f7'}"
+      stroke="${lit ? themeC1 : '#cfd8e3'}" stroke-width="${lit ? 1.1 : 0.6}"
+      style="cursor:${lit ? 'pointer' : 'default'};transition:fill .2s ease"
+      ${lit ? `onclick="showProvinceFootprints('${short}')"` : ''}><title>${short}${lit ? ` · 已点亮 ${st.cities.size} 座城市 / ${st.shows.length} 场` : ''}</title></path>`;
+  }).join('');
+
+  const active = window.__fpActiveProvince || '';
+  const activeShows = active && stats[active] ? stats[active].shows : [];
+
+  return `
+    <div class="p-4 sm:p-5 rounded-2xl metal-card space-y-3" id="footprint-china-map-card">
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <h3 class="text-sm font-bold text-slate-900">🗺️ 中国足迹点亮地图</h3>
+        <span class="text-[11px] font-semibold" style="color:${themeC1}">已点亮全国 ${litProvinces.length} 个省份 · ${citySet.size} 座城市</span>
+      </div>
+      <div class="w-full rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100 p-2 flex justify-center">
+        <svg viewBox="0 0 ${map.width} ${map.height}" class="w-full max-w-xl h-auto" role="img" aria-label="中国省份足迹点亮地图">
+          <defs>
+            <linearGradient id="fp-province-lit" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="${themeC1}" stop-opacity="0.92" />
+              <stop offset="100%" stop-color="${themeC1}" stop-opacity="0.55" />
+            </linearGradient>
+          </defs>
+          ${paths}
+        </svg>
+      </div>
+      <div class="flex items-center gap-1.5 flex-wrap">
+        ${litProvinces.length
+          ? litProvinces.map(p => `<button type="button" class="fp-province-chip ${active === p ? 'is-active' : ''}" onclick="showProvinceFootprints('${p}')">${p} · ${stats[p].shows.length} 场</button>`).join('')
+          : `<span class="text-[11px] text-slate-400">还没有点亮任何省份，去「档案」点卡片上的「+ 足迹」记录第一场吧～</span>`}
+      </div>
+      ${active && activeShows.length ? `
+        <div class="space-y-1.5 pt-1 border-t border-slate-200/70">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-semibold text-slate-700">📍 ${active} · 去过的演出（${activeShows.length}）</span>
+            <button type="button" class="text-[10px] text-slate-400 underline" onclick="showProvinceFootprints('')">收起</button>
+          </div>
+          ${activeShows.map(f => `
+            <div class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[11px] flex items-center justify-between gap-2">
+              <span class="truncate font-semibold text-slate-800">${escapeTicketHtml(f.title || '未命名场次')}</span>
+              <span class="text-slate-400 shrink-0">${escapeTicketHtml(String(f.date || '').slice(0, 10))} · ${escapeTicketHtml(f.city || '')}</span>
+            </div>
+          `).join('')}
+        </div>` : ''}
+    </div>
+  `;
+}
+
+function showProvinceFootprints(province) {
+  window.__fpActiveProvince = String(province || '');
+  renderFootprintMapAndList();
+}
+
 // 2. 观演足迹记录与 SVG 连线轨迹图
 function recordFootprintFromShow(title, date, venue, artist = 'ONER') {
   // 新增足迹前先做一次首页对象 ⇄ 足迹粉籍的一致性检测（本会话已选「保持各自独立」则跳过）
@@ -246,6 +327,7 @@ function renderFootprintMapAndList() {
   const isGradient = themeC1 !== themeC2;
 
   box.innerHTML = `
+    ${renderChinaProvinceMap(list)}
     <div class="p-4 sm:p-5 rounded-2xl metal-card space-y-3">
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-bold text-slate-900">🗺️ 个人奔赴连线足迹（已点亮 ${list.length} 场）</h3>

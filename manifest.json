@@ -1,0 +1,18 @@
+{
+  "name": "ONERLAND · 时光典藏与观演实用工具站",
+  "short_name": "ONERLAND",
+  "description": "ONER 演出档案、观演足迹、纪念票根与出行实用工具，数据仅保存在本机。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "fullscreen", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#f1f5f9",
+  "theme_color": "#cbd5e1",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "./assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./assets/icons/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
+  ]
+}

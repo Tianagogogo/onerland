@@ -2555,23 +2555,45 @@ function findFootprintIndex({ showKey, title, date, venue } = {}) {
   return -1;
 }
 
+// 从单条足迹的标题 / 场馆 / 显式 city 中识别城市（依次尝试，识别不到返回空）
+function detectFootprintCity(payload = {}) {
+  const explicit = String(payload.city || '').trim();
+  if (explicit) {
+    const norm = typeof normalizeCityName === 'function' ? normalizeCityName(explicit) : explicit.replace(/[省市县区]$/g, '');
+    if (norm) return norm;
+  }
+  const text = `${payload.title || ''} ${payload.venue || ''}`;
+  if (!text.trim()) return '';
+  const stops = [...text.matchAll(/([\u4e00-\u9fa5]{2,6})站/g)];
+  for (let i = stops.length - 1; i >= 0; i--) {
+    const c = stops[i][1].replace(/[省市县区]$/g, '');
+    if (!c || /收官|加场|返场|首站|最终|巡演|演出|音乐节|演唱会|开票|预售/.test(c)) continue;
+    return c;
+  }
+  const list = (typeof KNOWN_CITY_NAMES !== 'undefined' && Array.isArray(KNOWN_CITY_NAMES) && KNOWN_CITY_NAMES.length)
+    ? KNOWN_CITY_NAMES
+    : Object.keys(typeof CITY_TO_PROVINCE !== 'undefined' ? CITY_TO_PROVINCE : {});
+  const hit = list.slice().sort((a, b) => b.length - a.length).find(c => text.includes(c));
+  return hit || (typeof extractCityFromVenue === 'function' ? extractCityFromVenue(payload.venue || '') : '') || '';
+}
+
 // 同场次重复保存只覆盖更新，绝不产生重复足迹条目
 function upsertFootprintEntry(payload = {}) {
   const list = Array.isArray(AppState.footprints) ? [...AppState.footprints] : [];
   const idx = findFootprintIndex(payload);
-  const cityMatch = `${payload.title || ''} ${payload.venue || ''} ${payload.city || ''}`
-    .match(/(北京|上海|广州|深圳|杭州|南京|合肥|西安|成都|重庆|武汉|长沙|苏州|天津|郑州|青岛|厦门|沈阳)/);
   const base = idx >= 0 ? list[idx] : {
     id: Date.now(),
     createdAt: new Date().toLocaleDateString()
   };
+  // 城市只从「本条足迹自身」的字段推断，绝不拿旧条目或固定城市兜底（修复多城市全变北京）
+  const city = detectFootprintCity(payload) || (idx >= 0 ? String(base.city || '') : '') || '未知城市';
   const next = {
     ...base,
     showKey: payload.showKey || base.showKey || '',
     title: payload.title || base.title || '未命名场次',
     date: (payload.date || base.date || new Date().toISOString().slice(0, 10)).slice(0, 10),
     venue: payload.venue || base.venue || '',
-    city: payload.city || base.city || (cityMatch ? cityMatch[1] : '北京'),
+    city,
     artist: payload.artist || base.artist || 'ONER',
     updatedAt: new Date().toLocaleString('zh-CN')
   };
