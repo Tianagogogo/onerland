@@ -614,9 +614,62 @@ function openLightbox(src, caption = '') {
   img.style.transform = 'none';
   img.src = src;
   if (cap) cap.textContent = caption;
+  if (!lightboxKeepGallery) lightboxGallery = { list: [], idx: 0, base: '' };
+  updateLightboxGalleryNav();
   box.classList.remove('hidden');
   bindLightboxGestures();
 }
+
+// ================= 灯箱多图画廊（音乐节时间表多张切换） =================
+let lightboxGallery = { list: [], idx: 0, base: '' };
+let lightboxKeepGallery = false;
+
+function updateLightboxGalleryNav() {
+  const nav = document.getElementById('lightbox-gallery-nav');
+  if (!nav) return;
+  const multi = lightboxGallery.list.length > 1;
+  nav.classList.toggle('hidden', !multi);
+  const counter = document.getElementById('lightbox-gallery-counter');
+  if (counter) counter.textContent = `${lightboxGallery.idx + 1} / ${lightboxGallery.list.length}`;
+  const cap = document.getElementById('lightbox-caption');
+  if (cap && lightboxGallery.list.length) {
+    cap.textContent = `${lightboxGallery.base}${multi ? ` #${lightboxGallery.idx + 1}` : ''}`;
+  }
+}
+
+function stepLightboxGallery(step) {
+  const total = lightboxGallery.list.length;
+  if (total <= 1) return;
+  lightboxGallery.idx = (lightboxGallery.idx + step + total) % total;
+  const img = document.getElementById('lightbox-img');
+  if (img) {
+    img.classList.remove('is-original');
+    img.style.transform = 'none';
+    img.src = lightboxGallery.list[lightboxGallery.idx];
+  }
+  lightboxState.scale = 1;
+  lightboxState.x = 0;
+  lightboxState.y = 0;
+  applyLightboxTransform();
+  updateLightboxGalleryNav();
+}
+
+function openLightboxGallery(list, startIdx = 0, captionBase = '') {
+  const imgs = (Array.isArray(list) ? list : []).filter(Boolean);
+  if (!imgs.length) return;
+  lightboxGallery = {
+    list: imgs,
+    idx: Math.min(Math.max(startIdx, 0), imgs.length - 1),
+    base: captionBase
+  };
+  lightboxKeepGallery = true;
+  openLightbox(imgs[lightboxGallery.idx], captionBase);
+  lightboxKeepGallery = false;
+  updateLightboxGalleryNav();
+}
+
+window.openLightboxGallery = openLightboxGallery;
+window.stepLightboxGallery = stepLightboxGallery;
 
 window.openLightbox = openLightbox;
 window.resetLightboxZoom = resetLightboxZoom;

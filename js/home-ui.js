@@ -447,6 +447,10 @@ function buildHomeTimelineList() {
     date: String(item.show_date || '').slice(0, 10),
     posterUrl: item.posterUrl || item.poster_url || item.poster || item.cover || item.cover_url || item.image || '',
     slot: item.slot || item.timeSlot || item.time_slot || item.schedule_time || item.stage_time || item.performance_time || '',
+    scheduleImgs: Array.isArray(item.scheduleImgs) ? item.scheduleImgs
+      : (Array.isArray(item.timetables) ? item.timetables
+      : (Array.isArray(item.timetable_urls) ? item.timetable_urls
+      : (Array.isArray(item.schedule_images) ? item.schedule_images : []))),
     cloudId: item.cloudId
   }));
 
@@ -462,6 +466,10 @@ function buildHomeTimelineList() {
     date: String(item.showDate || '').slice(0, 10),
     posterUrl: item.posterUrl || item.poster_url || item.poster || item.cover || item.cover_url || item.image || '',
     slot: item.slot || item.timeSlot || item.time_slot || item.schedule_time || item.stage_time || item.performance_time || '',
+    scheduleImgs: Array.isArray(item.scheduleImgs) ? item.scheduleImgs
+      : (Array.isArray(item.timetables) ? item.timetables
+      : (Array.isArray(item.timetable_urls) ? item.timetable_urls
+      : (Array.isArray(item.schedule_images) ? item.schedule_images : []))),
     cloudId: item.cloudId,
     isArchive: true
   }));
@@ -535,7 +543,10 @@ function renderUpcomingMiniTimeline() {
               <div class="timeline-meta-line timeline-meta-date">📅 ${item.date} ${weekday}</div>
               <div class="timeline-meta-line timeline-meta-venue" title="${String(item.venue || '场馆待定').replace(/["<>]/g, '')}">📍 ${item.venue || '场馆待定'}</div>
             </div>
-            ${item.slot ? `<div class="timeline-slot-row"><span class="timeline-slot-badge">⏰ ${String(item.slot).replace(/[<>"']/g, '')}</span></div>` : ''}
+            ${(item.slot || (item.scheduleImgs && item.scheduleImgs.length)) ? `<div class="timeline-slot-row">
+              ${item.slot ? `<span class="timeline-slot-badge">⏰ ${String(item.slot).replace(/[<>"']/g, '')}</span>` : ''}
+              ${(item.scheduleImgs && item.scheduleImgs.length) ? `<button type="button" data-sched="${idx}" class="timeline-table-btn" title="查看音乐节时间表大图">🗓️ 时间表${item.scheduleImgs.length > 1 ? ` ×${item.scheduleImgs.length}` : ''}</button>` : ''}
+            </div>` : ''}
           </div>
         </div>
         <div class="timeline-card-actions flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-end flex-wrap pt-1.5 sm:pt-0 border-t border-slate-200/70 sm:border-0">
@@ -548,4 +559,23 @@ function renderUpcomingMiniTimeline() {
       </div>
     `;
   }).join('');
+
+  // 首页卡片直接开时间表大图：复用站内灯箱（支持多图上一张/下一张、缩放）
+  const schedPool = list.map(item => ({
+    imgs: Array.isArray(item.scheduleImgs) ? item.scheduleImgs : [],
+    title: String(item.city || item.title || '音乐节').replace(/['"<>]/g, '')
+  }));
+  box.querySelectorAll('[data-sched]').forEach(btn => {
+    btn.addEventListener('click', ev => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      const entry = schedPool[Number(btn.dataset.sched)];
+      if (!entry || !entry.imgs.length) return;
+      if (typeof openLightboxGallery === 'function') {
+        openLightboxGallery(entry.imgs, 0, `${entry.title} · 音乐节时间表`);
+      } else if (typeof openLightbox === 'function') {
+        openLightbox(entry.imgs[0], `${entry.title} · 音乐节时间表`);
+      }
+    });
+  });
 }

@@ -1012,7 +1012,7 @@ select::-moz-focus-inner { border: 0; }
 }
 .timeline-meta-date { color: #475569; font-weight: 600; letter-spacing: 0.01em; }
 .timeline-meta-venue { color: #64748b; }
-.timeline-slot-row { display: flex; margin-top: 5px; }
+.timeline-slot-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 5px; }
 .timeline-slot-badge {
   display: inline-flex;
   align-items: center;
@@ -1090,4 +1090,42 @@ select::-moz-focus-inner { border: 0; }
 @media (max-width: 640px) {
   .show-card .show-card-meta { white-space: normal; line-height: 1.6; }
   .show-card .show-card-meta span { white-space: normal; word-break: break-word; }
+}
+
+/* ================= 首页时间轴：🗓️ 时间表 银白金属微胶囊按钮 ================= */
+.timeline-table-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #ffffff 0%, #f4f7fa 45%, #e6ecf3 100%);
+  border: 1px solid #cbd5e1;
+  color: #1e293b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 1px 4px rgba(100, 116, 139, 0.16);
+  transition: transform 0.16s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+.timeline-table-btn:hover {
+  background: linear-gradient(135deg, #ffffff 0%, #eef3f9 50%, #dde5ef 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1), 0 2px 8px rgba(100, 116, 139, 0.24);
+  transform: translateY(-1px);
+}
+.timeline-table-btn:active { transform: translateY(0); }
+
+/* 灯箱多图导航：去掉 hidden 时以行内 flex 呈现 */
+#lightbox-gallery-nav:not(.hidden) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 640px) {
+  .timeline-table-btn { font-size: 10px; padding: 2px 6px; }
+  .timeline-slot-row { gap: 5px; }
 }
