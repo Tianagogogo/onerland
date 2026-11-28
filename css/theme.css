@@ -5825,3 +5825,134 @@ body.feature-modal-open { overflow: hidden; }
   .chant-singer-tag { font-size: 12px; padding: 3px 8px; }
   .chant-line.is-chant { padding: 4px 8px; }
 }
+
+/* ================= 💿 应援词典：专辑 Tag 筛选 / 选择 / 徽标 ================= */
+.chant-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.chant-album-filter-group {
+  padding-top: 6px;
+  border-top: 1px dashed rgba(203, 213, 225, 0.85);
+}
+.chant-song-meta,
+.chant-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.chant-album-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(221, 5, 20, 0.18);
+  background: rgba(221, 5, 20, 0.06);
+  color: #8D0D0E;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+.chant-album-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+.chant-album-chip,
+.chant-album-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 29px;
+  max-width: 100%;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 650;
+  line-height: 1.3;
+  cursor: pointer;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.chant-album-chip {
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  color: #475569;
+}
+.chant-album-chip:hover { border-color: #94a3b8; color: #0f172a; }
+.chant-album-chip.is-active {
+  border-color: rgba(221, 5, 20, 0.48);
+  background: linear-gradient(180deg, rgba(221, 5, 20, 0.11), rgba(141, 13, 14, 0.06));
+  color: #8D0D0E;
+  box-shadow: 0 2px 7px rgba(141, 13, 14, 0.12);
+}
+.chant-album-add {
+  border: 1px dashed #cbd5e1;
+  background: transparent;
+  color: #64748b;
+}
+.chant-album-add:hover { border-color: #94a3b8; color: #334155; }
+.chant-album-create.hidden { display: none; }
+.chant-album-create {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  width: 100%;
+}
+.chant-album-create-input {
+  flex: 1 1 180px;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #1e293b;
+  font-size: 12px;
+  outline: none;
+}
+.chant-album-create-input:focus { border-color: rgba(221, 5, 20, 0.55); box-shadow: 0 0 0 3px rgba(221, 5, 20, 0.08); }
+.chant-album-create-confirm,
+.chant-album-create-cancel {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.chant-album-create-confirm {
+  border: 1px solid rgba(221, 5, 20, 0.35);
+  background: linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%);
+  color: #ffffff;
+}
+.chant-album-create-cancel {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #64748b;
+}
+.chant-import-album {
+  margin: 8px 0 10px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(221, 5, 20, 0.14);
+  background: linear-gradient(120deg, rgba(255, 247, 247, 0.9), rgba(248, 250, 252, 0.95));
+}
+.chant-import-album-label {
+  margin-bottom: 6px;
+  font-size: 11px;
+}

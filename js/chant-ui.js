@@ -8,6 +8,8 @@
 
 const CHANT_TABLE = 'fan_chants';
 const CHANT_LOCAL_KEY = 'onerland_fan_chants_v1';
+const CHANT_ALBUM_TAG_KEY = 'onerland_chant_album_tags_v1';
+const CHANT_ALBUM_TAG_PRESETS = ['过敏', '舞会', '恶浪', '镜象马戏团', 'ONER', '单曲 / 舞台'];
 const CHANT_RATING_KEY = 'onerland_chant_ratings';
 const CHANT_RATING_TABLE = 'fan_chant_ratings';
 const CHANT_CATEGORIES = ['ONER团歌', '岳岳', '木子洋', '灵超'];
@@ -92,6 +94,7 @@ let chantRatingStatsPromise = null;
 
 const chantState = {
   filter: 'all',
+  albumFilter: 'all',
   activeId: '',
   editorId: null,
   loading: false,
@@ -206,6 +209,62 @@ function normalizeChantRecord(row) {
 
 function chantNewId() {
   return `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// ===== 专辑 Tag：预设 + 管理员新建 + 曲库已有专辑动态合并 =====
+function readChantAlbumTagStore() {
+  try {
+    const raw = localStorage.getItem(CHANT_ALBUM_TAG_KEY);
+    const data = raw ? JSON.parse(raw) : [];
+    return Array.isArray(data) ? data.map(t => String(t || '').trim()).filter(Boolean) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function writeChantAlbumTagStore(tags) {
+  try {
+    localStorage.setItem(CHANT_ALBUM_TAG_KEY, JSON.stringify(Array.from(new Set(tags))));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function getAvailableAlbumTags() {
+  const out = [];
+  const seen = new Set();
+  const add = value => {
+    const tag = String(value || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    if (!tag || seen.has(tag)) return;
+    seen.add(tag);
+    out.push(tag);
+  };
+  CHANT_ALBUM_TAG_PRESETS.forEach(add);
+  readChantAlbumTagStore().forEach(add);
+  try {
+    getChantSongs().forEach(song => add(song.album));
+  } catch (e) { /* 曲库尚未加载时仅展示预设 */ }
+  return out;
+}
+
+function saveChantAlbumTag(tag) {
+  const value = String(tag || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  if (!value) return '';
+  const tags = readChantAlbumTagStore();
+  if (!tags.includes(value)) tags.push(value);
+  writeChantAlbumTagStore(tags);
+  return value;
+}
+
+function getChantAlbumFilterTags(songs) {
+  const out = [];
+  const seen = new Set();
+  (Array.isArray(songs) ? songs : []).forEach(song => {
+    const tag = String(song && song.album || '').trim();
+    if (tag && !seen.has(tag)) { seen.add(tag); out.push(tag); }
+  });
+  return out;
 }
 
 // ===== 本机降级存储：created / overrides / deleted =====
@@ -468,10 +527,39 @@ function renderChantFilterBar() {
     { key: 'mid', label: '3星 适中', count: songs.filter(s => chantEffectiveRating(s) === 3).length },
     { key: 'hard', label: '4-5星 高难', count: songs.filter(s => chantEffectiveRating(s) >= 4).length }
   ];
+  const albumTags = getChantAlbumFilterTags(songs);
+  const albumOptions = [{ key: 'all', label: '全部专辑', count: songs.length }].concat(
+    albumTags.map(tag => ({ key: tag, label: `💿 ${tag}`, count: songs.filter(s => String(s.album || '') === tag).length }))
+  );
   box.innerHTML = `
-    <span class="chant-filter-label">我的难度</span>
-    ${options.map(opt => `<button type="button" class="chant-filter-chip ${chantState.filter === opt.key ? 'is-active' : ''}" data-chant-filter="${opt.key}" onclick="setChantFilter('${opt.key}')">${travelEsc(opt.label)}<span class="chant-filter-count">${opt.count}</span></button>`).join('')}
+    <div class="chant-filter-group">
+      <span class="chant-filter-label">我的难度</span>
+      ${options.map(opt => `<button type="button" class="chant-filter-chip ${chantState.filter === opt.key ? 'is-active' : ''}" data-chant-filter="${opt.key}" onclick="setChantFilter('${opt.key}')">${travelEsc(opt.label)}<span class="chant-filter-count">${opt.count}</span></button>`).join('')}
+    </div>
+    <div class="chant-filter-group chant-album-filter-group">
+      <span class="chant-filter-label">专辑</span>
+      ${albumOptions.map(opt => `<button type="button" class="chant-filter-chip ${chantState.albumFilter === opt.key ? 'is-active' : ''}" data-chant-album="${travelEsc(opt.key)}" onclick="setChantAlbumFilter(this.dataset.chantAlbum)">${travelEsc(opt.label)}<span class="chant-filter-count">${opt.count}</span></button>`).join('')}
+    </div>
   `;
+}
+
+function chantAlbumBadgeHtml(album) {
+  const tag = String(album || '').trim();
+  return tag ? `<span class="chant-album-badge">💿 ${travelEsc(tag)}</span>` : '';
+}
+
+function chantAlbumMetaHtml(song) {
+  const album = String(song && song.album || '').trim();
+  const category = String(song && song.category || '').trim();
+  if (!album) return category ? `<span>${travelEsc(category)}</span>` : '';
+  return chantAlbumBadgeHtml(album)
+    + (category && category !== album ? `<span class="chant-meta-sep">·</span><span>${travelEsc(category)}</span>` : '');
+}
+
+function chantAlbumMetaText(song) {
+  const album = String(song && song.album || '').trim();
+  const category = String(song && song.category || '').trim();
+  return album ? `💿 ${album}${category && category !== album ? ` · ${category}` : ''}` : category;
 }
 
 function chantSongCardHtml(song) {
@@ -489,7 +577,7 @@ function chantSongCardHtml(song) {
       <button type="button" class="chant-song-open" onclick="openChantSong('${idAttr}')">
         <span class="chant-song-main">
           <span class="chant-song-title">${travelEsc(song.title)}</span>
-          <span class="chant-song-meta">${travelEsc(song.album || song.category)} · ${travelEsc(song.category)}</span>
+          <span class="chant-song-meta">${chantAlbumMetaHtml(song)}</span>
           <span class="chant-song-sub">🎯 ${chantCount} 处跟喊点${song.video ? ' · 🎬 官方应援视频' : ''}</span>
         </span>
       </button>
@@ -544,6 +632,7 @@ function renderChantPage() {
 
   const songs = getChantSongs();
   const filtered = songs.filter(song => {
+    if (chantState.albumFilter !== 'all' && String(song.album || '') !== chantState.albumFilter) return false;
     if (chantState.filter === 'all') return true;
     const rating = chantEffectiveRating(song);
     if (chantState.filter === 'easy') return rating >= 1 && rating <= 2;
@@ -566,6 +655,11 @@ function renderChantPage() {
 
 function setChantFilter(key) {
   chantState.filter = String(key || 'all');
+  renderChantPage();
+}
+
+function setChantAlbumFilter(key) {
+  chantState.albumFilter = String(key || 'all');
   renderChantPage();
 }
 
@@ -677,7 +771,7 @@ function renderChantDetail(song) {
         <button type="button" class="chant-mini-btn is-danger" onclick="deleteChantSong('${safeId}')">🗑️ 删除</button>
       </div>` : ''}
       <h3 class="chant-detail-title">${travelEsc(song.title)}</h3>
-      <p class="chant-detail-meta">${travelEsc(song.album || song.category)} · ${travelEsc(song.category)}</p>
+      <p class="chant-detail-meta">${chantAlbumMetaHtml(song)}</p>
       ${video ? `<a class="chant-video-link" href="${travelEsc(video)}" target="_blank" rel="noopener noreferrer">🎬 官方应援视频 ↗</a>` : ''}
       <div class="chant-level-row chant-star-row" id="chant-level-row">${chantStarChipsHtml(song)}</div>
       <p class="chant-level-hint" id="chant-rating-hint">${travelEsc(chantRatingHintHtml(song))}</p>
@@ -1135,6 +1229,10 @@ function chantImportPreviewHtml() {
         <div class="chant-import-preview-title">📚 逐页拆分确认</div>
         <div class="chant-import-preview-sub">共识别出 <b>${chantImportDrafts.length}</b> 首歌曲，每页对应 1 首 · 已选 <b>${selected}</b> 首</div>
       </div>
+      <div class="chant-import-album">
+        <div class="chant-import-album-label">💿 专辑 Tag（批量统一归类，可新建）</div>
+        ${chantAlbumTagPickerHtml('batch', '')}
+      </div>
       <div class="chant-import-preview-list">
         ${chantImportDrafts.map((draft, idx) => `
           <label class="chant-import-draft ${draft.selected ? 'is-selected' : ''}">
@@ -1194,12 +1292,12 @@ function clearChantImportDrafts() {
   renderChantPage();
 }
 
-async function chantBatchCreateOne(draft, category) {
+async function chantBatchCreateOne(draft, category, album) {
   const id = chantNewId();
   const payload = {
     title: String(draft.title || '').trim().slice(0, 60),
     category,
-    album: '',
+    album: String(album || '').trim().slice(0, 80),
     video_url: '',
     content: String(draft.content || '').trim()
   };
@@ -1230,6 +1328,8 @@ async function submitChantBatchImport() {
   }
   const categoryEl = document.querySelector('input[name="chant-category"]:checked');
   const category = categoryEl ? String(categoryEl.value || '') : '';
+  const albumEl = document.getElementById('chant-batch-album');
+  const album = String(albumEl ? albumEl.value : '').trim();
   if (!CHANT_CATEGORIES.includes(category)) {
     if (typeof toastError === 'function') toastError('请先选择分类归属');
     return;
@@ -1252,7 +1352,7 @@ async function submitChantBatchImport() {
   let localCount = 0;
   try {
     for (const draft of drafts) {
-      const saved = await chantBatchCreateOne(draft, category);
+      const saved = await chantBatchCreateOne(draft, category, album);
       if (saved.remote) remoteCount += 1;
       else localCount += 1;
     }
@@ -1269,6 +1369,80 @@ async function submitChantBatchImport() {
     if (btn) { btn.disabled = false; btn.textContent = label || '✅ 批量导入全部歌曲'; }
     if (typeof toastError === 'function') toastError(`批量导入失败：${e && e.message ? e.message : '请稍后重试'}`);
   }
+}
+
+// ===== 专辑 Tag 选择器（编辑表单 / 多页 PDF 批量预览共用）=====
+function chantAlbumChipHtml(tag, selected, scope) {
+  return `<button type="button" class="chant-album-chip ${selected ? 'is-active' : ''}" data-album-tag="${travelEsc(tag)}" onclick="chantSelectAlbumTag('${scope}', this.dataset.albumTag)">💿 ${travelEsc(tag)}</button>`;
+}
+
+function chantAlbumTagPickerHtml(scope, selected) {
+  const tags = getAvailableAlbumTags();
+  const value = String(selected || '');
+  const hiddenId = scope === 'batch' ? 'chant-batch-album' : 'chant-form-album';
+  return `
+    <div class="chant-album-tags" id="chant-album-tags-${scope}">
+      ${tags.map(tag => chantAlbumChipHtml(tag, tag === value, scope)).join('')}
+      <button type="button" class="chant-album-add" onclick="toggleChantAlbumCreate('${scope}')">+ 新建专辑Tag</button>
+    </div>
+    <div class="chant-album-create hidden" id="chant-album-create-${scope}">
+      <input type="text" class="chant-album-create-input" id="chant-new-album-input-${scope}" maxlength="80"
+        placeholder="输入新专辑 Tag" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmChantAlbumTag('${scope}');}" />
+      <button type="button" class="chant-album-create-confirm" onclick="confirmChantAlbumTag('${scope}')">确认</button>
+      <button type="button" class="chant-album-create-cancel" onclick="toggleChantAlbumCreate('${scope}', false)">取消</button>
+    </div>
+    <input type="hidden" id="${hiddenId}" value="${travelEsc(value)}" />`;
+}
+
+function chantSelectAlbumTag(scope, tag) {
+  const hidden = document.getElementById(scope === 'batch' ? 'chant-batch-album' : 'chant-form-album');
+  if (!hidden) return;
+  const value = String(tag || '').trim();
+  const next = hidden.value === value ? '' : value;
+  hidden.value = next;
+  const wrap = document.getElementById(`chant-album-tags-${scope}`);
+  if (!wrap) return;
+  wrap.querySelectorAll('[data-album-tag]').forEach(chip => {
+    chip.classList.toggle('is-active', chip.dataset.albumTag === next);
+  });
+}
+
+function toggleChantAlbumCreate(scope, force) {
+  const row = document.getElementById(`chant-album-create-${scope}`);
+  if (!row) return;
+  const show = typeof force === 'boolean' ? force : row.classList.contains('hidden');
+  row.classList.toggle('hidden', !show);
+  if (show) {
+    const input = document.getElementById(`chant-new-album-input-${scope}`);
+    if (input) setTimeout(() => input.focus(), 20);
+  }
+}
+
+function confirmChantAlbumTag(scope) {
+  if (!chantIsAdmin()) {
+    if (typeof toastError === 'function') toastError('请先解锁管理员口令后再新建专辑 Tag');
+    return;
+  }
+  const input = document.getElementById(`chant-new-album-input-${scope}`);
+  const tag = String(input ? input.value : '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  if (!tag) {
+    if (typeof toastError === 'function') toastError('请输入专辑 Tag 名称');
+    if (input) input.focus();
+    return;
+  }
+  saveChantAlbumTag(tag);
+  const wrap = document.getElementById(`chant-album-tags-${scope}`);
+  if (wrap) {
+    const exists = Array.from(wrap.querySelectorAll('[data-album-tag]')).some(chip => chip.dataset.albumTag === tag);
+    if (!exists) {
+      const add = wrap.querySelector('.chant-album-add');
+      if (add) add.insertAdjacentHTML('beforebegin', chantAlbumChipHtml(tag, false, scope));
+    }
+  }
+  chantSelectAlbumTag(scope, tag);
+  if (input) input.value = '';
+  toggleChantAlbumCreate(scope, false);
+  if (typeof showToast === 'function') showToast(`已新建并选中专辑 Tag「${tag}」`);
 }
 
 // ===== 新增 / 编辑表单 =====
@@ -1308,9 +1482,8 @@ function renderChantEditor(songId) {
         </div>
       </div>
       <div class="chant-form-row">
-        <label class="chant-form-label" for="chant-form-album">所属专辑 / 备注</label>
-        <input id="chant-form-album" class="chant-form-input" type="text" maxlength="80"
-          placeholder="选填，如：ONER · 收录曲" value="${song ? travelEsc(song.album) : ''}" />
+        <span class="chant-form-label">所属专辑 Tag</span>
+        ${chantAlbumTagPickerHtml('editor', song ? song.album : '')}
       </div>
       <div class="chant-form-row">
         <label class="chant-form-label" for="chant-form-video">官方应援视频链接</label>
@@ -1455,7 +1628,7 @@ async function deleteChantSong(songId) {
 // ===== 复制 / 长图 / PDF =====
 function chantPlainText(song) {
   if (!song) return '';
-  const head = `📣 ${song.title} · ${song.album || song.category} · ${song.category}`;
+  const head = `📣 ${song.title} · ${chantAlbumMetaText(song)}`;
   const body = song.lines.map(line => {
     const prefix = line.singer ? `${line.singer}: ` : '';
     return prefix + (line.text || line.segments.map(s => s.text).join(''));
@@ -1608,7 +1781,7 @@ function buildChantLongImage(song) {
 
   ctx.fillStyle = '#6b7280';
   ctx.font = metaFont;
-  ctx.fillText(`${song.album || song.category} · ${song.category}`, padX, metaY);
+  ctx.fillText(chantAlbumMetaText(song), padX, metaY);
 
   const legendGrad = ctx.createLinearGradient(padX, 0, padX + 92, 0);
   legendGrad.addColorStop(0, CHANT_COLOR_TOKENS.groupGradient[0]);
@@ -1832,7 +2005,7 @@ function buildChantPrintRoot(song) {
     <div class="chant-print-head">
       <div class="chant-print-brand">ONERLAND · 应援词典</div>
       <h1 class="chant-print-title">${travelEsc(song.title)}</h1>
-      <p class="chant-print-meta">${travelEsc(song.album || song.category)} · ${travelEsc(song.category)}</p>
+      <p class="chant-print-meta">${travelEsc(chantAlbumMetaText(song))}</p>
     </div>
     <div class="chant-print-legend"><span class="chant-print-swatch"></span> 高亮部分为粉丝应援词</div>
     <div class="chant-print-lines">${song.lines.map(chantPrintLineHtml).join('')}</div>
