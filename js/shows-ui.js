@@ -714,6 +714,11 @@ async function hydrateSecurityVoteBlocks() {
 }
 
 // 简约标签投票面板：一行一个胶囊，带实时人数；选中即高亮描边
+// 仅管理员密码解锁后才渲染清空入口（普通访客完全看不到）
+function isSecurityAdminUnlocked() {
+  return typeof AppState !== 'undefined' && Boolean(AppState.isAdminPasswordVerified || AppState.isAdmin);
+}
+
 function renderSecurityVoteBlock(host, stats) {
   const key = host.dataset.showKey;
   const venue = host.dataset.venue || '';
@@ -730,6 +735,7 @@ function renderSecurityVoteBlock(host, stats) {
     ? window.SECURITY_TAG_META
     : (window.SECURITY_VOTE_TAGS || []).map(t => ({ tag: t, emoji: '•' }));
 
+  const adminUnlocked = isSecurityAdminUnlocked();
   const chips = meta.map(({ tag, emoji }) => {
     const on = myTags.includes(tag);
     const n = counts[tag] || 0;
@@ -739,6 +745,7 @@ function renderSecurityVoteBlock(host, stats) {
         class="security-tag-chip ${on ? 'is-active' : ''}" aria-pressed="${on}">
         <span class="security-tag-label">${on ? '✓ ' : ''}${emoji} ${tag}</span>
         <span class="security-tag-count">${n}</span>
+        ${(adminUnlocked && n > 0) ? `<span class="security-tag-admin-x" role="button" tabindex="0" title="管理员：清零该标签" onclick="clearSecurityVotesAsAdmin('${safeKey}', '${escapeVoteText(tag)}', event)">×</span>` : ''}
       </button>
     `;
   }).join('');
@@ -762,7 +769,10 @@ function renderSecurityVoteBlock(host, stats) {
     <div class="security-vote-panel">
       <div class="security-vote-head">
         <span class="security-vote-title">🛡️ 安检体验 · 一键标签投票</span>
-        <span class="security-vote-total">本场 <strong>${total}</strong> 票</span>
+        <span class="security-vote-actions">
+          <span class="security-vote-total">本场 <strong>${total}</strong> 票</span>
+          ${adminUnlocked ? `<button type="button" class="security-admin-clear" title="仅管理员可见：清空该场次全部安检投票" onclick="clearSecurityVotesAsAdmin('${safeKey}', '', event)">🗑️ 清空本场投票</button>` : ''}
+        </span>
       </div>
       <div class="security-tag-grid">${chips}</div>
       ${venueRef}
@@ -770,6 +780,24 @@ function renderSecurityVoteBlock(host, stats) {
       ${degradedHtml}
     </div>
   `;
+}
+
+// 🗑️ 管理员清空本场 / 单个标签：二次确认 → 调 RPC → 清零本地已选并刷新面板
+async function clearSecurityVotesAsAdmin(showKey, tag, event) {
+  if (event && event.stopPropagation) event.stopPropagation();
+  if (!isSecurityAdminUnlocked()) return toastError('需要先用管理员密码解锁');
+  const label = tag ? `「${tag}」该场次` : '该场次';
+  const tip = tag
+    ? `确定要清零${label}的投票数据吗？此操作不可恢复。`
+    : '确定要清空该场次的全部安检投票数据吗？此操作不可恢复。';
+  if (!window.confirm(tip)) return;
+  const res = await adminClearSecurityVotes(showKey, tag || null);
+  if (!res.ok) {
+    if (!res.cancel) toastError(`清空失败：${res.error}`);
+    return;
+  }
+  await refreshAllSecurityVoteHosts(showKey);
+  showToast(tag ? `已清零「${tag}」的投票` : '已清空本场安检投票');
 }
 
 async function refreshAllSecurityVoteHosts(showKey) {

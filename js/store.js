@@ -1821,6 +1821,41 @@ const SECURITY_TAG_META = [
   { tag: '过检很快', emoji: '⚡' }
 ];
 const securityVoteCache = new Map();
+
+// 管理员口令只保留在当前会话内存中（不落 localStorage），页面刷新后重新输入即可
+let __securityAdminKey = '';
+function setSecurityAdminKey(k) { __securityAdminKey = String(k || ''); }
+function getSecurityAdminKey() { return __securityAdminKey; }
+
+// 🗑️ 管理员清空：tag 为空 → 删整场；传入具体标签 → 只清零该标签
+async function adminClearSecurityVotes(showKey, tag) {
+  const key = String(showKey || '');
+  if (!key) return { ok: false, error: '缺少场次标识' };
+  let adminKey = getSecurityAdminKey();
+  if (!adminKey) {
+    let typed = '';
+    try {
+      typed = window.prompt('请输入管理员密码以确认清空操作：') || '';
+    } catch (e) { typed = ''; }
+    if (!typed) return { ok: false, cancel: true };
+    adminKey = typed;
+  }
+  try {
+    const data = await securityRpc('admin_clear_security_votes', {
+      p_show_id: key,
+      p_admin_key: adminKey,
+      p_tag: tag ? String(tag) : null
+    });
+    setSecurityAdminKey(adminKey);
+    // 本地已选状态与缓存一起清掉，避免清空后仍显示自己投过的标签
+    if (tag) setMySecurityTags(key, getMySecurityTags(key).filter(t => t !== String(tag)));
+    else setMySecurityTags(key, []);
+    securityVoteCache.delete(key);
+    return { ok: true, data };
+  } catch (e) {
+    return { ok: false, error: e && e.message ? e.message : '网络异常' };
+  }
+}
 let securityVenueColumnOk = true;
 
 // ---------- 稳定访客指纹：硬件特征 + Canvas 指纹 + UA 哈希 ----------
