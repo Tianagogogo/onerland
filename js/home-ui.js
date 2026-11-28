@@ -344,14 +344,26 @@ function renderAnniversaryManager() {
           <input type="date" value="2000-${ev.date}" class="px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-xs"
             onchange="managerRetypeAnniversary('${rowKey}', this.value)" />
           ${isBuiltin
-            ? `<button type="button" onclick="managerRestoreAnniversary('${ev.builtinKey}')" class="tour-action-btn tour-action-btn--mini">恢复默认</button>`
-            : `<button type="button" onclick="managerRemoveAnniversary('${ev.customKey}')" class="tour-action-btn tour-action-btn--mini">删除</button>`}
+            ? `<button type="button" onclick="managerRestoreAnniversary('${ev.builtinKey}')" class="tour-action-btn tour-action-btn--mini">恢复默认</button>
+               <button type="button" onclick="managerDeleteBuiltinAnniversary('${ev.builtinKey}')" class="tour-action-btn tour-action-btn--mini anniv-del-btn">删除</button>`
+            : `<button type="button" onclick="managerRemoveAnniversary('${ev.customKey}')" class="tour-action-btn tour-action-btn--mini anniv-del-btn">删除</button>`}
         </div>
       </div>
     `;
   }).join('');
 
+  const deletedBuiltinCount = (typeof getDeletedBuiltinAnniversaryKeys === 'function')
+    ? getDeletedBuiltinAnniversaryKeys().length
+    : 0;
+  const deletedTipHtml = deletedBuiltinCount ? `
+    <div class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200">
+      <span class="text-[11px] text-amber-800">已在本机隐藏 <strong>${deletedBuiltinCount}</strong> 条官方内置纪念日</span>
+      <button type="button" onclick="restoreAllBuiltinAnniversariesUI()" class="tour-action-btn tour-action-btn--mini shrink-0">↺ 恢复全部内置纪念日</button>
+    </div>
+  ` : '';
+
   box.innerHTML = `
+    ${deletedTipHtml}
     <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
       <div class="text-[11px] font-semibold text-slate-700">相识起点（用于计算「第 X 天」）</div>
       <div class="flex items-center gap-1.5 flex-wrap">
@@ -368,7 +380,10 @@ function renderAnniversaryManager() {
     </div>
 
     <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
-      <div class="text-[11px] font-semibold text-slate-700">➕ 新增纪念日（年度循环）</div>
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <div class="text-[11px] font-semibold text-slate-700">➕ 新增纪念日（年度循环）</div>
+        ${deletedBuiltinCount ? `<button type="button" onclick="restoreAllBuiltinAnniversariesUI()" class="text-[10.5px] text-slate-500 hover:text-slate-900 underline underline-offset-2">↺ 恢复全部内置纪念日</button>` : ''}
+      </div>
       <div class="flex items-center gap-1.5 flex-wrap" data-enter-scope>
         <input id="anniv-new-title" type="text" placeholder="纪念日名称（如：初遇 / 双向奔赴）" class="flex-1 min-w-[8rem] px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-xs" />
         <input id="anniv-new-date" type="date" class="px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-xs" />
@@ -405,6 +420,17 @@ function managerRetypeAnniversary(key, value) {
     saveAnniversaryState({ customEvents: events });
   }
   renderAnniversaryManager();
+}
+
+function managerDeleteBuiltinAnniversary(builtinKey) {
+  const res = deleteBuiltinAnniversary(builtinKey);
+  if (!res.ok) return toastError(res.message);
+  showToast('已移除该内置纪念日');
+}
+
+function restoreAllBuiltinAnniversariesUI() {
+  restoreAllBuiltinAnniversaries();
+  showToast('已恢复全部官方内置纪念日');
 }
 
 function managerRestoreAnniversary(builtinKey) {

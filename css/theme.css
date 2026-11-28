@@ -1637,3 +1637,14 @@ body.travel-modal-open { overflow: hidden; }
 @media (max-width: 640px) {
   .security-admin-clear { height: 21px; padding: 0 7px; font-size: 10px; }
 }
+
+/* ================= 纪念日：删除按钮（内置与自定义同款） ================= */
+.anniv-del-btn {
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+.anniv-del-btn:hover {
+  color: #7f1d1d;
+  border-color: #fca5a5;
+  background: linear-gradient(135deg, #fff5f5 0%, #fee2e2 100%);
+}

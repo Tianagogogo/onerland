@@ -380,14 +380,60 @@ window.getFanIdentityAccent = getFanIdentityAccent;
 window.getAnniversaryAccentColor = getAnniversaryAccentColor;
 window.getAnniversaryTargetColor = getAnniversaryTargetColor;
 
+// ================= 官方内置纪念日：本机删除 / 一键恢复 =================
+const DELETED_BUILTIN_ANNIV_KEY = 'onerland_deleted_builtin_anniversaries';
+
+function getDeletedBuiltinAnniversaryKeys() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DELETED_BUILTIN_ANNIV_KEY) || '[]');
+    return Array.isArray(raw) ? raw.map(v => String(v)) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function isBuiltinAnniversaryDeleted(builtinKey) {
+  return getDeletedBuiltinAnniversaryKeys().includes(String(builtinKey));
+}
+
+function refreshAnniversarySurfaces() {
+  if (typeof renderAnniversaryCard === 'function') renderAnniversaryCard();
+  if (typeof renderAnniversaryManager === 'function' &&
+      !document.getElementById('anniversary-manager-modal')?.classList.contains('hidden')) {
+    renderAnniversaryManager();
+  }
+}
+
+// 删除单条官方内置纪念日（仅本机隐藏，不动物理默认数据）
+function deleteBuiltinAnniversary(builtinKey) {
+  const key = String(builtinKey || '');
+  if (!key) return { ok: false, message: '缺少纪念日标识' };
+  const exists = BUILTIN_ANNIVERSARIES.some(item => String(item.key) === key);
+  if (!exists) return { ok: false, message: '该纪念日不是官方内置' };
+  const list = getDeletedBuiltinAnniversaryKeys();
+  if (!list.includes(key)) list.push(key);
+  try { localStorage.setItem(DELETED_BUILTIN_ANNIV_KEY, JSON.stringify(list)); } catch (e) { /* ignore */ }
+  refreshAnniversarySurfaces();
+  return { ok: true };
+}
+
+// 恢复全部官方内置纪念日
+function restoreAllBuiltinAnniversaries() {
+  try { localStorage.removeItem(DELETED_BUILTIN_ANNIV_KEY); } catch (e) { /* ignore */ }
+  refreshAnniversarySurfaces();
+  return { ok: true };
+}
+
 function getMergedAnniversaryList(now = new Date()) {
   const state = AppState.anniversary;
   const overrides = state.builtinOverrides || {};
+  const deletedBuiltins = getDeletedBuiltinAnniversaryKeys();
   const list = [];
 
   BUILTIN_ANNIVERSARIES.forEach(item => {
     const ov = overrides[item.key] || {};
     if (ov.hidden) return;
+    if (deletedBuiltins.includes(String(item.key))) return;
     const date = normalizeMonthDay(ov.date || item.date);
     const countdown = getAnnualCountdown(date, now);
     if (!countdown) return;
@@ -460,6 +506,10 @@ window.addCustomAnniversary = addCustomAnniversary;
 window.removeCustomAnniversary = removeCustomAnniversary;
 window.updateBuiltinAnniversary = updateBuiltinAnniversary;
 window.restoreBuiltinAnniversary = restoreBuiltinAnniversary;
+window.getDeletedBuiltinAnniversaryKeys = getDeletedBuiltinAnniversaryKeys;
+window.isBuiltinAnniversaryDeleted = isBuiltinAnniversaryDeleted;
+window.deleteBuiltinAnniversary = deleteBuiltinAnniversary;
+window.restoreAllBuiltinAnniversaries = restoreAllBuiltinAnniversaries;
 window.BUILTIN_ANNIVERSARIES = BUILTIN_ANNIVERSARIES;
 window.ANNIVERSARY_TARGET_OPTIONS = ANNIVERSARY_TARGET_OPTIONS;
 
