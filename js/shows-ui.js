@@ -1141,7 +1141,7 @@ function renderThemeQuickBar() {
   themeMap.forEach(entry => {
     if (entry.count >= 2) {
       const safe = String(entry.label).replace(/['"<>"]/g, '');
-      seriesBtns.push(`<button type="button" data-theme="${safe}" onclick="openSeriesModal(this.dataset.theme)" class="text-xs px-2.5 py-1 rounded-full liquid-silver-btn font-medium theme-series-btn">🏛️ ${safe}（${entry.count}场专题）↗</button>`);
+      seriesBtns.push(`<button type="button" data-theme="${safe}" onclick="openSeriesModal(this.dataset.theme)" class="text-xs px-2.5 py-1 rounded-full liquid-silver-btn font-medium theme-series-btn">🏛️ ${safe}（${entry.count}场）↗</button>`);
     }
   });
   const festBtn = festCount > 0
