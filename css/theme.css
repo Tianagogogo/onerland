@@ -2144,7 +2144,7 @@ body.travel-modal-open { overflow: hidden; }
   .timeline-card .tl-quick-bar {
     display: flex !important;
     flex-wrap: wrap !important;
-    gap: 6px !important;
+    gap: 5px !important;
     margin-top: 8px !important;
     padding-top: 8px !important;
     border-top: 1px solid rgba(148, 163, 184, 0.2) !important;
@@ -2488,4 +2488,62 @@ body.travel-modal-open { overflow: hidden; }
   border-color: rgba(220, 38, 38, 0.3);
   background: linear-gradient(135deg, #fff 0%, #fef2f2 100%);
   color: #b91c1c;
+}
+
+/* ============================================================
+   📱 手机端微时间轴卡片兜底（≤768px）
+   根因：.tl-quick-bar 的 flex: 0 0 100% 在「column 方向」下被解析成
+   100% 的“高度”，配合卡片 height:100% + justify-between + overflow:hidden，
+   卡片主内容被压缩、快捷栏被撑成整卡高度并裁切 → 下半屏空白且 5 个按钮看不见。
+   这里改为竖向自适应 + 快捷栏按内容高度排布。
+   ============================================================ */
+@media (max-width: 768px) {
+  #home-upcoming-timeline > .timeline-card,
+  .timeline-card {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    justify-content: flex-start !important;
+    align-items: stretch !important;
+  }
+  .timeline-card > .timeline-card-main,
+  .timeline-card > .timeline-card-actions {
+    flex: 0 0 auto !important;
+    min-height: 0 !important;
+  }
+  .timeline-card .timeline-card-body {
+    min-height: 0 !important;
+    flex: 0 1 auto !important;
+  }
+  /* 关键：竖向布局下不能再用 100% 作为 flex-basis */
+  .timeline-card .tl-quick-bar {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    max-height: none !important;
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin-top: 8px !important;
+    padding-top: 8px !important;
+    border-top: 1px solid rgba(148, 163, 184, 0.2) !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+  }
+  .timeline-card .tl-quick-bar .tl-quick-btn {
+    flex: 0 0 auto !important;
+    height: 25px !important;
+    line-height: 1 !important;
+    padding: 0 7px !important;
+    font-size: 10px !important;
+    letter-spacing: -0.01em !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    white-space: nowrap !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
 }
