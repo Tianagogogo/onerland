@@ -1851,6 +1851,35 @@ function aggregateSecurityTags(rows, myTags, venueRows) {
   };
 }
 
+// ---------- Supabase RPC：数据库层按 出口IP + 硬件指纹 去重 ----------
+async function securityRpc(fnName, params) {
+  if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) throw new Error('未配置 Supabase');
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
+    method: 'POST',
+    headers: { ...SB_HEADERS, 'Content-Type': 'application/json' },
+    body: JSON.stringify(params || {})
+  });
+  if (!res.ok) throw new Error(`RPC ${fnName} HTTP ${res.status}`);
+  return res.json().catch(() => null);
+}
+
+function mapSecurityRpcPayload(data, showId) {
+  const payload = data && typeof data === 'object' ? data : {};
+  const countsRaw = payload.counts || payload.tags || {};
+  const venueRaw = payload.venue_counts || {};
+  const counts = {};
+  const venueCounts = {};
+  SECURITY_VOTE_TAGS.forEach(t => {
+    counts[t] = Number(countsRaw[t] || 0);
+    venueCounts[t] = Number(venueRaw[t] || 0);
+  });
+  const total = Number(payload.total || Object.values(counts).reduce((a, b) => a + b, 0));
+  const venueTotal = Number(payload.venue_total || Object.values(venueCounts).reduce((a, b) => a + b, 0));
+  const myTags = Array.isArray(payload.my_tags) ? payload.my_tags.filter(t => SECURITY_VOTE_TAGS.includes(t)) : [];
+  if (myTags.length) setMySecurityTags(showId, myTags);
+  return { counts, venueCounts, total, venueTotal, myTags, degraded: false };
+}
+
 async function fetchSecurityTagStats(showId, venue) {
   const key = String(showId || '');
   const empty = () => ({ counts: SECURITY_VOTE_TAGS.reduce((a, t) => ({ ...a, [t]: 0 }), {}),
@@ -1862,6 +1891,22 @@ async function fetchSecurityTagStats(showId, venue) {
     return { ...cached, myTags: getMySecurityTags(key) };
   }
   if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) return empty();
+  try {
+    // 首选 RPC：数据库内部用 md5(出口IP:硬件指纹) 做 voter_key，微信/Safari/无痕共用同一票
+    const rpcData = await securityRpc('get_security_votes', {
+      p_show_id: key,
+      p_hw_hash: getDeviceSignature(),
+      p_venue: String(venue || '')
+    });
+    if (rpcData && typeof rpcData === 'object') {
+      const stats = mapSecurityRpcPayload(rpcData, key);
+      securityVoteCache.set(key, stats);
+      return stats;
+    }
+    throw new Error('RPC 返回为空');
+  } catch (rpcErr) {
+    // RPC 未部署时回退 REST 直读（旧部署不受影响）
+  }
   try {
     const url = `${SUPABASE_URL}/rest/v1/${SECURITY_VOTE_TABLE}?show_id=eq.${encodeURIComponent(key)}&select=tag,visitor_id`;
     const res = await fetch(url, { headers: SB_HEADERS, cache: 'no-store' });
@@ -1906,37 +1951,53 @@ async function toggleSecurityTag(showId, venue, tag) {
   const mine = getMySecurityTags(key);
   const active = mine.includes(tag);
   const nextTags = active ? mine.filter(t => t !== tag) : [...mine, tag];
-  // 先本地乐观更新，保证多标签页即时一致
+  // 先本地乐观更新：同浏览器多标签页即时一致，页面不等待网络
   setMySecurityTags(key, nextTags);
   securityVoteCache.clear();
   if (typeof SUPABASE_URL === 'undefined' || !SUPABASE_URL) return { ok: false, error: '未配置云端' };
 
-  const visitorId = getVisitorId();
+  const hwHash = getDeviceSignature();
   try {
-    if (active) {
-      const path = `?show_id=eq.${encodeURIComponent(key)}&visitor_id=eq.${encodeURIComponent(visitorId)}&tag=eq.${encodeURIComponent(tag)}`;
-      const res = await securityVoteRequest(path, { method: 'DELETE', headers: { 'Prefer': 'return=minimal' } });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    } else {
-      const payload = { show_id: key, visitor_id: visitorId, tag };
-      if (venue && securityVenueColumnOk) payload.venue = String(venue);
-      const insert = body => securityVoteRequest('', {
-        method: 'POST',
-        headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify([body])
-      });
-      let res = await insert(payload);
-      if (!res.ok && payload.venue) {
-        // 表里没有 venue 列时自动降级，只写最小列
-        securityVenueColumnOk = false;
-        const fallback = { show_id: key, visitor_id: visitorId, tag };
-        res = await insert(fallback);
-      }
-      if (!res.ok && res.status !== 409) throw new Error(`HTTP ${res.status}`);
+    // 数据库内部完成「有则删、无则插」的 toggle，并保证 UNIQUE(show_id, voter_key, tag)
+    const rpcData = await securityRpc('submit_security_vote', {
+      p_show_id: key,
+      p_tag: tag,
+      p_hw_hash: hwHash,
+      p_venue: String(venue || '')
+    });
+    if (rpcData && typeof rpcData === 'object') {
+      const stats = mapSecurityRpcPayload(rpcData, key);
+      securityVoteCache.set(key, stats);
+      return { ok: true, tags: stats.myTags };
     }
     return { ok: true, tags: nextTags };
   } catch (e) {
-    return { ok: false, tags: nextTags, error: String(e && e.message || e) };
+    // RPC 未部署：回退 REST（用 local:visitor_id 充当 voter_key，保持同一唯一键语义）
+    const voterKey = `local:${getVisitorId()}`;
+    try {
+      if (active) {
+        const path = `?show_id=eq.${encodeURIComponent(key)}&tag=eq.${encodeURIComponent(tag)}&voter_key=eq.${encodeURIComponent(voterKey)}`;
+        const res = await securityVoteRequest(path, { method: 'DELETE', headers: { 'Prefer': 'return=minimal' } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } else {
+        const payload = { show_id: key, tag, voter_key: voterKey, visitor_id: getVisitorId(), hw_hash: hwHash };
+        if (venue) payload.venue = String(venue);
+        const insert = body => securityVoteRequest('', {
+          method: 'POST',
+          headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify([body])
+        });
+        let res = await insert(payload);
+        if (!res.ok && payload.venue) {
+          delete payload.venue;
+          res = await insert(payload);
+        }
+        if (!res.ok && res.status !== 409) throw new Error(`HTTP ${res.status}`);
+      }
+      return { ok: true, tags: nextTags };
+    } catch (e2) {
+      return { ok: false, tags: nextTags, error: String(e2 && e2.message || e2) };
+    }
   }
 }
 

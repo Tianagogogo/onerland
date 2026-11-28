@@ -657,21 +657,13 @@ function refreshFootprintAfterSecurity(showKey) {
 }
 
 // ================= 安检体验：云端公共投票（匿名聚合，无自由文本） =================
-const SECURITY_VOTE_SQL_HINT = `-- 在 Supabase SQL Editor 执行一次 sql/security_votes.sql 即可开启云端共享
-create table if not exists public.show_security_votes (
-  id bigserial primary key,
-  show_id text not null,
-  visitor_id text not null,
-  tag text not null,
-  venue text default '',
-  created_at timestamptz default now()
-);
-create unique index if not exists show_security_votes_unique_idx
-  on public.show_security_votes (show_id, visitor_id, tag);
-alter table public.show_security_votes enable row level security;
-create policy "sv read" on public.show_security_votes for select using (true);
-create policy "sv insert" on public.show_security_votes for insert with check (true);
-create policy "sv delete" on public.show_security_votes for delete using (true);`;
+const SECURITY_VOTE_SQL_HINT = `-- 在 Supabase SQL Editor 执行一次 sql/security_votes.sql
+-- 表 public.show_security_votes，UNIQUE (show_id, voter_key, tag)
+-- RPC：submit_security_vote(p_show_id, p_tag, p_hw_hash, p_venue)  —— 有则删、无则插
+--      get_security_votes(p_show_id, p_hw_hash, p_venue)
+-- voter_key = md5(出口IP || ':' || 硬件指纹)，微信/Safari/无痕共用同一票
+grant execute on function public.submit_security_vote(text, text, text, text, text[]) to anon;
+grant execute on function public.get_security_votes(text, text, text) to anon;`;
 
 function escapeVoteText(v) {
   return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
