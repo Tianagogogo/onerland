@@ -615,13 +615,19 @@ function renderUpcomingMiniTimeline() {
             ${(() => { const ps = (typeof posterSrcFor === 'function') ? posterSrcFor(item, item.posterUrl) : item.posterUrl; return ps ? `<img src="${ps}" alt="${safeTitle}" ${(typeof posterAttrsFor === 'function') ? posterAttrsFor(item, item.posterUrl, idx) : posterImgAttrs(ps, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" onclick="event.stopPropagation(); openPosterLightbox(this.dataset.hdSrc || this.src, '${safeTitle}')" class="cursor-zoom-in" />` : ((typeof posterPlaceholderHtml === 'function') ? posterPlaceholderHtml(safeTitle) : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`); })()}
           </div>
           <div class="timeline-card-body min-w-0 flex-1">
-            <div class="timeline-title-row flex items-start gap-1.5 flex-wrap">
+            <div class="timeline-title-row flex items-center gap-2">
               <span class="text-[10px] px-1.5 py-0.5 rounded text-white font-semibold shrink-0" style="background:${badge}">${displayArtist}</span>
-              <span class="timeline-card-title font-bold text-sm text-slate-900 leading-snug break-words">${safeTitle}</span>
-              ${isUpcomingShow
-                ? `<button type="button" class="plan-chip tl-plan-inline ${plannedShow ? 'is-active' : ''}" aria-pressed="${plannedShow ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); handleHomeTimelinePlan(${idx}, this)">${plannedShow ? '✓ 计划前往' : '🎫 计划前往'}</button>`
-                : ''}
+              <div class="timeline-card-actions flex items-center gap-1.5 justify-end">
+                ${item === pinned
+                  ? `<span class="timeline-next-badge tl-state-chip">⚡ 下一场</span>`
+                  : `<span class="tl-state-chip ${isFuture ? 'bg-white border border-slate-300 text-slate-600' : 'bg-slate-100 text-slate-500'}">${isFuture ? '待开演' : '已落幕'}</span>`}
+                ${isUpcomingShow
+                  ? `<button type="button" class="plan-chip tl-plan-action ${plannedShow ? 'is-active' : ''}" aria-pressed="${plannedShow ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); handleHomeTimelinePlan(${idx}, this)">${plannedShow ? '✓ 计划前往' : '🎫 计划前往'}</button>`
+                  : ''}
+                <button type="button" onclick="switchMainTab('shows')" class="tour-action-btn tl-detail-btn">详情</button>
+              </div>
             </div>
+            <div class="timeline-card-title font-bold text-sm text-slate-900 leading-snug break-words">${safeTitle}</div>
             <div class="timeline-card-meta text-xs text-slate-500 mt-1">
               <button type="button" class="timeline-meta-line timeline-meta-date meta-date-ics" title="点击添加到日历提醒"
                 onclick="event.stopPropagation(); handleHomeTimelineDateClick(${idx})">📅 ${item.date} ${weekday}</button>
@@ -631,15 +637,6 @@ function renderUpcomingMiniTimeline() {
               ${item.slot ? `<span class="timeline-slot-badge">⏰ ${String(item.slot).replace(/[<>"']/g, '')}</span>` : ''}
               ${(item.scheduleImgs && item.scheduleImgs.length) ? `<button type="button" data-sched="${idx}" class="timeline-table-btn" title="查看音乐节时间表大图">🗓️ 时间表${item.scheduleImgs.length > 1 ? ` ×${item.scheduleImgs.length}` : ''}</button>` : ''}
             </div>` : ''}
-            <div class="timeline-card-actions flex items-center gap-1.5 justify-end flex-wrap">
-              ${item === pinned
-                ? `<span class="timeline-next-badge tl-state-chip">⚡ 下一场</span>`
-                : `<span class="tl-state-chip ${isFuture ? 'bg-white border border-slate-300 text-slate-600' : 'bg-slate-100 text-slate-500'}">${isFuture ? '待开演' : '已落幕'}</span>`}
-              ${isUpcomingShow
-                ? `<button type="button" class="plan-chip tl-plan-action ${plannedShow ? 'is-active' : ''}" aria-pressed="${plannedShow ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); handleHomeTimelinePlan(${idx}, this)">${plannedShow ? '✓ 计划前往' : '🎫 计划前往'}</button>`
-                : ''}
-              <button type="button" onclick="switchMainTab('shows')" class="tour-action-btn tl-detail-btn">详情</button>
-            </div>
           </div>
         </div>
         <div class="tl-quick-bar" data-tl-bar="${idx}">
