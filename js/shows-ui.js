@@ -1921,24 +1921,24 @@ function renderTourCards() {
           </div>`;
 
     return `
-      <div class="p-4 rounded-2xl metal-card flex flex-col gap-3" data-show-card="${item.cloudId || idx}" style="--fan-theme:${getFanPrefThemeColor()}">
+      <div class="show-card p-4 rounded-2xl metal-card flex flex-col gap-3" data-show-card="${item.cloudId || idx}" style="--fan-theme:${getFanPrefThemeColor()}">
         <div class="flex gap-3.5">
           <div class="w-24 poster-square-box shrink-0">
             ${(item.posterUrl || item.poster_url || item.poster || item.cover || item.image) ? `<img src="${item.posterUrl || item.poster_url || item.poster || item.cover || item.image}" alt="${safeCity}" data-cap="${safeCity} · 演出海报" ${posterImgAttrs(item.posterUrl, idx)} onload="this.classList.add(&#39;is-loaded&#39;)" onerror="handlePosterImageError(this)" onclick="event.stopPropagation(); openLightbox(this.src, this.dataset.cap)" class="cursor-zoom-in" title="点击查看大图" />` : `<div class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">ONER</div>`}
           </div>
           <div class="flex-1 min-w-0 space-y-1.5">
-            <div class="flex items-start justify-between gap-2">
+            <div class="show-card-head flex items-start justify-between gap-2 flex-wrap">
               <div class="flex items-center gap-1.5 flex-wrap min-w-0">
                 <span class="text-[11px] px-2 py-0.5 rounded text-white font-semibold" style="background:${badge}">${item.artist}</span>
-                <h3 class="font-bold text-base text-slate-900 truncate">${safeCity}</h3>
+                <h3 class="show-card-title font-bold text-base text-slate-900 leading-snug break-words">${safeCity}</h3>
                 ${statusBadge}
               </div>
-              <div class="flex items-center gap-1.5 shrink-0">
+              <div class="show-card-actions flex items-center gap-1.5 shrink-0">
                 ${canEditContent() ? `<button type="button" data-edit-show="${String(item.cloudId == null ? '' : item.cloudId).replace(/"/g, '&quot;')}" data-edit-kind="ticket" data-edit-title="${safeCity.replace(/"/g, '&quot;')}" data-edit-date="${String(item.show_date || '').slice(0, 10)}" class="tour-action-btn tour-action-btn--mini">✏️ 编辑</button>` : ''}
                 <button type="button" onclick="recordFootprintFromShow('${safeCity}', '${item.show_date}', '${cleanVenue}', '${item.artist}')" class="tour-action-btn tour-action-btn--mini ${footprintSaved ? 'is-active' : ''}">${footprintSaved ? '✓ 已打卡' : '+ 足迹'}</button>
               </div>
             </div>
-            <p class="text-xs text-slate-500 truncate">📍 ${item.venue} ｜ 🗓️ ${item.show_date}</p>
+            <p class="show-card-meta text-xs text-slate-500"><span>📍 ${item.venue}</span><span class="meta-sep"> ｜ </span><span>🗓️ ${item.show_date}</span></p>
             ${item.prices ? `<p class="text-[11px] text-slate-600">💰 ${item.prices}</p>` : ''}
             ${safeBooth ? `<p class="text-[11px] text-slate-500 truncate" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</p>` : ''}
             <div class="flex items-center gap-1.5 flex-wrap">
@@ -2255,7 +2255,7 @@ function renderArchiveTimeline() {
     const venueStats = computeVenueExperienceStats(item.venue);
 
     return `
-      <div class="p-4 rounded-2xl metal-card space-y-3">
+      <div class="show-card archive-strip p-4 rounded-2xl metal-card space-y-3">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div class="flex items-center gap-3.5 min-w-0 w-full">
             <div class="w-16 poster-square-box shrink-0">
@@ -2264,7 +2264,7 @@ function renderArchiveTimeline() {
             <div class="min-w-0 space-y-1">
               <div class="flex items-center gap-1.5 flex-wrap">
                 <span class="text-[10px] px-2 py-0.5 rounded text-white font-semibold" style="background:${badge}">${item.artist}</span>
-                <span class="font-bold text-sm text-slate-900 truncate">${safeTitle}</span>
+                <span class="archive-strip-title font-bold text-sm text-slate-900 leading-snug">${safeTitle}</span>
                 ${safeBooth ? `<span class="text-[10px] px-2 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-700 font-medium" title="${safeBooth}">🛍️ 官方小卖部：${safeBooth}</span>` : ''}
                 ${buildSlotHoverBadgeHTML(item.slot, item.scheduleImgs, slotPopoverId, safeTitle)}
               </div>
