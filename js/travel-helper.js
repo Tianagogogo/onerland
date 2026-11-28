@@ -626,16 +626,35 @@ async function deleteApprovedCheckin(spotId) {
   }
 }
 
-function checkinRowsHtml(list, adminSide) {
+function cleanCheckinShopName(item) {
+  const raw = String((item && (item.spot_name || item.shop_name || item.name || item.title)) || '').trim();
+  // 剥离前导 emoji / 图标 / 空白（兼容常见表情、ZWJ、变体选择符与代理对）
+  const leadingEmoji = /^(?:[\s\u00A0\u200D\uFE0F\u20E3\u2190-\u21FF\u2300-\u27BF\u2900-\u297F\u2B00-\u2BFF]|[\uD800-\uDBFF][\uDC00-\uDFFF])+/;
+  return raw.replace(leadingEmoji, '').trim();
+}
+
+function checkinShopSearchKeyword(city, shopName) {
+  const c = String(city || '').trim();
+  const name = String(shopName || '').trim();
+  if (!name) return c;
+  if (!c || name.includes(c)) return name;
+  return `${c} ${name}`;
+}
+
+function checkinRowsHtml(list, adminSide, city) {
   if (!list.length) return '';
   return list.map(sp => {
     const proof = String(sp.proof_data || '');
     const hasProof = checkinProofIsImage(proof) || checkinProofIsLink(proof);
     const members = checkinMembersText(sp.members);
+    const cleanShopName = cleanCheckinShopName(sp);
+    const shopKeyword = checkinShopSearchKeyword(city, cleanShopName);
+    const dianpingUrl = `https://m.dianping.com/shoplist/search?keyword=${encodeURIComponent(shopKeyword)}`;
+    const amapUrl = `https://uri.amap.com/search?keyword=${encodeURIComponent(shopKeyword)}&amp;city=${encodeURIComponent(String(city || '').trim())}&amp;src=onerland&amp;callnative=1`;
     return `
       <div class="checkin-row">
         <div class="checkin-main">
-          <div class="checkin-name">${checkinCategoryIcon(sp.category)} ${travelEsc(sp.spot_name || '未命名打卡点')}</div>
+          <div class="checkin-name">${checkinCategoryIcon(sp.category)} ${travelEsc(cleanShopName || '未命名打卡点')}</div>
           <div class="checkin-tags">
             <span class="checkin-tag is-member">${travelEsc(members)}</span>
             <span class="checkin-tag">${travelEsc(sp.category || '🍜 餐厅美食')}</span>
@@ -643,6 +662,8 @@ function checkinRowsHtml(list, adminSide) {
           ${sp.note ? `<div class="checkin-note">${travelEsc(sp.note)}</div>` : ''}
         </div>
         <div class="checkin-side">
+          ${cleanShopName ? `<a class="checkin-mini-btn checkin-shop-btn" href="${dianpingUrl}" target="_blank" rel="noopener noreferrer">⭐ 大众点评评价 ↗</a>` : ''}
+          ${cleanShopName ? `<a class="checkin-mini-btn checkin-shop-btn" href="${amapUrl}" target="_blank" rel="noopener noreferrer">🗺️ 地图导航 ↗</a>` : ''}
           ${hasProof ? `<button type="button" class="checkin-mini-btn" onclick="openCheckinProof('${travelEsc(sp.id)}')">👀 查看出处</button>` : ''}
           ${adminSide ? `<button type="button" class="checkin-mini-btn is-danger" onclick="${adminSide === 'pending' ? 'adminRejectCheckin' : 'deleteApprovedCheckin'}('${travelEsc(sp.id)}')">🗑️ ${adminSide === 'pending' ? '驳回删除' : '删除'}</button>` : ''}
         </div>
@@ -713,13 +734,13 @@ function renderCheckinSection() {
     </div>
 
     <div class="checkin-list-head">
-      <span>📍 ${travelEsc(city)} · 已通过审核的同款打卡（${spots.length}）</span>
+      <span>📍 ${travelEsc(city)} · 同款打卡 (${spots.length})</span>
     </div>
     ${checkinState.loading
       ? `<div class="checkin-empty">⏳ 正在加载同款打卡点…</div>`
       : spots.length
-        ? `<div class="checkin-list">${checkinRowsHtml(spots, isAdmin ? 'approved' : '')}</div>`
-        : `<div class="checkin-empty">${checkinState.failed ? '暂时无法加载打卡点，稍后再看看～' : '还没有已通过审核的同款打卡点，欢迎下方投稿～'}</div>`}
+        ? `<div class="checkin-list">${checkinRowsHtml(spots, isAdmin ? 'approved' : '', city)}</div>`
+        : `<div class="checkin-empty">${checkinState.failed ? '暂时无法加载打卡点，稍后再看看～' : '还没有同款打卡点，欢迎下方投稿~'}</div>`}
 
     <button type="button" class="checkin-toggle-form" onclick="toggleCheckinForm()">
       ${checkinState.formOpen ? '✕ 收起表单' : (isAdmin ? '➕ 录入同款打卡点（免审直发）' : '➕ 推荐同款打卡点（需审核）')}
