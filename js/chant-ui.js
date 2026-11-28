@@ -21,6 +21,56 @@ const CHANT_STAR_LEVELS = [
   { stars: 5, label: '★★★★★ 5星', desc: '地狱级手速/口速' }
 ];
 
+// ===== 应援色：直接复用 config.js 的 ARTIST_COLORS，网页 / Canvas / PDF 三端共用 =====
+const CHANT_COLOR_TOKENS = (function () {
+  const c = (typeof ARTIST_COLORS !== 'undefined' && ARTIST_COLORS) || {};
+  const groupBg = String((c['ONER'] && c['ONER'].bg) || 'linear-gradient(135deg, #DD0514 0%, #8D0D0E 100%)');
+  const hexes = groupBg.match(/#[0-9a-f]{6}/gi) || [];
+  return {
+    groupGradient: [hexes[0] || '#DD0514', hexes[1] || hexes[0] || '#8D0D0E'],
+    yueyue: (c['岳岳'] && c['岳岳'].hex) || '#9C73EF',
+    muziyang: (c['木子洋'] && c['木子洋'].hex) || '#F90092',
+    lingchao: (c['灵超'] && c['灵超'].hex) || '#32B5E1',
+    members: {
+      member_yueyue: ['岳岳', 'PINKRAY', '岳明辉'],
+      member_muziyang: ['木子洋', 'KWIN', '李振洋'],
+      member_lingchao: ['灵超', 'DIDI', '李英超']
+    }
+  };
+})();
+
+const CHANT_MEMBER_ALIASES = (function () {
+  const list = [];
+  Object.keys(CHANT_COLOR_TOKENS.members).forEach(type => {
+    CHANT_COLOR_TOKENS.members[type].forEach(alias => list.push({ alias, type }));
+  });
+  return list.sort((a, b) => b.alias.length - a.alias.length);
+})();
+
+function chantMemberTypeFor(alias) {
+  const key = String(alias || '').toLowerCase();
+  const hit = CHANT_MEMBER_ALIASES.find(item => item.alias.toLowerCase() === key);
+  return hit ? hit.type : '';
+}
+
+// 把一段文字按成员人名拆成带 type 的片段（人名优先于团红）
+function chantExpandSegment(text, chant) {
+  const src = String(text == null ? '' : text);
+  if (!src) return [];
+  const pattern = CHANT_MEMBER_ALIASES.map(item => item.alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const re = new RegExp(pattern, 'gi');
+  const out = [];
+  let last = 0;
+  let m;
+  while ((m = re.exec(src))) {
+    if (m.index > last) out.push({ text: src.slice(last, m.index), chant: !!chant, type: chant ? 'chant' : 'normal' });
+    out.push({ text: m[0], chant: !!chant, type: chantMemberTypeFor(m[0]) || (chant ? 'chant' : 'normal') });
+    last = m.index + m[0].length;
+  }
+  if (last < src.length) out.push({ text: src.slice(last), chant: !!chant, type: chant ? 'chant' : 'normal' });
+  return out.filter(seg => seg.text);
+}
+
 let chantRatingStats = {};
 let chantRatingStatsPromise = null;
 
@@ -56,21 +106,29 @@ function parseChantContent(text) {
     while ((m = re.exec(lineText))) {
       if (m.index > last) {
         const plain = lineText.slice(last, m.index);
-        if (plain) segments.push({ text: plain, chant: false });
+        if (plain) segments.push(...chantExpandSegment(plain, false));
       }
       const marked = m[1] || m[2] || '';
-      if (marked) segments.push({ text: marked, chant: true });
+      if (marked) segments.push(...chantExpandSegment(marked, true));
       last = m.index + m[0].length;
     }
     if (last < lineText.length) {
       const tail = lineText.slice(last);
-      if (tail) segments.push({ text: tail, chant: false });
+      if (tail) segments.push(...chantExpandSegment(tail, false));
     }
-    if (!segments.length) segments.push({ text: lineText, chant: false });
+    if (!segments.length) segments.push({ text: lineText, chant: false, type: 'normal' });
+    let plainText = '';
+    let opened = false;
+    segments.forEach(seg => {
+      if (seg.chant && !opened) { plainText += '【'; opened = true; }
+      if (!seg.chant && opened) { plainText += '】'; opened = false; }
+      plainText += seg.text;
+    });
+    if (opened) plainText += '】';
     lines.push({
       segments,
       chant: segments.some(s => s.chant),
-      text: segments.map(s => (s.chant ? `【${s.text}】` : s.text)).join('')
+      text: plainText
     });
   });
   return lines;
@@ -85,15 +143,22 @@ function chantLinePlain(line) {
 
 function normalizeChantLine(line) {
   if (line && Array.isArray(line.segments)) {
-    const segments = line.segments
-      .map(s => ({ text: String(s && s.text || ''), chant: !!(s && s.chant) }))
-      .filter(s => s.text);
-    if (!segments.length) segments.push({ text: '', chant: false });
+    const segments = [];
+    line.segments.forEach(seg => {
+      const txt = String(seg && seg.text || '');
+      if (!txt) return;
+      const chant = !!(seg && seg.chant);
+      const type = String(seg && seg.type || '');
+      if (/^member_(yueyue|muziyang|lingchao)$/.test(type)) segments.push({ text: txt, chant, type });
+      else if (type === 'normal' || type === 'chant') segments.push({ text: txt, chant, type });
+      else segments.push(...chantExpandSegment(txt, chant));
+    });
+    if (!segments.length) segments.push({ text: '', chant: false, type: 'normal' });
     return { segments, chant: segments.some(s => s.chant), text: chantLinePlain({ segments }) };
   }
   const plain = chantLinePlain(line);
   const forced = !!(line && line.chant);
-  const segments = forced ? [{ text: plain, chant: true }] : [{ text: plain, chant: false }];
+  const segments = plain ? chantExpandSegment(plain, forced) : [{ text: '', chant: forced, type: forced ? 'chant' : 'normal' }];
   return { segments, chant: forced, text: plain };
 }
 
@@ -517,11 +582,31 @@ function chantCommunityLineHtml(song) {
   return `全站综合难度：★ ${stats.avg.toFixed(1)}（${stats.count}人评价）`;
 }
 
+function chantSegmentHtml(seg) {
+  const type = String(seg && seg.type || '');
+  if (/^member_(yueyue|muziyang|lingchao)$/.test(type)) {
+    const key = type.replace('member_', '');
+    return `<span class="chant-member chant-member-${key}">${travelEsc(seg.text)}</span>`;
+  }
+  return travelEsc(seg.text);
+}
+
+// 团红渐变 mark 内再嵌套成员专属色 span；相邻应援片段合并到同一个 mark，避免断色
+function chantSegmentsHtml(segments) {
+  let html = '';
+  let opened = false;
+  (segments || []).forEach(seg => {
+    if (seg.chant && !opened) { html += '<mark class="chant-hl">'; opened = true; }
+    else if (!seg.chant && opened) { html += '</mark>'; opened = false; }
+    html += chantSegmentHtml(seg);
+  });
+  if (opened) html += '</mark>';
+  return html;
+}
+
 function chantLineHtml(line) {
-  const segs = Array.isArray(line.segments) ? line.segments : [{ text: chantLinePlain(line), chant: !!line.chant }];
-  const inner = segs.map(seg => (seg.chant
-    ? `<mark class="chant-hl">${travelEsc(seg.text)}</mark>`
-    : travelEsc(seg.text))).join('');
+  const segs = Array.isArray(line.segments) ? line.segments : [{ text: chantLinePlain(line), chant: !!line.chant, type: line.chant ? 'chant' : 'normal' }];
+  const inner = chantSegmentsHtml(segs);
   return line.chant
     ? `<p class="chant-line is-chant"><span class="chant-line-mark">应援</span>${inner}</p>`
     : `<p class="chant-line">${inner}</p>`;
@@ -590,6 +675,256 @@ function toggleChantRating(songId, stars) {
   renderChantFilterBar();
 }
 
+// ===== Word (.docx) / PDF 导入：按需懒加载解析库，不阻塞首屏 =====
+let chantDocxLibPromise = null;
+let chantPdfLibPromise = null;
+
+function loadChantScriptOnce(src, globalCheck) {
+  return new Promise((resolve, reject) => {
+    if (typeof globalCheck === 'function' && globalCheck()) return resolve();
+    const found = Array.from(document.scripts).find(s => s.src === src);
+    if (found) {
+      found.addEventListener('load', () => resolve());
+      found.addEventListener('error', () => reject(new Error('解析库加载失败')));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('解析库加载失败，请检查网络'));
+    document.head.appendChild(script);
+  });
+}
+
+function loadChantMammoth() {
+  if (window.mammoth) return Promise.resolve(window.mammoth);
+  if (!chantDocxLibPromise) {
+    chantDocxLibPromise = loadChantScriptOnce(
+      'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js',
+      () => Boolean(window.mammoth)
+    ).then(() => window.mammoth).catch(err => { chantDocxLibPromise = null; throw err; });
+  }
+  return chantDocxLibPromise;
+}
+
+function loadChantPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (!chantPdfLibPromise) {
+    chantPdfLibPromise = loadChantScriptOnce(
+      'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
+      () => Boolean(window.pdfjsLib)
+    ).then(() => {
+      if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+      }
+      return window.pdfjsLib;
+    }).catch(err => { chantPdfLibPromise = null; throw err; });
+  }
+  return chantPdfLibPromise;
+}
+
+// 原生 ZIP 解压兜底：mammoth CDN 不可用时直接读 word/document.xml
+async function chantReadZipEntry(arrayBuffer, targetName) {
+  const view = new DataView(arrayBuffer);
+  const u8 = new Uint8Array(arrayBuffer);
+  let eocd = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 65558); i -= 1) {
+    if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('不是有效的 docx 文件');
+  const count = view.getUint16(eocd + 10, true);
+  let p = view.getUint32(eocd + 16, true);
+  for (let i = 0; i < count; i += 1) {
+    if (view.getUint32(p, true) !== 0x02014b50) break;
+    const method = view.getUint16(p + 10, true);
+    const compSize = view.getUint32(p + 20, true);
+    const nameLen = view.getUint16(p + 28, true);
+    const extraLen = view.getUint16(p + 30, true);
+    const commentLen = view.getUint16(p + 32, true);
+    const localOff = view.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nameLen));
+    if (name === targetName) {
+      const localNameLen = view.getUint16(localOff + 26, true);
+      const localExtraLen = view.getUint16(localOff + 28, true);
+      const start = localOff + 30 + localNameLen + localExtraLen;
+      const data = u8.subarray(start, start + compSize);
+      if (method === 0) return new TextDecoder().decode(data);
+      if (method === 8 && typeof DecompressionStream === 'function') {
+        const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+        return await new Response(stream).text();
+      }
+      throw new Error('暂不支持该 docx 压缩格式');
+    }
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  throw new Error('docx 中未找到正文');
+}
+
+function chantDocxXmlToText(xml) {
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  const paras = Array.from(doc.getElementsByTagName('w:p'));
+  return paras.map(p => {
+    let out = '';
+    Array.from(p.getElementsByTagName('w:r')).forEach(r => {
+      const txt = Array.from(r.getElementsByTagName('w:t')).map(t => t.textContent).join('');
+      if (!txt) return;
+      const rPr = r.getElementsByTagName('w:rPr')[0];
+      let emph = false;
+      if (rPr) {
+        const b = rPr.getElementsByTagName('w:b')[0];
+        if (b && b.getAttribute('w:val') !== '0' && b.getAttribute('w:val') !== 'false') emph = true;
+        const hl = rPr.getElementsByTagName('w:highlight')[0];
+        if (hl && hl.getAttribute('w:val') && hl.getAttribute('w:val') !== 'none') emph = true;
+        const color = rPr.getElementsByTagName('w:color')[0];
+        const val = color ? String(color.getAttribute('w:val') || '').toLowerCase() : '';
+        if (val && val !== 'auto' && val !== '000000' && val !== 'ffffff') emph = true;
+      }
+      out += emph && txt.trim() ? `[${txt}]` : txt;
+    });
+    return out;
+  }).filter(t => t.trim()).join('\n');
+}
+
+function chantDocxHtmlPara(p) {
+  let out = '';
+  Array.from(p.childNodes).forEach(node => {
+    if (node.nodeType === 3) { out += node.nodeValue || ''; return; }
+    if (node.nodeType !== 1) return;
+    const tag = node.tagName.toLowerCase();
+    const style = String(node.getAttribute('style') || '');
+    const emph = tag === 'strong' || tag === 'b' || /color\s*:|background|highlight/i.test(style);
+    const txt = node.textContent || '';
+    if (!txt) return;
+    out += emph && txt.trim() ? `[${txt}]` : txt;
+  });
+  return out.trim();
+}
+
+async function chantParseDocx(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  // 原生解压优先：能精确读到 w:b / w:color / w:highlight，彩色应援句不会丢标记
+  try {
+    const xml = await chantReadZipEntry(arrayBuffer, 'word/document.xml');
+    const nativeText = chantDocxXmlToText(xml);
+    if (nativeText && nativeText.trim()) return nativeText;
+  } catch (e) { /* 继续走 mammoth 兜底 */ }
+  const mammoth = await loadChantMammoth();
+  if (!mammoth) throw new Error('无法解析该 docx 文件');
+  const result = await mammoth.convertToHtml({ arrayBuffer }, {
+    styleMap: ['b => strong', 'strong => strong']
+  });
+  const doc = new DOMParser().parseFromString(result.value || '', 'text/html');
+  return Array.from(doc.querySelectorAll('p, li')).map(chantDocxHtmlPara).filter(Boolean).join('\n');
+}
+
+async function chantParsePdf(file) {
+  const pdfjs = await loadChantPdfJs();
+  if (!pdfjs) throw new Error('PDF 解析库未就绪');
+  const buffer = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
+  const pages = [];
+  const total = Math.min(pdf.numPages, 40);
+  for (let i = 1; i <= total; i += 1) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const rows = [];
+    (content.items || []).forEach(item => {
+      if (!item || !String(item.str || '').trim()) return;
+      const tr = item.transform || [];
+      const x = Number(tr[4] || 0);
+      const y = Number(tr[5] || 0);
+      let row = rows.find(r => Math.abs(r.y - y) <= 3);
+      if (!row) { row = { y, items: [] }; rows.push(row); }
+      row.items.push({ x, str: String(item.str) });
+    });
+    rows.sort((a, b) => b.y - a.y);
+    const pageText = rows.map(row => row.items
+      .sort((a, b) => a.x - b.x)
+      .map(it => it.str)
+      .join(' ')
+      .replace(/([\u4e00-\u9fa5])\s+(?=[\u4e00-\u9fa5])/g, '$1')
+      .replace(/\s+/g, ' ')
+      .trim()
+    ).filter(Boolean).join('\n');
+    if (pageText) pages.push(pageText);
+  }
+  return pages.join('\n');
+}
+
+function chantMemberNameCount(text) {
+  return CHANT_MEMBER_ALIASES.filter(item => new RegExp(item.alias, 'i').test(text)).length;
+}
+
+function chantLooksLikeSlogan(line) {
+  const text = String(line || '').trim();
+  if (!text || /[\[\]【】]/.test(text)) return false;
+  if (text.length > 50) return false;
+  const memberCount = chantMemberNameCount(text);
+  const hasGroup = /ONER/i.test(text);
+  const hasCheer = /(hey|oh|go|come\s*on|加油|应援)/i.test(text);
+  return (hasGroup && memberCount >= 1) || memberCount >= 2 || ((hasGroup || memberCount >= 1) && hasCheer);
+}
+
+// 把识别出的纯文本规范成 [应援内容] 结构
+function chantNormalizeImportedText(text) {
+  return String(text || '')
+    .split(/\r?\n/)
+    .map(raw => {
+      let line = String(raw || '')
+        .replace(/^[\s　]+|[\s　]+$/g, '')
+        .replace(/(?:\(|（)\s*(?:应援|喊|口号)\s*[:：]\s*([^)）]+)(?:\)|）)/gi, '[$1]')
+        .replace(/^(?:应援|喊|口号)\s*[:：]\s*(.+)$/i, '[$1]')
+        .replace(/\s+/g, ' ');
+      if (!line) return '';
+      if (!/[\[\]【】]/.test(line) && chantLooksLikeSlogan(line)) line = `[${line}]`;
+      return line;
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
+function chantApplyImportedText(text) {
+  const normalized = chantNormalizeImportedText(text);
+  const lines = normalized.split('\n').filter(Boolean);
+  if (!lines.length) throw new Error('未提取到可用文字');
+  const titleEl = document.getElementById('chant-form-title');
+  const contentEl = document.getElementById('chant-form-content');
+  let bodyLines = lines.slice();
+  if (titleEl && !titleEl.value.trim() && lines.length > 1) {
+    const first = lines[0];
+    if (first.length <= 30 && !/[\[\]【】]/.test(first) && !chantLooksLikeSlogan(first)) {
+      titleEl.value = first.replace(/^[#＃\d０-９.、\s]+/, '').trim();
+      bodyLines = lines.slice(1);
+    }
+  }
+  if (contentEl) contentEl.value = bodyLines.join('\n');
+  if (typeof showToast === 'function') showToast('已识别并填入正文，可核对微调后保存');
+}
+
+async function handleChantImportFile(input) {
+  const file = input && input.files && input.files[0];
+  if (!file) return;
+  const name = String(file.name || '').toLowerCase();
+  if (!/\.(docx|pdf)$/.test(name)) {
+    if (typeof toastError === 'function') toastError('仅支持 .docx 或 .pdf 文件');
+    input.value = '';
+    return;
+  }
+  const btn = document.getElementById('chant-import-btn');
+  const label = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 正在解析…'; }
+  try {
+    const text = name.endsWith('.pdf') ? await chantParsePdf(file) : await chantParseDocx(file);
+    chantApplyImportedText(text);
+  } catch (e) {
+    if (typeof toastError === 'function') toastError(`解析失败：${e && e.message ? e.message : '请检查文件或网络后重试'}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = label || '📄 导入 Word / PDF 自动识别'; }
+    input.value = '';
+  }
+}
+
 // ===== 新增 / 编辑表单 =====
 function renderChantEditor(songId) {
   const box = document.getElementById('chant-editor-view');
@@ -606,6 +941,11 @@ function renderChantEditor(songId) {
       <div class="chant-detail-head">
         <button type="button" class="chant-back-btn" onclick="closeChantEditor()">← 返回列表</button>
         <span class="chant-detail-tip">${isEdit ? '✏️ 编辑应援词' : '+ 新增应援词'}</span>
+      </div>
+      <div class="chant-import-row">
+        <button type="button" class="chant-import-btn" id="chant-import-btn" onclick="document.getElementById('chant-import-file').click()">📄 导入 Word / PDF 自动识别</button>
+        <input type="file" id="chant-import-file" class="chant-import-file" accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onchange="handleChantImportFile(this)" />
+        <span class="chant-import-tip">自动提取文字与加粗应援句，可再手动微调</span>
       </div>
       <div class="chant-form-row">
         <label class="chant-form-label" for="chant-form-title">歌曲名称 <span class="chant-req">*</span></label>
@@ -633,7 +973,7 @@ function renderChantEditor(songId) {
       </div>
       <div class="chant-form-row">
         <label class="chant-form-label" for="chant-form-content">应援词正文 <span class="chant-req">*</span>
-          <span class="chant-form-tip">用中括号 [ONER! ONER!] 或【岳岳!】括起来的词会自动高亮为应援词</span>
+          <span class="chant-form-tip">用中括号 [ONER! ONER!] 或【岳岳!】括起来的词会套用团红渐变；岳岳 / 木子洋 / 灵超自动点亮成员专属应援色</span>
         </label>
         <textarea id="chant-form-content" class="chant-form-textarea" rows="9" required
           placeholder="示例：黑夜降临 [ONER! ONER!] 冲破迷雾 [岳岳! 木子洋! 灵超!]">${song ? travelEsc(song.content) : ''}</textarea>
@@ -801,7 +1141,7 @@ function fallbackCopyChant(text, done) {
 }
 
 // 按字符折行，保留每段的应援高亮标记
-function chantWrapSegments(ctx, segments, maxWidth) {
+function chantWrapSegments(ctx, segments, maxWidth, fontFor) {
   const lines = [];
   let current = [];
   let currentWidth = 0;
@@ -811,11 +1151,12 @@ function chantWrapSegments(ctx, segments, maxWidth) {
     currentWidth = 0;
   };
   segments.forEach(seg => {
+    if (typeof fontFor === 'function') ctx.font = fontFor(seg);
     const chars = Array.from(String(seg.text || ''));
     let buffer = '';
     const flush = () => {
       if (buffer) {
-        current.push({ text: buffer, chant: !!seg.chant });
+        current.push({ text: buffer, chant: !!seg.chant, type: seg.type || (seg.chant ? 'chant' : 'normal') });
         buffer = '';
       }
     };
@@ -831,7 +1172,7 @@ function chantWrapSegments(ctx, segments, maxWidth) {
     flush();
   });
   pushLine();
-  return lines.length ? lines : [[{ text: '', chant: false }]];
+  return lines.length ? lines : [[{ text: '', chant: false, type: 'normal' }]];
 }
 
 function chantRoundRect(ctx, x, y, w, h, r) {
@@ -860,12 +1201,14 @@ function buildChantLongImage(song) {
   const titleFont = '700 44px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
   const metaFont = '400 24px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
   const bodyFont = '400 28px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+  const bodyBoldFont = '700 28px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
   const legendFont = '500 22px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+  const fontFor = seg => ((seg && (seg.chant || /^member_/.test(String(seg.type || '')))) ? bodyBoldFont : bodyFont);
 
   measure.font = bodyFont;
   const blocks = song.lines.map(line => ({
     chant: !!line.chant,
-    wrapped: chantWrapSegments(measure, Array.isArray(line.segments) ? line.segments : [{ text: chantLinePlain(line), chant: !!line.chant }], innerW - 28)
+    wrapped: chantWrapSegments(measure, Array.isArray(line.segments) ? line.segments : [{ text: chantLinePlain(line), chant: !!line.chant, type: line.chant ? 'chant' : 'normal' }], innerW - 28, fontFor)
   }));
 
   const headTop = 92;
@@ -907,10 +1250,15 @@ function buildChantLongImage(song) {
   ctx.font = metaFont;
   ctx.fillText(`${song.album || song.category} · ${song.category}`, padX, metaY);
 
-  ctx.fillStyle = 'rgba(214, 122, 60, 0.22)';
+  const legendGrad = ctx.createLinearGradient(padX, 0, padX + 92, 0);
+  legendGrad.addColorStop(0, CHANT_COLOR_TOKENS.groupGradient[0]);
+  legendGrad.addColorStop(1, CHANT_COLOR_TOKENS.groupGradient[1]);
+  ctx.globalAlpha = 0.16;
+  ctx.fillStyle = legendGrad;
   chantRoundRect(ctx, padX, legendY - 18, 92, 30, 8);
   ctx.fill();
-  ctx.fillStyle = '#9a3b1f';
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = CHANT_COLOR_TOKENS.groupGradient[1];
   ctx.font = legendFont;
   ctx.fillText('应援词', padX + 14, legendY + 4);
   ctx.fillStyle = '#6b7280';
@@ -921,19 +1269,29 @@ function buildChantLongImage(song) {
   blocks.forEach(b => {
     if (b.chant) {
       const blockH = b.wrapped.length * bodyLineH + 8;
-      ctx.fillStyle = 'rgba(224, 122, 63, 0.14)';
+      ctx.fillStyle = 'rgba(221, 5, 20, 0.06)';
       chantRoundRect(ctx, padX - 14, y - bodyLineH + 4, innerW + 28, blockH, 12);
       ctx.fill();
     }
     b.wrapped.forEach(runs => {
       let x = padX;
       runs.forEach(run => {
+        const member = /^member_(yueyue|muziyang|lingchao)$/.test(String(run.type || ''));
+        ctx.font = (run.chant || member) ? bodyBoldFont : bodyFont;
         const runW = ctx.measureText(run.text).width;
         if (run.chant && run.text) {
-          ctx.fillStyle = 'rgba(224, 122, 63, 0.3)';
+          ctx.fillStyle = 'rgba(221, 5, 20, 0.08)';
           chantRoundRect(ctx, x - 3, y - bodyLineH + 10, runW + 6, bodyLineH - 8, 6);
           ctx.fill();
-          ctx.fillStyle = '#9a3412';
+        }
+        if (member) {
+          const key = String(run.type).replace('member_', '');
+          ctx.fillStyle = CHANT_COLOR_TOKENS[key] || '#374151';
+        } else if (run.chant) {
+          const g = ctx.createLinearGradient(x, 0, x + Math.max(runW, 1), 0);
+          g.addColorStop(0, CHANT_COLOR_TOKENS.groupGradient[0]);
+          g.addColorStop(1, CHANT_COLOR_TOKENS.groupGradient[1]);
+          ctx.fillStyle = g;
         } else {
           ctx.fillStyle = '#374151';
         }
@@ -1063,10 +1421,20 @@ async function shareChantImage() {
 
 // ===== PDF =====
 function chantPrintLineHtml(line) {
-  const segs = Array.isArray(line.segments) ? line.segments : [{ text: chantLinePlain(line), chant: !!line.chant }];
-  const inner = segs.map(seg => (seg.chant
-    ? `<span class="chant-print-hl">${travelEsc(seg.text)}</span>`
-    : travelEsc(seg.text))).join('');
+  const segs = Array.isArray(line.segments) ? line.segments : [{ text: chantLinePlain(line), chant: !!line.chant, type: line.chant ? 'chant' : 'normal' }];
+  let inner = '';
+  let opened = false;
+  segs.forEach(seg => {
+    if (seg.chant && !opened) { inner += '<span class="chant-print-hl">'; opened = true; }
+    else if (!seg.chant && opened) { inner += '</span>'; opened = false; }
+    const type = String(seg.type || '');
+    if (/^member_(yueyue|muziyang|lingchao)$/.test(type)) {
+      inner += `<span class="chant-print-member chant-print-member-${type.replace('member_', '')}">${travelEsc(seg.text)}</span>`;
+    } else {
+      inner += travelEsc(seg.text);
+    }
+  });
+  if (opened) inner += '</span>';
   return line.chant ? `<p class="chant-print-line is-chant">${inner}</p>` : `<p class="chant-print-line">${inner}</p>`;
 }
 
@@ -1208,6 +1576,9 @@ window.deleteChantSong = deleteChantSong;
 window.getChantSongs = getChantSongs;
 window.loadChantSongs = loadChantSongs;
 window.parseChantContent = parseChantContent;
+window.parseChantTokens = parseChantContent;
+window.handleChantImportFile = handleChantImportFile;
+window.CHANT_COLOR_TOKENS = CHANT_COLOR_TOKENS;
 
 loadChantSongs();
 loadChantRatingStats();
