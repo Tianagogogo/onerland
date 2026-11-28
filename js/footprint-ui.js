@@ -402,7 +402,7 @@ function renderTicketCanvasPreview() {
   ctx.save();
   ctx.globalAlpha = 0.04;
   ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 58px sans-serif';
+  ctx.font = 'bold 58px "PingFang SC","Noto Sans SC","Source Han Sans SC",sans-serif';
   ctx.textAlign = 'right';
   ctx.fillText('ONERLAND', cutX - 32, bodyY + bodyH - 68);
   ctx.restore();
@@ -450,10 +450,10 @@ function renderTicketCanvasPreview() {
   const headerY = bodyY + padMainY + 12;
   ctx.textAlign = 'left';
   ctx.fillStyle = P.faintInk;
-  ctx.font = '12.5px sans-serif';
+  ctx.font = '12.5px "PingFang SC","Noto Sans SC","Source Han Sans SC",sans-serif';
   ctx.fillText('ONERLAND · 个人非商业观演纪念票根', mainX, headerY);
   ctx.textAlign = 'right';
-  ctx.font = '11.5px monospace';
+  ctx.font = '11.5px "SFMono-Regular",Menlo,Consolas,monospace';
   ctx.fillText(serial, mainRight, headerY);
   ctx.textAlign = 'left';
 
@@ -477,7 +477,7 @@ function renderTicketCanvasPreview() {
 
   // 演出主标题：30px / 800 / 字距 0.5px
   ctx.fillStyle = P.ink;
-  ctx.font = '800 30px sans-serif';
+  ctx.font = '800 30px "PingFang SC","Noto Sans SC","Source Han Sans SC",sans-serif';
   const titleGap = 0.5;
   const titleText = showName.length > 15 ? `${showName.slice(0, 14)}…` : showName;
   let titleCursor = mainX;
@@ -488,7 +488,7 @@ function renderTicketCanvasPreview() {
 
   // 观演日期与位置：16px / 500 / #334155
   ctx.fillStyle = '#334155';
-  ctx.font = '500 16px sans-serif';
+  ctx.font = '500 16px "PingFang SC","Noto Sans SC","Source Han Sans SC",sans-serif';
   ctx.fillText(`观演日期：${showDate}  |  位置：${seatInfo}`, mainX, sessionBase);
 
   // 极浅虚线分隔（核心信息块 ↔ 纪念寄语块）
@@ -504,22 +504,22 @@ function renderTicketCanvasPreview() {
 
   // 纪念高光：16px 加粗
   ctx.fillStyle = P.ink;
-  ctx.font = '800 16px sans-serif';
+  ctx.font = '800 16px "PingFang SC","Noto Sans SC","Source Han Sans SC",sans-serif';
   ctx.fillText(`✨ 相识第 ${meetDays} 天 · 线下奔赴第 ${faceCount} 面`, mainX, highlightBase);
 
   // 观演寄语：14px / 行高 1.6
   ctx.fillStyle = 'rgba(15,23,42,0.5)';
-  ctx.font = '14px sans-serif';
+  ctx.font = '14px "PingFang SC","Noto Sans SC","Source Han Sans SC",sans-serif';
   ctx.fillText('观演寄语：愿每一次奔赴，都被认真记住。', mainX, noteBase);
 
   // ③ 底部页脚区
   ctx.fillStyle = P.faintInk;
-  ctx.font = '11px sans-serif';
+  ctx.font = '11px "PingFang SC","Noto Sans SC","Source Han Sans SC",sans-serif';
   ctx.fillText('非商业粉丝个人纪念生成 · 仅供个人留念严禁售卖', mainX, footerY);
 
   if (venueText) {
     ctx.textAlign = 'right';
-    ctx.font = '11px sans-serif';
+    ctx.font = '11px "PingFang SC","Noto Sans SC","Source Han Sans SC",sans-serif';
     ctx.fillText(`场馆：${venueText.slice(0, 18)}`, mainRight, footerY);
     ctx.textAlign = 'left';
   }
@@ -530,12 +530,12 @@ function renderTicketCanvasPreview() {
 
   // ① 副券存根
   ctx.fillStyle = P.subInk;
-  ctx.font = 'bold 13.5px sans-serif';
+  ctx.font = 'bold 13.5px "PingFang SC","Noto Sans SC","Source Han Sans SC",sans-serif';
   ctx.fillText('副券存根', stubCenter, bodyY + 48);
 
   // ② 日期简码
   ctx.fillStyle = P.ink;
-  ctx.font = 'bold 22px monospace';
+  ctx.font = 'bold 22px "SFMono-Regular",Menlo,Consolas,monospace';
   ctx.fillText(dateCode.slice(2), stubCenter, bodyY + 128);
 
   // ③ 留念印章
@@ -550,9 +550,9 @@ function renderTicketCanvasPreview() {
   ctx.arc(stubCenter, stampY, 24, 0, Math.PI * 2);
   ctx.stroke();
   ctx.fillStyle = 'rgba(15,23,42,0.55)';
-  ctx.font = 'bold 14px sans-serif';
+  ctx.font = 'bold 14px "PingFang SC","Noto Sans SC","Source Han Sans SC",sans-serif';
   ctx.fillText('留念', stubCenter, stampY + 1);
-  ctx.font = '8.5px sans-serif';
+  ctx.font = '8.5px "PingFang SC","Noto Sans SC","Source Han Sans SC",sans-serif';
   ctx.fillText('MEMORY', stubCenter, stampY + 15);
   ctx.restore();
 
@@ -569,7 +569,7 @@ function renderTicketCanvasPreview() {
     ctx.fillRect(cursor, barTop, w, 26);
     cursor += w + 1 + (seed % 2);
   }
-  ctx.font = '9px monospace';
+  ctx.font = '9px "SFMono-Regular",Menlo,Consolas,monospace';
   ctx.fillStyle = P.faintInk;
   ctx.fillText(dateCode, stubCenter, barTop + 38);
   ctx.textAlign = 'left';

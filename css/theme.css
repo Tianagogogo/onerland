@@ -1,3 +1,13 @@
+/* ===== 全局字体规范：系统无衬线 + 思源黑体（Noto Sans SC，SIL OFL 1.1 免费商用） ===== */
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+html, body, button, input, select, textarea {
+  font-family: var(--font-sans);
+}
+
 body {
   background-color: #f4f5f7;
   background-image:
