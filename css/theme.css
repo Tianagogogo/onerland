@@ -2622,3 +2622,200 @@ body {
   .timeline-card .tl-quick-panel-body { max-width: 100%; min-width: 0; }
   .timeline-card .tl-map-menu { flex-wrap: wrap; }
 } 
+
+/* ================= 首页微时间轴卡片：桌面 / 手机双端排版精修 ================= */
+/* 桌面端：大海报顶对齐 + 右上角状态/计划/详情同一行 + 底部 4 等分 */
+@media (min-width: 769px) {
+  #home-upcoming-timeline .timeline-card {
+    align-items: stretch !important;
+    gap: 10px !important;
+    padding: 14px 16px !important;
+  }
+  #home-upcoming-timeline .timeline-card-main {
+    align-items: flex-start !important;
+    gap: 14px !important;
+  }
+  #home-upcoming-timeline .timeline-card .poster-square-box {
+    width: 92px !important;
+    height: 124px !important;
+    aspect-ratio: auto !important;
+    border-radius: 10px !important;
+    flex: 0 0 92px !important;
+    align-self: flex-start;
+  }
+  #home-upcoming-timeline .timeline-card-body {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 4px 10px;
+    min-width: 0;
+  }
+  #home-upcoming-timeline .timeline-title-row {
+    order: 1;
+    flex: 1 1 0;
+    min-width: 0;
+    align-items: flex-start !important;
+    row-gap: 4px;
+  }
+  #home-upcoming-timeline .tl-plan-inline { display: none !important; }
+  #home-upcoming-timeline .timeline-card-actions .plan-chip {
+    margin-left: 0;
+    height: 28px !important;
+    min-height: 28px;
+    line-height: 26px;
+    padding: 0 10px;
+    font-size: 12px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+  }
+  #home-upcoming-timeline .timeline-card-actions {
+    order: 2;
+    flex: 0 0 auto;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    justify-content: flex-end !important;
+    align-items: center;
+    gap: 8px;
+  }
+  #home-upcoming-timeline .timeline-card-actions .tl-state-chip,
+  #home-upcoming-timeline .timeline-card-actions .tl-detail-btn {
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px;
+    box-sizing: border-box;
+    line-height: 28px;
+    padding: 0 10px;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  #home-upcoming-timeline .timeline-card-meta {
+    order: 3;
+    flex: 0 0 100%;
+    margin-top: 2px !important;
+  }
+  #home-upcoming-timeline .timeline-slot-row {
+    order: 4;
+    flex: 0 0 100%;
+    margin-top: 2px;
+  }
+  #home-upcoming-timeline .tl-quick-bar {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    width: 100%;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(148, 163, 184, 0.22);
+    flex: 0 0 auto;
+  }
+  #home-upcoming-timeline .tl-quick-btn {
+    width: 100%;
+    height: 34px;
+    padding: 0 8px;
+    font-size: 12px;
+    justify-content: center;
+    text-align: center;
+  }
+  #home-upcoming-timeline .tl-quick-panel {
+    order: 9;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+/* 手机端：68×92 海报 + 紧凑信息区 + 状态/详情右下对齐 + 2×2 等宽底栏 */
+@media (max-width: 768px) {
+  #home-upcoming-timeline .timeline-card-main {
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+  #home-upcoming-timeline .timeline-card .poster-square-box {
+    width: 68px !important;
+    height: 92px !important;
+    aspect-ratio: auto !important;
+    border-radius: 8px !important;
+    flex: 0 0 68px !important;
+    align-self: flex-start;
+  }
+  #home-upcoming-timeline .timeline-card-body {
+    display: flex !important;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  #home-upcoming-timeline .timeline-title-row {
+    align-items: center !important;
+    gap: 6px !important;
+    row-gap: 4px;
+  }
+  #home-upcoming-timeline .tl-plan-action { display: none !important; }
+  #home-upcoming-timeline .timeline-title-row .plan-chip {
+    margin-left: 4px;
+    font-size: 11px !important;
+    padding: 2px 7px !important;
+    height: auto !important;
+    line-height: 1.25 !important;
+    border-radius: 999px;
+  }
+  #home-upcoming-timeline .timeline-card-meta {
+    margin-top: 2px !important;
+    line-height: 1.45;
+  }
+  #home-upcoming-timeline .timeline-slot-row { margin-top: 2px; }
+  #home-upcoming-timeline .timeline-card-actions {
+    width: 100% !important;
+    margin: 4px 0 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    justify-content: flex-end !important;
+    gap: 6px !important;
+  }
+  #home-upcoming-timeline .timeline-card-actions .tl-state-chip,
+  #home-upcoming-timeline .timeline-card-actions .tl-detail-btn {
+    height: 26px !important;
+    min-height: 26px !important;
+    max-height: 26px;
+    box-sizing: border-box;
+    line-height: 26px;
+    padding: 0 10px;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  #home-upcoming-timeline .tl-quick-bar {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+    width: 100% !important;
+    margin-top: 8px !important;
+    padding-top: 8px !important;
+    border-top: 1px solid rgba(148, 163, 184, 0.2);
+    flex: 0 0 auto;
+  }
+  #home-upcoming-timeline .tl-quick-btn {
+    width: 100% !important;
+    height: 30px !important;
+    padding: 0 6px !important;
+    font-size: 11.5px !important;
+    letter-spacing: 0;
+    justify-content: center !important;
+    text-align: center;
+  }
+  #home-upcoming-timeline .tl-quick-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+    position: static !important;
+  }
+}
