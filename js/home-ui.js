@@ -624,7 +624,7 @@ function renderUpcomingMiniTimeline() {
                 ${isUpcomingShow
                   ? `<button type="button" class="plan-chip tl-plan-action ${plannedShow ? 'is-active' : ''}" aria-pressed="${plannedShow ? 'true' : 'false'}" title="标记计划前往（不计入已观演场次）" onclick="event.stopPropagation(); handleHomeTimelinePlan(${idx}, this)">${plannedShow ? '✓ 计划前往' : '🎫 计划前往'}</button>`
                   : ''}
-                <button type="button" onclick="switchMainTab('shows')" class="tour-action-btn tl-detail-btn">详情</button>
+                <button type="button" onclick="switchMainTab('shows')" class="tour-action-btn tl-detail-btn">📄 详情</button>
               </div>
             </div>
             <div class="timeline-card-title font-bold text-sm text-slate-900 leading-snug break-words">${safeTitle}</div>

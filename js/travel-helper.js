@@ -736,13 +736,8 @@ function renderCheckinSection() {
 
   box.innerHTML = `
     <div class="checkin-member-bar">
-      <div class="checkin-member-title">🔎 成员同款检索 <span class="checkin-member-sub">· 自动拼精准关键词</span></div>
+      <div class="checkin-member-title">🔍 成员同款检索 <span class="checkin-member-sub">· 自动拼精准关键词</span></div>
       <div class="checkin-chip-row">${memberChips}</div>
-      <div class="checkin-keyword">${travelEsc(keyword)}</div>
-      <div class="checkin-member-actions">
-        <a class="checkin-action-primary" href="https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(keyword)}" target="_blank" rel="noopener noreferrer">↗️ 跳转小红书搜索</a>
-        <button type="button" class="checkin-action-ghost" onclick="copyCheckinMemberKeyword()">📋 复制关键词</button>
-      </div>
     </div>
 
     <div class="checkin-list-head">
@@ -787,6 +782,15 @@ function renderCheckinSection() {
               </div>`).join('')}</div>`
           : `<div class="checkin-empty">暂无待审核投稿</div>`) : ''}
       </div>` : ''}
+
+    <div class="checkin-keyword-box">
+      <div class="checkin-keyword-label">🔎 关键词预览</div>
+      <div class="checkin-keyword">${travelEsc(keyword)}</div>
+      <div class="checkin-member-actions">
+        <a class="checkin-action-primary" href="https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(keyword)}" target="_blank" rel="noopener noreferrer">↗️ 跳转小红书搜索</a>
+        <button type="button" class="checkin-action-ghost" onclick="copyCheckinMemberKeyword()">📋 复制关键词</button>
+      </div>
+    </div>
   `;
 }
 
@@ -796,8 +800,7 @@ function buildCheckinQuickLinks(city) {
   const enc = encodeURIComponent;
   return [
     { label: '大众点评 · 城市必吃榜', desc: `${c} 本地特色美食排行`, url: `https://www.dianping.com/search/keyword/0/0_${enc(`${c} 必吃榜`)}` },
-    { label: '小红书 · 城市美食', desc: `${c} 探店与排队攻略`, url: `https://www.xiaohongshu.com/search_result?keyword=${enc(`${c} 必吃`)}` },
-    { label: '小红书 · 成员同款打卡', desc: '按成员分流检索同款探店', url: `https://www.xiaohongshu.com/search_result?keyword=${enc(`ONER ${c} 同款 探店`)}`, memberSearch: true }
+    { label: '小红书 · 城市美食', desc: `${c} 探店与排队攻略`, url: `https://www.xiaohongshu.com/search_result?keyword=${enc(`${c} 必吃`)}` }
   ];
 }
 
@@ -1143,10 +1146,12 @@ function ensureCheckinModal() {
         <button type="button" class="travel-close" data-checkin-close aria-label="关闭">✕</button>
       </div>
       <div class="travel-body checkin-modal-body" id="checkin-body">
-        <div class="checkin-quick-head">🍜 三张直达卡 · 城市必吃 / 成员同款</div>
-        <div class="travel-link-grid checkin-quick-links" id="checkin-quick-links"></div>
         <div class="food-spot-box checkin-standalone-box" id="checkin-spots-box">
           <div class="checkin-empty">⏳ 正在加载同款打卡点…</div>
+        </div>
+        <div class="checkin-quick-foot">
+          <div class="checkin-quick-head">🍜 城市美食 · 直达卡</div>
+          <div class="travel-link-grid checkin-quick-links checkin-quick-links--duo" id="checkin-quick-links"></div>
         </div>
       </div>
       <div class="travel-foot">
