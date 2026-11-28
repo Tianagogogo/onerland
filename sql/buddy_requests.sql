@@ -1,34 +1,26 @@
--- 搭子互换申请表（可在 Supabase SQL Editor 直接执行，幂等）
+-- 与线上实际表结构对齐（Supabase 项目：xtgkepaqikpzvmpkoxsa）
+-- 真实列：id / buddy_id / note / contact / contact_type /
+--         sender_device_id / sender_contact / sender_nickname / status / created_at
 create table if not exists public.buddy_requests (
-  id bigserial primary key,
-  buddy_id text not null,
-  event_id text not null,
-  requester_device_id text not null,
-  requester_nickname text,
+  id uuid primary key default gen_random_uuid(),
+  buddy_id uuid not null,
   note text,
   contact text,
-  owner_device_id text not null,
+  contact_type text,
+  sender_device_id text not null,
+  sender_contact text not null,
+  sender_nickname text,
   status text default 'pending',
   created_at timestamptz default now()
 );
 
-alter table public.buddy_requests add column if not exists buddy_id text;
-alter table public.buddy_requests add column if not exists event_id text;
-alter table public.buddy_requests add column if not exists requester_device_id text;
-alter table public.buddy_requests add column if not exists requester_nickname text;
 alter table public.buddy_requests add column if not exists note text;
 alter table public.buddy_requests add column if not exists contact text;
-alter table public.buddy_requests add column if not exists owner_device_id text;
+alter table public.buddy_requests add column if not exists contact_type text;
+alter table public.buddy_requests add column if not exists sender_device_id text;
+alter table public.buddy_requests add column if not exists sender_contact text;
+alter table public.buddy_requests add column if not exists sender_nickname text;
 alter table public.buddy_requests add column if not exists status text default 'pending';
-alter table public.buddy_requests add column if not exists created_at timestamptz default now();
-
--- 先解除旧外键（concert_buddies.id 为 uuid，与 text 不兼容会导致 42804 无法实施）
-alter table public.buddy_requests drop constraint if exists buddy_requests_buddy_id_fkey;
-
--- 兼容历史 bigint 自增 ID / UUID 字符串 ID：统一改为 text
-alter table public.buddy_requests alter column buddy_id type text using buddy_id::text;
-alter table public.buddy_requests alter column buddy_id drop not null;
-alter table public.buddy_requests alter column buddy_id set not null;
 
 alter table public.buddy_requests enable row level security;
 

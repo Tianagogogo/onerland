@@ -1238,13 +1238,11 @@ async function adminDeleteBuddyIntent(buddyId) {
 // ================= 双向同意解锁联系方式（buddy_requests） =================
 // create table if not exists public.buddy_requests (
 //   id bigserial primary key,
-//   buddy_id bigint not null,
-//   event_id text not null,
-//   requester_device_id text not null,
-//   requester_nickname text,
+//   buddy_id uuid not null,
+//   buddy_id uuid not null,
 //   note text,
 //   contact text,
-//   owner_device_id text not null,
+//   sender_device_id text not null,
 //   status text default 'pending',
 //   created_at timestamptz default now()
 // );
@@ -1272,63 +1270,82 @@ async function fetchBuddyContact(buddyId) {
   }
 }
 
+// 云端 buddy_requests 真实列（已通过 REST 探测）：
+// id / buddy_id / note / contact / contact_type / sender_device_id / sender_contact / sender_nickname / status / created_at
+// 不再假设 event_id、requester_*、owner_device_id 等不存在的列。
 function normalizeBuddyRequest(row) {
   return {
     id: row.id,
     buddyId: String(row.buddy_id || ''),
-    eventId: String(row.event_id || ''),
-    requesterDeviceId: row.requester_device_id || '',
-    requesterNickname: row.requester_nickname || '匿名同好',
+    eventId: '',
+    requesterDeviceId: row.sender_device_id || '',
+    requesterNickname: row.sender_nickname || '匿名同好',
     note: row.note || '',
-    contact: row.contact || '',
-    ownerDeviceId: row.owner_device_id || '',
+    contact: row.sender_contact || row.contact || '',
+    ownerDeviceId: '',
     status: row.status || 'pending',
     createdAt: row.created_at ? new Date(row.created_at).toLocaleString() : ''
   };
 }
 
 // 申请者：提交互换申请（pending）
-// 关键修复：buddy_id 可能是 bigint 自增或 UUID 字符串；event_id 缺失会触发 not-null 400；
-// 同时把 Supabase 返回的 message/details/hint 原样带回，便于定位具体字段。
+// 只发送云端真实存在的列，并在遇到 PGRST204 未知列时自动剥离后重试。
+const BUDDY_REQUEST_COLUMNS = ['buddy_id', 'note', 'contact', 'contact_type', 'sender_device_id', 'sender_contact', 'sender_nickname', 'status'];
+
+async function postBuddyRequestPayload(payload) {
+  let body = { ...payload };
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${BUDDY_REQUESTS_TABLE}`, {
+      method: 'POST',
+      headers: buddyHeaders(),
+      body: JSON.stringify(body)
+    });
+    if (res.ok) {
+      let rows = null;
+      try { rows = await res.json(); } catch (e) { rows = null; }
+      return { ok: true, rows, sent: body };
+    }
+    let row = null;
+    try { row = await res.json(); } catch (e) { row = null; }
+    const detail = row && typeof row === 'object'
+      ? [row.message, row.details, row.hint, row.code].filter(Boolean).join(' | ')
+      : '';
+    // PGRST204：schema cache 中找不到某列 → 从 payload 里删掉该列重试
+    const missing = detail.match(/Could not find the '([^']+)' column/i);
+    if (missing && body[missing[1]] !== undefined) {
+      delete body[missing[1]];
+      continue;
+    }
+    return { ok: false, status: res.status, detail, sent: body };
+  }
+  return { ok: false, status: 400, detail: '字段与云端表结构不匹配', sent: body };
+}
+
 async function sendBuddyRequest(buddy, note, contact, context) {
   const me = getDeviceId();
+  const contactText = (contact || '').slice(0, 40);
+  const [contactPlatform, contactAccount] = contactText.split(/：|:/).map(x => (x || '').trim());
   if (String(buddy.deviceId || buddy.ownerId || '') === String(me)) return { ok: false, reason: 'self' };
-  const eventId = String((context && context.eventId) || buddy.eventId || buddy.cloudId || '').trim();
   const rawId = buddy.id == null ? '' : String(buddy.id).trim();
   if (!rawId || /^tmp-/.test(rawId)) {
     return { ok: false, reason: '该搭子信息尚未同步到云端，请刷新后重试' };
   }
-  // 纯数字 ID 转成 Number（匹配 bigint 列），UUID 保持字符串
-  const buddyId = /^\d+$/.test(rawId) ? Number(rawId) : rawId;
   const payload = {
-    buddy_id: buddyId,
-    event_id: eventId,
-    requester_device_id: me,
-    requester_nickname: getGuestNickname() || null,
+    buddy_id: rawId,
     note: (note || '').slice(0, 60) || null,
-    contact: (contact || '').slice(0, 40) || null,
-    owner_device_id: String(buddy.deviceId || buddy.ownerId || ''),
+    contact: contactAccount || contactText || null,
+    contact_type: contactPlatform || null,
+    sender_device_id: me,
+    sender_contact: contactText || null,
+    sender_nickname: (getGuestNickname() || '匿名同好').slice(0, 16),
     status: 'pending'
   };
-  Object.keys(payload).forEach(k => { if (payload[k] === undefined) delete payload[k]; });
+  BUDDY_REQUEST_COLUMNS.forEach(k => { if (payload[k] === undefined) delete payload[k]; });
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${BUDDY_REQUESTS_TABLE}`, {
-      method: 'POST',
-      headers: buddyHeaders(),
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) {
-      let detail = '';
-      let row = null;
-      try { row = await res.json(); } catch (e) { row = null; }
-      if (row && typeof row === 'object') {
-        detail = [row.message, row.details, row.hint, row.code].filter(Boolean).join(' | ');
-      }
-      return { ok: false, reason: `HTTP ${res.status}`, detail, sent: payload };
-    }
-    let rows = null;
-    try { rows = await res.json(); } catch (e) { rows = null; }
-    const req = Array.isArray(rows) && rows[0] ? normalizeBuddyRequest(rows[0]) : normalizeBuddyRequest(payload);
+    const res = await postBuddyRequestPayload(payload);
+    if (!res.ok) return { ok: false, reason: `HTTP ${res.status}`, detail: res.detail, sent: res.sent };
+    const row = Array.isArray(res.rows) ? res.rows[0] : res.rows;
+    const req = row ? normalizeBuddyRequest(row) : normalizeBuddyRequest(res.sent);
     buddyStateFor(buddy.id).myRequest = req;
     return { ok: true, request: req };
   } catch (e) {
@@ -1341,7 +1358,7 @@ async function fetchBuddyRequests(buddyId, ownerDeviceId) {
   if (String(ownerDeviceId || '') !== String(getDeviceId())) return [];
   try {
     const url = `${SUPABASE_URL}/rest/v1/${BUDDY_REQUESTS_TABLE}?buddy_id=eq.${encodeURIComponent(buddyId)}`
-      + `&owner_device_id=eq.${encodeURIComponent(getDeviceId())}&select=*&order=created_at.desc&limit=30`;
+      + `&select=id,buddy_id,note,contact,contact_type,sender_device_id,sender_contact,sender_nickname,status,created_at&order=created_at.desc&limit=30`;
     const res = await fetch(url, { headers: buddyHeaders(), cache: 'no-store' });
     if (!res.ok) return [];
     const rows = await res.json();
@@ -1357,8 +1374,7 @@ async function fetchBuddyRequests(buddyId, ownerDeviceId) {
 async function acceptBuddyRequest(buddyId, requestId) {
   try {
     const url = `${SUPABASE_URL}/rest/v1/${BUDDY_REQUESTS_TABLE}?id=eq.${encodeURIComponent(requestId)}`
-      + `&buddy_id=eq.${encodeURIComponent(buddyId)}`
-      + `&owner_device_id=eq.${encodeURIComponent(getDeviceId())}`;
+      + `&buddy_id=eq.${encodeURIComponent(buddyId)}`;
     const res = await fetch(url, {
       method: 'PATCH',
       headers: buddyHeaders(),
@@ -1374,7 +1390,7 @@ async function acceptBuddyRequest(buddyId, requestId) {
 async function fetchMyBuddyRequest(buddyId) {
   try {
     const url = `${SUPABASE_URL}/rest/v1/${BUDDY_REQUESTS_TABLE}?buddy_id=eq.${encodeURIComponent(buddyId)}`
-      + `&requester_device_id=eq.${encodeURIComponent(getDeviceId())}&select=*&order=created_at.desc&limit=1`;
+      + `&sender_device_id=eq.${encodeURIComponent(getDeviceId())}&select=id,buddy_id,note,contact,contact_type,sender_device_id,sender_contact,sender_nickname,status,created_at&order=created_at.desc&limit=1`;
     const res = await fetch(url, { headers: buddyHeaders(), cache: 'no-store' });
     if (!res.ok) return null;
     const rows = await res.json();
